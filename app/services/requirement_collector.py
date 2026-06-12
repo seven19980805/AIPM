@@ -2599,6 +2599,7 @@ class RequirementCollectorService:
         localized_model = normalize_structured_requirement_model(model)
         canonical_status = normalize_structured_requirement_model(canonical_model)["collection_status"]
         localized_model["collection_status"] = canonical_status
+        localized_model = self._preserve_previous_requesting_department(localized_model, canonical_model)
         return localized_model
 
     def _message_count(self, messages: list[dict[str, Any]]) -> int:
@@ -5364,6 +5365,11 @@ class RequirementCollectorService:
             chain_state,
             normalized_language,
         )
+        evidence_gap_guidance = self._ic_substrate_missing_evidence_question_guidance(
+            session,
+            structured_requirement_model,
+            normalized_language,
+        )
         runtime_guardrails = self._ic_substrate_runtime_guardrails_for_prompt(
             chain_state,
             normalized_language,
@@ -5395,6 +5401,8 @@ class RequirementCollectorService:
                 state_text += "\n" + node_question_guidance
             if expert_prd_quality_gate:
                 state_text += "\n" + expert_prd_quality_gate
+            if evidence_gap_guidance:
+                state_text += "\n" + evidence_gap_guidance
             if runtime_guardrails:
                 state_text += "\n" + runtime_guardrails
             if convergence_guidance:
@@ -5423,6 +5431,8 @@ class RequirementCollectorService:
                 state_text += "\n" + node_question_guidance
             if expert_prd_quality_gate:
                 state_text += "\n" + expert_prd_quality_gate
+            if evidence_gap_guidance:
+                state_text += "\n" + evidence_gap_guidance
             if runtime_guardrails:
                 state_text += "\n" + runtime_guardrails
             if convergence_guidance:
@@ -5451,6 +5461,8 @@ class RequirementCollectorService:
                 state_text += "\n" + node_question_guidance
             if expert_prd_quality_gate:
                 state_text += "\n" + expert_prd_quality_gate
+            if evidence_gap_guidance:
+                state_text += "\n" + evidence_gap_guidance
             if runtime_guardrails:
                 state_text += "\n" + runtime_guardrails
             if convergence_guidance:
@@ -5478,6 +5490,8 @@ class RequirementCollectorService:
             state_text += "\n" + node_question_guidance
         if expert_prd_quality_gate:
             state_text += "\n" + expert_prd_quality_gate
+        if evidence_gap_guidance:
+            state_text += "\n" + evidence_gap_guidance
         if runtime_guardrails:
             state_text += "\n" + runtime_guardrails
         if convergence_guidance:
@@ -5903,6 +5917,80 @@ class RequirementCollectorService:
             "- If the key fields are ready for a first document, stop expanding and ask the user to confirm URD/PRD generation."
         )
 
+    def _ic_substrate_missing_evidence_question_guidance(
+        self,
+        session: Session | None,
+        structured_requirement_model: dict[str, Any],
+        language: str | None = None,
+    ) -> str:
+        gate = self._ic_substrate_readiness_evidence_gate(session, structured_requirement_model)
+        if not gate:
+            return ""
+        checks = gate.get("checks")
+        if not isinstance(checks, list):
+            return ""
+        missing_checks = [check for check in checks if isinstance(check, dict) and not check.get("ready")]
+        if not missing_checks:
+            return ""
+        department_key = str(gate.get("department_specific_evidence", "")).strip().lower()
+        if department_key:
+            missing_checks = sorted(
+                missing_checks,
+                key=lambda check: 0
+                if str(check.get("key", "")).strip().lower().startswith(f"{department_key}_")
+                else 1,
+            )
+
+        normalized_language = self._normalize_language(language)
+        if normalized_language == "zh":
+            heading = "IC Substrate 下一问证据缺口："
+            intro = (
+                "- 下一问优先补齐下列缺口中的 1 个；把 follow-up 改写成自然中文问题，"
+                "并给 A/B/C 选项帮助业务方选择口径。"
+            )
+            label_prefix = "缺口"
+            follow_prefix = "建议追问"
+            close = "- 如果用户回答已覆盖某缺口，不要重复问；转向下一个未满足证据项。"
+        elif normalized_language == "de":
+            heading = "IC Substrate Evidence-Gaps fuer die naechste Frage:"
+            intro = (
+                "- Die naechste Frage soll genau einen der folgenden Gaps schliessen; "
+                "formuliere die Follow-up-Frage natuerlich auf Deutsch und nutze A/B/C zur Definition."
+            )
+            label_prefix = "Gap"
+            follow_prefix = "Empfohlene Rueckfrage"
+            close = "- Wenn die Nutzerantwort einen Gap bereits abdeckt, nicht wiederholen; zum naechsten offenen Evidence Item wechseln."
+        elif normalized_language == "ms":
+            heading = "Gap evidence IC Substrate untuk soalan seterusnya:"
+            intro = (
+                "- Soalan seterusnya perlu menutup satu gap di bawah; tulis semula follow-up sebagai soalan Bahasa Melayu "
+                "yang natural dan gunakan A/B/C untuk bantu pengguna pilih definisi."
+            )
+            label_prefix = "Gap"
+            follow_prefix = "Cadangan soalan"
+            close = "- Jika jawapan pengguna sudah meliputi gap itu, jangan ulang; beralih kepada evidence item seterusnya."
+        else:
+            heading = "IC Substrate evidence gaps for the next question:"
+            intro = (
+                "- The next question should close exactly one gap below; rewrite the follow-up as a natural English question "
+                "and use A/B/C options to help the business owner choose a definition."
+            )
+            label_prefix = "Gap"
+            follow_prefix = "Suggested follow-up"
+            close = "- If the user already covered a gap, do not repeat it; move to the next missing evidence item."
+
+        prioritized_checks = missing_checks[:3]
+        lines = [heading, intro]
+        for index, check in enumerate(prioritized_checks, start=1):
+            key = self._single_line_markdown(str(check.get("key", "")).strip())
+            label = self._single_line_markdown(str(check.get("label", "")).strip())
+            follow_up = self._single_line_markdown(str(check.get("if_missing", "")).strip())
+            lines.append(f"- {label_prefix} {index}: {label or key}")
+            if follow_up:
+                lines.append(f"  - {follow_prefix}: {follow_up}")
+        lines.append(close)
+        return "\n".join(lines)
+
     def _ic_substrate_runtime_guardrails_for_prompt(
         self,
         chain_state: dict[str, Any],
@@ -6256,11 +6344,15 @@ class RequirementCollectorService:
                     "label": "TDI request intake, triage, priority, owner, and SLA",
                     "ready": any(
                         keyword in all_text
-                        for keyword in ["request", "case", "ticket", "priority", "sla", "owner", "status", "需求", "案例", "工单", "优先级", "时效", "负责人", "状态"]
+                        for keyword in ["case", "ticket", "triage", "intake", "工单", "案例", "受理", "分派", "请求入口"]
+                    )
+                    and any(
+                        keyword in all_text
+                        for keyword in ["priority", "sla", "owner", "status", "优先级", "时效", "负责人", "状态"]
                     ),
                     "evidence": first_evidence(
                         collect_text(model),
-                        ["request", "case", "ticket", "priority", "sla", "owner", "status", "需求", "工单", "优先级", "负责人"],
+                        ["case", "ticket", "triage", "intake", "priority", "sla", "owner", "status", "工单", "受理", "优先级", "负责人"],
                     ),
                     "if_missing": "Ask how TDI requests enter, how priority is assigned, who owns each status, and what SLA or escalation rule applies.",
                 },

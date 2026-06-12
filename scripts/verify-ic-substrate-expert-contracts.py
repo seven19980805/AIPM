@@ -72,6 +72,7 @@ def main() -> None:
     evidence_appendix = method_body(collector, "_append_ic_substrate_prd_evidence_appendix")
     evidence_appendix_heading = method_body(collector, "_ic_substrate_prd_evidence_appendix_heading")
     evidence_appendix_formatter = method_body(collector, "_format_ic_substrate_prd_evidence_appendix")
+    evidence_gap_guidance = method_body(collector, "_ic_substrate_missing_evidence_question_guidance")
     stream_prd_document = method_body(collector, "stream_prd_document")
     build_prd_document = method_body(collector, "build_prd_document")
     create_session_service = method_body(collector, "create_session")
@@ -79,6 +80,7 @@ def main() -> None:
     starter_department_normalizer = method_body(collector, "_normalize_ic_substrate_starter_department")
     merge_structured_model = method_body(collector, "_merge_structured_requirement_collection_status")
     preserve_department = method_body(collector, "_preserve_previous_requesting_department")
+    canonical_status_projection = method_body(collector, "_with_canonical_collection_status")
     structured_model_track = method_body(collector, "_ic_substrate_intent_track_from_structured_model")
     chain_state = method_body(collector, "build_conversation_chain_state")
     readiness_gate = method_body(collector, "_ic_substrate_readiness_evidence_gate")
@@ -98,6 +100,10 @@ def main() -> None:
     require(
         "_ic_substrate_expert_prd_quality_gate_for_prompt" in conversation_prompt,
         "conversation prompt does not include expert PRD quality gate",
+    )
+    require(
+        "_ic_substrate_missing_evidence_question_guidance" in conversation_prompt,
+        "conversation prompt does not include IC Substrate missing-evidence question guidance",
     )
     require(
         "_ic_substrate_structured_extraction_contract" in structured_prompt,
@@ -146,6 +152,11 @@ def main() -> None:
         preserve_department,
         ["requesting_department", "_ic_substrate_intent_track_from_text", "_ic_substrate_is_department"],
         "previous requesting department preservation",
+    )
+    require_all(
+        canonical_status_projection,
+        ["_preserve_previous_requesting_department", "localized_model[\"collection_status\"] = canonical_status"],
+        "canonical structured model starter department projection",
     )
     require_all(
         structured_model_track,
@@ -199,6 +210,19 @@ def main() -> None:
             "Lampiran Evidence Pakar IC Substrate",
         ],
         "PRD evidence appendix four-language headings",
+    )
+    require_all(
+        evidence_gap_guidance,
+        [
+            "_ic_substrate_readiness_evidence_gate",
+            "department_specific_evidence",
+            "startswith(f\"{department_key}_\")",
+            "missing_checks",
+            "The next question should close exactly one gap",
+            "下一问优先补齐",
+            "A/B/C",
+        ],
+        "IC Substrate missing evidence question guidance",
     )
     require_all(
         language_router,
