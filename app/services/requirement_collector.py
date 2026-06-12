@@ -5475,6 +5475,64 @@ class RequirementCollectorService:
             "- When the user confirms a canonical term, formula, state, owner, or acceptance standard, mark the closest requirement area confirmed and preserve the user's wording."
         )
 
+    def _ic_substrate_structured_extraction_contract(
+        self,
+        session: Session,
+        language: str | None = None,
+    ) -> str:
+        template = self._resolve_business_template(session, language)
+        template_context = template or {
+            "template_id": session.applied_template_id,
+            "template_name": session.applied_template_name,
+        }
+        if not self._template_matches_ic_substrate_focus(template_context):
+            return ""
+
+        normalized_language = self._normalize_language(language)
+        if normalized_language == "zh":
+            return (
+                "IC Substrate 结构化抽取合同：\n"
+                "- 不新增 JSON schema；把专家访谈证据映射到现有字段，并保留用户原话口径。\n"
+                "- product_context：抽取 requesting_department 只能是 Production、Quality、TDI 或 General；business_owner、software_type、primary_user、decision_or_action、acceptance_owner 必须来自用户确认或标为待确认。\n"
+                "- functional_requirements.feature_details：每个 feature 都要尽量写清 trigger、processing_logic、inputs、outputs、exception_cases；围绕 lot/panel/unit/case/page/action 的业务动作，不写泛泛页面功能。\n"
+                "- business_rules：存放 KPI/公式、状态定义、缺陷分类、放行/关闭规则、SLA 起止点、权限/owner 规则；未确认公式或状态必须写成 draft assumption 或 open question。\n"
+                "- data_and_dependencies：存放 source of truth、对象粒度、字段来源、刷新频率、对账逻辑、历史数据迁移、接口边界；不要自造 MES/QMS/ERP/SAP 表名。\n"
+                "- acceptance_criteria：存放可验收证据，包括主流程、异常流程、数据准确性、导出/下载、跨部门 sign-off、证据留存和关闭条件。\n"
+                "- collection_status：只有用户明确确认的字段才能 confirmed；从模板、AI 推荐或附件推断出的内容最多 pending_confirmation；矛盾内容标 conflict，关键缺口保留 pending_questions。"
+            )
+        if normalized_language == "de":
+            return (
+                "IC Substrate structured extraction contract:\n"
+                "- Do not add JSON schema. Map expert interview evidence into existing fields and preserve the user's wording.\n"
+                "- product_context: requesting_department must be Production, Quality, TDI, or General; business_owner, software_type, primary_user, decision_or_action, and acceptance_owner need user confirmation or remain pending.\n"
+                "- functional_requirements.feature_details: capture trigger, processing_logic, inputs, outputs, and exception_cases for each feature around lot/panel/unit/case/page/action business actions, not generic page features.\n"
+                "- business_rules: store KPI/formula, state definition, defect taxonomy, release/closure rule, SLA start-end, permission/owner rule; unconfirmed formulas or states are draft assumptions or open questions.\n"
+                "- data_and_dependencies: store source of truth, object grain, field source, refresh frequency, reconciliation logic, historical migration, and interface boundary. Do not invent MES/QMS/ERP/SAP table names.\n"
+                "- acceptance_criteria: store verifiable evidence for main flow, exception flow, data accuracy, export/download, cross-functional sign-off, evidence retention, and closure condition.\n"
+                "- collection_status: mark confirmed only when the user explicitly confirms it; template evidence, AI recommendations, or attachment inference are at most pending_confirmation; contradictions are conflict and key gaps keep pending_questions."
+            )
+        if normalized_language == "ms":
+            return (
+                "Kontrak ekstraksi berstruktur IC Substrate:\n"
+                "- Jangan tambah JSON schema. Petakan bukti interview pakar ke field sedia ada dan kekalkan wording pengguna.\n"
+                "- product_context: requesting_department mesti Production, Quality, TDI atau General; business_owner, software_type, primary_user, decision_or_action dan acceptance_owner mesti disahkan pengguna atau kekal pending.\n"
+                "- functional_requirements.feature_details: untuk setiap feature, tangkap trigger, processing_logic, inputs, outputs dan exception_cases sekitar business action lot/panel/unit/case/page/action, bukan fungsi halaman umum.\n"
+                "- business_rules: simpan KPI/formula, state definition, defect taxonomy, release/closure rule, SLA start-end, permission/owner rule; formula atau state belum sah ialah draft assumption atau open question.\n"
+                "- data_and_dependencies: simpan source of truth, object grain, field source, refresh frequency, reconciliation logic, historical migration dan interface boundary. Jangan reka nama table MES/QMS/ERP/SAP.\n"
+                "- acceptance_criteria: simpan evidence yang boleh diverifikasi untuk main flow, exception flow, data accuracy, export/download, cross-functional sign-off, evidence retention dan closure condition.\n"
+                "- collection_status: confirmed hanya jika pengguna sahkan dengan jelas; template evidence, AI recommendation atau attachment inference paling tinggi pending_confirmation; contradiction ialah conflict dan key gaps kekalkan pending_questions."
+            )
+        return (
+            "IC Substrate structured extraction contract:\n"
+            "- Do not add JSON schema. Map expert interview evidence into existing fields and preserve the user's wording.\n"
+            "- product_context: requesting_department must be Production, Quality, TDI, or General; business_owner, software_type, primary_user, decision_or_action, and acceptance_owner need user confirmation or remain pending.\n"
+            "- functional_requirements.feature_details: capture trigger, processing_logic, inputs, outputs, and exception_cases for each feature around lot/panel/unit/case/page/action business actions, not generic page features.\n"
+            "- business_rules: store KPI/formula, state definition, defect taxonomy, release/closure rule, SLA start-end, permission/owner rule; unconfirmed formulas or states are draft assumptions or open questions.\n"
+            "- data_and_dependencies: store source of truth, object grain, field source, refresh frequency, reconciliation logic, historical migration, and interface boundary. Do not invent MES/QMS/ERP/SAP table names.\n"
+            "- acceptance_criteria: store verifiable evidence for main flow, exception flow, data accuracy, export/download, cross-functional sign-off, evidence retention, and closure condition.\n"
+            "- collection_status: mark confirmed only when the user explicitly confirms it; template evidence, AI recommendations, or attachment inference are at most pending_confirmation; contradictions are conflict and key gaps keep pending_questions."
+        )
+
     def _prd_skill_style_document_guidance(self, language: str | None = None) -> str:
         normalized_language = self._normalize_language(language)
         if normalized_language == "zh":
@@ -5756,6 +5814,7 @@ class RequirementCollectorService:
     def _structured_requirement_model_prompt(self, session: Session, language: str) -> str:
         prompt_parts = [build_structured_requirement_model_prompt(language)]
         prompt_parts.append(self._structured_requirement_skill_extraction_guidance(language))
+        prompt_parts.append(self._ic_substrate_structured_extraction_contract(session, language))
         template_addendum = self._business_template_pm_addendum(session, language)
         if template_addendum:
             prompt_parts.append(
