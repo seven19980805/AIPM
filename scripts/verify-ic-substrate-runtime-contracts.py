@@ -10,6 +10,7 @@ actual prompt/gate state no longer routes like an expert PM.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -21,6 +22,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 try:
+    from app import create_app
     from app.services.requirement_collector import (
         RequirementCollectorService,
         STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
@@ -175,10 +177,58 @@ def assert_language_locked_evidence_guidance() -> None:
             require(marker in prompt_state, f"{language}: missing localized evidence guidance marker")
 
 
+def assert_api_starter_department_contract() -> None:
+    expected_tracks = {
+        "Production": "Production",
+        "Quality": "Quality",
+        "TDI": "TDI",
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        previous_db_path = os.environ.get("SQLITE_DB_PATH")
+        os.environ["SQLITE_DB_PATH"] = str(Path(tmp) / "api-rqmd.sqlite3")
+        try:
+            app = create_app()
+        finally:
+            if previous_db_path is None:
+                os.environ.pop("SQLITE_DB_PATH", None)
+            else:
+                os.environ["SQLITE_DB_PATH"] = previous_db_path
+
+        app.config.update(TESTING=True)
+        client = app.test_client()
+        for department, expected_track in expected_tracks.items():
+            response = client.post(
+                "/api/sessions",
+                json={
+                    "template_id": TEMPLATE_ID,
+                    "template_start_mode": "guided",
+                    "starter_department": department,
+                },
+                headers={"X-Language": "zh"},
+            )
+            require(response.status_code == 201, f"{department}: API create session failed: {response.status_code}")
+            payload = response.get_json() or {}
+            model = payload.get("structured_requirement_model")
+            require(isinstance(model, dict), f"{department}: API missing structured requirement model")
+            product_context = model.get("product_context")
+            require(isinstance(product_context, dict), f"{department}: API missing product_context")
+            require(
+                product_context.get("requesting_department") == department,
+                f"{department}: API response lost starter department",
+            )
+            chain_state = payload.get("conversation_chain_state")
+            require(isinstance(chain_state, dict), f"{department}: API missing conversation_chain_state")
+            require(
+                chain_state.get("current_track") == expected_track,
+                f"{department}: API chain_state current_track mismatch",
+            )
+
+
 def main() -> None:
     assert_starter_department_runtime()
     assert_sparse_extraction_preserves_department()
     assert_language_locked_evidence_guidance()
+    assert_api_starter_department_contract()
     print("IC Substrate runtime expert PM contracts verified.")
 
 
