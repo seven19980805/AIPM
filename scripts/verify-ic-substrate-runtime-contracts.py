@@ -55,6 +55,26 @@ class SparseInternalModel:
         )
 
 
+class FirstQuestionThenSparseExtraction:
+    """Fake model for API message flow: question first, sparse JSON second."""
+
+    def __init__(self) -> None:
+        self.chat_count = 0
+
+    def chat(self, *args: Any, **kwargs: Any) -> str:
+        _ = args, kwargs
+        self.chat_count += 1
+        if self.chat_count % 2 == 1:
+            return "请确认这个系统首版要解决哪个质量业务动作？"
+        return json.dumps(
+            {
+                "background": {"objective": "Build a defect dashboard"},
+                "product_context": {"software_type": "dashboard"},
+                "collection_status": {},
+            }
+        )
+
+
 def fail(message: str) -> None:
     print(f"FAIL: {message}", file=sys.stderr)
     raise SystemExit(1)
@@ -224,11 +244,70 @@ def assert_api_starter_department_contract() -> None:
             )
 
 
+def assert_api_first_message_preserves_expert_route() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        previous_db_path = os.environ.get("SQLITE_DB_PATH")
+        os.environ["SQLITE_DB_PATH"] = str(Path(tmp) / "api-message-rqmd.sqlite3")
+        try:
+            app = create_app()
+        finally:
+            if previous_db_path is None:
+                os.environ.pop("SQLITE_DB_PATH", None)
+            else:
+                os.environ["SQLITE_DB_PATH"] = previous_db_path
+
+        app.extensions["requirement_collector"].llm_client = FirstQuestionThenSparseExtraction()
+        app.config.update(TESTING=True)
+        client = app.test_client()
+
+        create_response = client.post(
+            "/api/sessions",
+            json={
+                "template_id": TEMPLATE_ID,
+                "template_start_mode": "guided",
+                "starter_department": "Quality",
+            },
+            headers={"X-Language": "zh"},
+        )
+        require(create_response.status_code == 201, f"API create session failed: {create_response.status_code}")
+        session_id = (create_response.get_json() or {}).get("session_id")
+        require(isinstance(session_id, str) and session_id, "API create session missing session_id")
+
+        message_response = client.post(
+            f"/api/sessions/{session_id}/messages",
+            json={
+                "message": "想做一个缺陷看板",
+                "language": "zh",
+            },
+        )
+        require(message_response.status_code == 200, f"API send message failed: {message_response.status_code}")
+        payload = message_response.get_json() or {}
+        assistant_message = str(payload.get("assistant_message", ""))
+        require("A. 同意按上面的建议口径" in assistant_message, "API assistant message missing zh fallback choices")
+
+        model = payload.get("structured_requirement_model")
+        require(isinstance(model, dict), "API message response missing structured requirement model")
+        product_context = model.get("product_context")
+        require(isinstance(product_context, dict), "API message response missing product_context")
+        require(
+            product_context.get("requesting_department") == "Quality",
+            "API first message sparse extraction lost starter department",
+        )
+        chain_state = payload.get("conversation_chain_state")
+        require(isinstance(chain_state, dict), "API message response missing conversation_chain_state")
+        require(
+            chain_state.get("current_track") == "Quality",
+            "API first message sparse extraction lost Quality chain route",
+        )
+        require(payload.get("structured_requirement_sync_status") == "ready", "API message response not marked ready")
+
+
 def main() -> None:
     assert_starter_department_runtime()
     assert_sparse_extraction_preserves_department()
     assert_language_locked_evidence_guidance()
     assert_api_starter_department_contract()
+    assert_api_first_message_preserves_expert_route()
     print("IC Substrate runtime expert PM contracts verified.")
 
 
