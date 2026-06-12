@@ -15,6 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 REQUIREMENT_COLLECTOR = ROOT / "app" / "services" / "requirement_collector.py"
 FRONTEND_APP = ROOT / "frontend" / "src" / "App.vue"
+REQUIREMENT_PREVIEW = ROOT / "frontend" / "src" / "components" / "RequirementMarkdownPreview.vue"
 
 
 def fail(message: str) -> None:
@@ -45,6 +46,7 @@ def require_all(text: str, snippets: list[str], label: str) -> None:
 def main() -> None:
     collector = REQUIREMENT_COLLECTOR.read_text(encoding="utf-8")
     frontend = FRONTEND_APP.read_text(encoding="utf-8")
+    preview = REQUIREMENT_PREVIEW.read_text(encoding="utf-8")
 
     active_departments = re.search(
         r"ACTIVE_IC_SUBSTRATE_DEPARTMENTS\s*=\s*\(([^)]*)\)",
@@ -174,6 +176,18 @@ def main() -> None:
     require(
         "General requirement" in frontend and "IC Substrate professional chain" in frontend,
         "frontend new-chat entry cards should keep General and IC Substrate paths",
+    )
+    require_all(
+        preview,
+        [
+            "icSubstrateEvidence",
+            "asIcSubstrateEvidenceSection",
+            "Entry department and owner",
+            "Object grain",
+            "Data source and reconciliation",
+            "Acceptance evidence",
+        ],
+        "frontend developer markdown IC Substrate evidence checklist",
     )
 
     print("IC Substrate expert PM contracts verified.")

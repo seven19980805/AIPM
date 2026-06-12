@@ -101,6 +101,7 @@ type PreviewCopy = {
     moduleCandidates: string
     pageTouchpoints: string
     api: string
+    icSubstrateEvidence: string
     dataModel: string
     dependencies: string
     keyFlows: string
@@ -217,16 +218,17 @@ const enCopy: PreviewCopy = {
     moduleCandidates: '### 7.1 Candidate Modules',
     pageTouchpoints: '### 7.2 Page / Touchpoint Notes',
     api: '## 8. API Design (Draft)',
-    dataModel: '## 9. Data Model and Database Design',
-    dependencies: '### 9.1 Known Data / Dependency Inputs',
-    keyFlows: '## 10. Key Flows / Sequence Notes',
-    security: '## 11. Security, Privacy, and Compliance',
-    observability: '## 12. Observability and Operations',
-    deployment: '## 13. Deployment and Environment Planning',
-    testing: '## 14. Testing and Acceptance Plan',
-    risks: '## 15. Risks, Trade-offs, and Assumptions',
-    milestones: '## 16. Milestones and Delivery Plan',
-    openQuestions: '## 17. Open Questions / Missing Inputs',
+    icSubstrateEvidence: '## 9. IC Substrate Expert Evidence Checklist',
+    dataModel: '## 10. Data Model and Database Design',
+    dependencies: '### 10.1 Known Data / Dependency Inputs',
+    keyFlows: '## 11. Key Flows / Sequence Notes',
+    security: '## 12. Security, Privacy, and Compliance',
+    observability: '## 13. Observability and Operations',
+    deployment: '## 14. Deployment and Environment Planning',
+    testing: '## 15. Testing and Acceptance Plan',
+    risks: '## 16. Risks, Trade-offs, and Assumptions',
+    milestones: '## 17. Milestones and Delivery Plan',
+    openQuestions: '## 18. Open Questions / Missing Inputs',
   },
 }
 
@@ -318,16 +320,17 @@ const zhCopy: PreviewCopy = {
     moduleCandidates: '### 7.1 \u5019\u9009\u6a21\u5757',
     pageTouchpoints: '### 7.2 \u9875\u9762 / \u89e6\u70b9\u8bf4\u660e',
     api: '## 8. API \u8bbe\u8ba1\uff08\u8349\u6848\uff09',
-    dataModel: '## 9. \u6570\u636e\u6a21\u578b\u4e0e\u6570\u636e\u5e93\u8bbe\u8ba1',
-    dependencies: '### 9.1 \u5df2\u8bc6\u522b\u7684\u6570\u636e / \u4f9d\u8d56\u8f93\u5165',
-    keyFlows: '## 10. \u5173\u952e\u6d41\u7a0b / \u65f6\u5e8f\u8bf4\u660e',
-    security: '## 11. \u5b89\u5168\u3001\u9690\u79c1\u4e0e\u5408\u89c4',
-    observability: '## 12. \u53ef\u89c2\u6d4b\u6027\u4e0e\u8fd0\u7ef4',
-    deployment: '## 13. \u90e8\u7f72\u4e0e\u73af\u5883\u89c4\u5212',
-    testing: '## 14. \u6d4b\u8bd5\u4e0e\u9a8c\u6536\u65b9\u6848',
-    risks: '## 15. \u98ce\u9669\u3001\u6743\u8861\u4e0e\u5047\u8bbe',
-    milestones: '## 16. \u91cc\u7a0b\u7891\u4e0e\u4ea4\u4ed8\u8ba1\u5212',
-    openQuestions: '## 17. \u5f85\u786e\u8ba4\u95ee\u9898 / \u7f3a\u5931\u8f93\u5165',
+    icSubstrateEvidence: '## 9. IC Substrate \u4e13\u5bb6\u8bc1\u636e\u6e05\u5355',
+    dataModel: '## 10. \u6570\u636e\u6a21\u578b\u4e0e\u6570\u636e\u5e93\u8bbe\u8ba1',
+    dependencies: '### 10.1 \u5df2\u8bc6\u522b\u7684\u6570\u636e / \u4f9d\u8d56\u8f93\u5165',
+    keyFlows: '## 11. \u5173\u952e\u6d41\u7a0b / \u65f6\u5e8f\u8bf4\u660e',
+    security: '## 12. \u5b89\u5168\u3001\u9690\u79c1\u4e0e\u5408\u89c4',
+    observability: '## 13. \u53ef\u89c2\u6d4b\u6027\u4e0e\u8fd0\u7ef4',
+    deployment: '## 14. \u90e8\u7f72\u4e0e\u73af\u5883\u89c4\u5212',
+    testing: '## 15. \u6d4b\u8bd5\u4e0e\u9a8c\u6536\u65b9\u6848',
+    risks: '## 16. \u98ce\u9669\u3001\u6743\u8861\u4e0e\u5047\u8bbe',
+    milestones: '## 17. \u91cc\u7a0b\u7891\u4e0e\u4ea4\u4ed8\u8ba1\u5212',
+    openQuestions: '## 18. \u5f85\u786e\u8ba4\u95ee\u9898 / \u7f3a\u5931\u8f93\u5165',
   },
 }
 
@@ -421,16 +424,17 @@ const previewCopy: Record<LanguageCode, PreviewCopy> = {
       moduleCandidates: '### 7.1 Kandidatenmodule',
       pageTouchpoints: '### 7.2 Seiten- / Touchpoint-Hinweise',
       api: '## 8. API-Design (Entwurf)',
-      dataModel: '## 9. Datenmodell und Datenbankdesign',
-      dependencies: '### 9.1 Bekannte Daten- / Abhaengigkeitseingaben',
-      keyFlows: '## 10. Wichtige Ablaeufe / Sequenzhinweise',
-      security: '## 11. Sicherheit, Datenschutz und Compliance',
-      observability: '## 12. Observability und Betrieb',
-      deployment: '## 13. Deployment- und Umgebungsplanung',
-      testing: '## 14. Test- und Abnahmeplan',
-      risks: '## 15. Risiken, Trade-offs und Annahmen',
-      milestones: '## 16. Meilensteine und Lieferplan',
-      openQuestions: '## 17. Offene Fragen / fehlende Inputs',
+      icSubstrateEvidence: '## 9. IC Substrate Expert Evidence Checklist',
+      dataModel: '## 10. Datenmodell und Datenbankdesign',
+      dependencies: '### 10.1 Bekannte Daten- / Abhaengigkeitseingaben',
+      keyFlows: '## 11. Wichtige Ablaeufe / Sequenzhinweise',
+      security: '## 12. Sicherheit, Datenschutz und Compliance',
+      observability: '## 13. Observability und Betrieb',
+      deployment: '## 14. Deployment- und Umgebungsplanung',
+      testing: '## 15. Test- und Abnahmeplan',
+      risks: '## 16. Risiken, Trade-offs und Annahmen',
+      milestones: '## 17. Meilensteine und Lieferplan',
+      openQuestions: '## 18. Offene Fragen / fehlende Inputs',
     },
   },
   zh: zhCopy,
@@ -522,16 +526,17 @@ const previewCopy: Record<LanguageCode, PreviewCopy> = {
       moduleCandidates: '### 7.1 Modul Cadangan',
       pageTouchpoints: '### 7.2 Nota Halaman / Titik Sentuh',
       api: '## 8. Reka Bentuk API (Draf)',
-      dataModel: '## 9. Model Data dan Reka Bentuk Pangkalan Data',
-      dependencies: '### 9.1 Input Data / Kebergantungan Dikenal Pasti',
-      keyFlows: '## 10. Aliran Utama / Nota Urutan',
-      security: '## 11. Keselamatan, Privasi dan Pematuhan',
-      observability: '## 12. Kebolehcerapan dan Operasi',
-      deployment: '## 13. Perancangan Deployment dan Persekitaran',
-      testing: '## 14. Pelan Ujian dan Penerimaan',
-      risks: '## 15. Risiko, Trade-off dan Andaian',
-      milestones: '## 16. Milestone dan Pelan Serahan',
-      openQuestions: '## 17. Soalan Terbuka / Input Hilang',
+      icSubstrateEvidence: '## 9. Senarai Semak Evidence Pakar IC Substrate',
+      dataModel: '## 10. Model Data dan Reka Bentuk Pangkalan Data',
+      dependencies: '### 10.1 Input Data / Kebergantungan Dikenal Pasti',
+      keyFlows: '## 11. Aliran Utama / Nota Urutan',
+      security: '## 12. Keselamatan, Privasi dan Pematuhan',
+      observability: '## 13. Kebolehcerapan dan Operasi',
+      deployment: '## 14. Perancangan Deployment dan Persekitaran',
+      testing: '## 15. Pelan Ujian dan Penerimaan',
+      risks: '## 16. Risiko, Trade-off dan Andaian',
+      milestones: '## 17. Milestone dan Pelan Serahan',
+      openQuestions: '## 18. Soalan Terbuka / Input Hilang',
     },
   },
 }
@@ -720,7 +725,7 @@ function buildDeveloperMarkdownDocument(
     '',
     labels.developerSections.api,
     ...asBulletSection([], labels.tbd),
-    '',
+    ...asIcSubstrateEvidenceSection(model, labels),
     labels.developerSections.dataModel,
     '',
     labels.developerSections.dependencies,
@@ -818,6 +823,80 @@ function asPageSection(pages: StructuredRequirementPage[], labels: PreviewCopy):
   return lines
 }
 
+function asIcSubstrateEvidenceSection(model: StructuredRequirementModel, labels: PreviewCopy): string[] {
+  if (!isIcSubstrateModel(model)) {
+    return ['', '']
+  }
+
+  const allText = collectModelText(model)
+  const dataText = normalizeList(model.data_and_dependencies)
+  const acceptanceText = normalizeList(model.acceptance_criteria)
+  const pendingQuestions = collectOpenQuestions(model.collection_status, model.open_questions)
+  const context = model.product_context
+  const entryOwnerEvidence = joinOrTbd(
+    [context.requesting_department, context.business_owner, context.acceptance_owner],
+    labels.tbd,
+  )
+  const checks = [
+    {
+      label: 'Entry department and owner',
+      ready:
+        ['production', 'quality', 'tdi', 'general'].includes(context.requesting_department.trim().toLowerCase()) &&
+        Boolean(context.business_owner.trim() || context.acceptance_owner.trim()),
+      evidence: entryOwnerEvidence,
+      missing: 'Confirm the v1 requesting entry and who signs off.',
+    },
+    {
+      label: 'Business action or decision',
+      ready: Boolean(context.decision_or_action.trim()),
+      evidence: valueOrTbd(context.decision_or_action, labels.tbd),
+      missing: 'Clarify the business action before implementation design.',
+    },
+    {
+      label: 'Object grain',
+      ready: hasAnyKeyword(allText, ['lot', 'panel', 'unit', 'case', 'route', 'station', '对象', '粒度', '工序', '站点']),
+      evidence: firstEvidence(allText, ['lot', 'panel', 'unit', 'case', 'route', 'station', '对象', '粒度', '工序', '站点'], labels.tbd),
+      missing: 'Confirm lot/panel/unit/case grain and route/station/time-window boundary.',
+    },
+    {
+      label: 'Workflow state and owner',
+      ready: hasAnyKeyword(allText, ['state', 'status', 'owner', 'hold', 'release', 'closure', 'rework', 'scrap', '状态', '责任', '放行', '关闭']),
+      evidence: firstEvidence(allText, ['state', 'status', 'owner', 'hold', 'release', 'closure', '状态', '责任', '放行', '关闭'], labels.tbd),
+      missing: 'Confirm current state names, owners, and exception closure.',
+    },
+    {
+      label: 'Data source and reconciliation',
+      ready: dataText.length > 0 && hasAnyKeyword(dataText, ['source', 'truth', 'refresh', 'reconciliation', 'interface', 'system', '数据源', '刷新', '对账', '接口']),
+      evidence: firstEvidence(dataText, ['source', 'truth', 'refresh', 'reconciliation', 'interface', '数据源', '刷新', '对账', '接口'], labels.tbd),
+      missing: 'Confirm source of truth, refresh, reconciliation, and interface boundary.',
+    },
+    {
+      label: 'Acceptance evidence',
+      ready: acceptanceText.length > 0 && hasAnyKeyword(acceptanceText, ['accept', 'evidence', 'sign-off', 'verify', '验收', '证据', '签核', '验证']),
+      evidence: firstEvidence(acceptanceText, ['accept', 'evidence', 'sign-off', 'verify', '验收', '证据', '签核', '验证'], labels.tbd),
+      missing: 'Confirm the evidence used for business sign-off.',
+    },
+    {
+      label: 'Open questions / assumptions',
+      ready: pendingQuestions.length > 0 || progressReadyEnough(model.collection_status),
+      evidence: pendingQuestions[0] || 'No visible unresolved terms',
+      missing: 'List unconfirmed formulas, states, system names, SLA values, or owner roles.',
+    },
+  ]
+
+  return [
+    '',
+    labels.developerSections.icSubstrateEvidence,
+    '',
+    ...checks.map((check) => {
+      const status = check.ready ? 'ready' : 'missing'
+      const detail = check.ready ? check.evidence : check.missing
+      return `- [${status}] ${check.label}: ${detail}`
+    }),
+    '',
+  ]
+}
+
 function collectModuleCandidates(model: StructuredRequirementModel): string[] {
   const values = [
     ...model.functional_requirements.feature_details.map((item) => item.feature_name || item.description),
@@ -832,6 +911,69 @@ function collectOpenQuestions(
 ): string[] {
   const pendingQuestions = Object.values(collectionStatus).flatMap((item) => item.pending_questions)
   return uniqueStrings([...openQuestions, ...pendingQuestions])
+}
+
+function isIcSubstrateModel(model: StructuredRequirementModel): boolean {
+  const department = model.product_context.requesting_department.trim().toLowerCase()
+  if (['production', 'quality', 'tdi'].includes(department)) {
+    return true
+  }
+
+  return hasAnyKeyword(collectModelText(model), ['ic substrate', 'finished lot', 'tdi'])
+}
+
+function collectModelText(model: StructuredRequirementModel): string[] {
+  return [
+    model.product_context.requesting_department,
+    model.product_context.business_owner,
+    model.product_context.software_type,
+    model.product_context.primary_user,
+    model.product_context.decision_or_action,
+    model.product_context.acceptance_owner,
+    model.background.summary,
+    model.background.objective,
+    ...model.scope.in_scope,
+    ...model.scope.out_of_scope,
+    ...model.users_and_scenarios.target_users,
+    ...model.users_and_scenarios.core_scenarios,
+    model.functional_requirements.overview,
+    ...model.functional_requirements.feature_details.flatMap((feature) => [
+      feature.feature_name,
+      feature.description,
+      feature.trigger,
+      feature.processing_logic,
+      ...feature.inputs,
+      ...feature.outputs,
+      ...feature.exception_cases,
+    ]),
+    ...model.business_rules,
+    ...model.page_and_interaction.pages.flatMap((page) => [
+      page.page_name,
+      page.entry_point,
+      ...page.page_elements,
+      ...page.button_actions,
+    ]),
+    ...model.page_and_interaction.interaction_flow,
+    ...model.data_and_dependencies,
+    ...model.risks_and_notes,
+    ...model.acceptance_criteria,
+    ...model.open_questions,
+  ].map((item) => item.trim()).filter(Boolean)
+}
+
+function hasAnyKeyword(values: string[], keywords: string[]): boolean {
+  const loweredValues = values.map((item) => item.toLowerCase())
+  return keywords.some((keyword) => loweredValues.some((value) => value.includes(keyword.toLowerCase())))
+}
+
+function firstEvidence(values: string[], keywords: string[], fallback: string): string {
+  const loweredKeywords = keywords.map((keyword) => keyword.toLowerCase())
+  const match = values.find((value) => loweredKeywords.some((keyword) => value.toLowerCase().includes(keyword)))
+  return valueOrTbd(match || '', fallback)
+}
+
+function progressReadyEnough(collectionStatus: StructuredRequirementCollectionStatus): boolean {
+  return Object.values(collectionStatus).every((item) => item.status === 'confirmed')
 }
 
 function asProductContextLines(model: StructuredRequirementModel, labels: PreviewCopy): string[] {
