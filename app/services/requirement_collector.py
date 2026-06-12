@@ -6018,6 +6018,7 @@ class RequirementCollectorService:
         data_text = "\n".join(collect_text(model.get("data_and_dependencies", []))).lower()
         acceptance_text = "\n".join(collect_text(model.get("acceptance_criteria", []))).lower()
         department = str(product_context.get("requesting_department", "")).strip().lower()
+        department_key = self._ic_substrate_intent_track_from_structured_model(model).lower() or department
         has_pending_or_conflict = any(
             isinstance(item, dict)
             and str(item.get("status", "")).strip().lower() in {"pending_confirmation", "conflict"}
@@ -6164,9 +6165,138 @@ class RequirementCollectorService:
                 "if_missing": "If any formula, status, system, station, SLA, or owner is not confirmed, list it in Open Questions or assumptions.",
             },
         ]
+        department_specific_checks = {
+            "production": [
+                {
+                    "key": "production_route_time_boundary",
+                    "label": "Production route, station, and time-window boundary",
+                    "ready": any(
+                        keyword in all_text
+                        for keyword in ["route", "station", "move-in", "move-out", "工序", "站点", "入站", "出站"]
+                    )
+                    and any(keyword in all_text for keyword in ["shift", "day", "hour", "time", "班次", "天", "小时", "时间"]),
+                    "evidence": first_evidence(
+                        collect_text(model),
+                        ["route", "station", "move-in", "move-out", "工序", "站点", "班次", "时间"],
+                    ),
+                    "if_missing": "Ask the route/station scope and whether the metric is cut by shift, hour, day, lot close, or move-out time.",
+                },
+                {
+                    "key": "production_kpi_formula_grain",
+                    "label": "Production KPI formula, numerator/denominator, and grain",
+                    "ready": any(
+                        keyword in all_text
+                        for keyword in ["yield", "throughput", "wip", "cycle time", "产出", "良率", "在制", "周期"]
+                    )
+                    and any(keyword in all_text for keyword in ["numerator", "denominator", "分子", "分母", "formula", "公式"]),
+                    "evidence": first_evidence(
+                        collect_text(model),
+                        ["yield", "throughput", "wip", "cycle time", "numerator", "denominator", "良率", "分子", "分母"],
+                    ),
+                    "if_missing": "Ask the KPI formula, numerator/denominator, excluded lots, and lot/panel/unit aggregation rule.",
+                },
+                {
+                    "key": "production_dispatch_exception_control",
+                    "label": "Dispatch, bottleneck, hold, and exception action control",
+                    "ready": any(
+                        keyword in all_text
+                        for keyword in ["dispatch", "priority", "bottleneck", "hold", "aging", "rework", "派工", "优先级", "瓶颈", "锁批", "超期", "返工"]
+                    ),
+                    "evidence": first_evidence(
+                        collect_text(model),
+                        ["dispatch", "priority", "bottleneck", "hold", "aging", "rework", "派工", "优先级", "瓶颈", "锁批"],
+                    ),
+                    "if_missing": "Ask what action the dashboard drives when WIP is aging, held, late, bottlenecked, or waiting for dispatch.",
+                },
+            ],
+            "quality": [
+                {
+                    "key": "quality_defect_disposition",
+                    "label": "Quality defect taxonomy, severity, and disposition rule",
+                    "ready": any(
+                        keyword in all_text
+                        for keyword in ["defect code", "defect type", "severity", "mrb", "retest", "rework", "scrap", "缺陷代码", "缺陷类型", "严重度", "判定", "复测", "返工", "报废"]
+                    ),
+                    "evidence": first_evidence(
+                        collect_text(model),
+                        ["defect code", "defect type", "severity", "mrb", "retest", "rework", "scrap", "缺陷代码", "缺陷类型", "严重度", "判定"],
+                    ),
+                    "if_missing": "Ask the defect taxonomy, severity levels, and how each defect is dispositioned to retest, rework, scrap, MRB, or release.",
+                },
+                {
+                    "key": "quality_inspection_coverage",
+                    "label": "Quality inspection coverage, sampling, and false-call handling",
+                    "ready": any(
+                        keyword in all_text
+                        for keyword in ["inspection", "sampling", "coverage", "aoi", "fvi", "e-test", "false call", "漏检", "误判", "抽样", "覆盖率", "检验", "检测"]
+                    ),
+                    "evidence": first_evidence(
+                        collect_text(model),
+                        ["inspection", "sampling", "coverage", "aoi", "fvi", "e-test", "false call", "抽样", "覆盖率", "检验"],
+                    ),
+                    "if_missing": "Ask which inspection stations feed the requirement, sampling or full inspection rules, and how false calls or missed defects are corrected.",
+                },
+                {
+                    "key": "quality_capa_traceability",
+                    "label": "Quality CAPA, root-cause, closure/reopen, and traceability",
+                    "ready": any(
+                        keyword in all_text
+                        for keyword in ["capa", "root cause", "8d", "closure", "reopen", "traceability", "责任部门", "根因", "关闭", "重开", "追溯"]
+                    ),
+                    "evidence": first_evidence(
+                        collect_text(model),
+                        ["capa", "root cause", "8d", "closure", "reopen", "traceability", "根因", "关闭", "重开", "追溯"],
+                    ),
+                    "if_missing": "Ask how root cause, responsible department, CAPA owner, closure evidence, reopen condition, and lot traceability are proven.",
+                },
+            ],
+            "tdi": [
+                {
+                    "key": "tdi_request_triage_sla",
+                    "label": "TDI request intake, triage, priority, owner, and SLA",
+                    "ready": any(
+                        keyword in all_text
+                        for keyword in ["request", "case", "ticket", "priority", "sla", "owner", "status", "需求", "案例", "工单", "优先级", "时效", "负责人", "状态"]
+                    ),
+                    "evidence": first_evidence(
+                        collect_text(model),
+                        ["request", "case", "ticket", "priority", "sla", "owner", "status", "需求", "工单", "优先级", "负责人"],
+                    ),
+                    "if_missing": "Ask how TDI requests enter, how priority is assigned, who owns each status, and what SLA or escalation rule applies.",
+                },
+                {
+                    "key": "tdi_engineering_data_mapping",
+                    "label": "TDI engineering data mapping across product, revision, spec, route, and parameter",
+                    "ready": any(
+                        keyword in all_text
+                        for keyword in ["product", "revision", "spec", "recipe", "parameter", "route", "ecn", "npi", "产品", "版本", "规格", "参数", "工艺路线", "工程变更", "新产品"]
+                    ),
+                    "evidence": first_evidence(
+                        collect_text(model),
+                        ["product", "revision", "spec", "recipe", "parameter", "route", "ecn", "npi", "产品", "版本", "规格", "参数"],
+                    ),
+                    "if_missing": "Ask which product/revision/spec/route/parameter records TDI manages and how mismatches are reconciled.",
+                },
+                {
+                    "key": "tdi_request_writeback_approval",
+                    "label": "TDI writeback target, approval, versioning, and audit trail",
+                    "ready": any(
+                        keyword in all_text
+                        for keyword in ["writeback", "approval", "version", "audit", "effective date", "change log", "回写", "审批", "版本", "审计", "生效日期", "变更记录"]
+                    ),
+                    "evidence": first_evidence(
+                        collect_text(model),
+                        ["writeback", "approval", "version", "audit", "effective date", "change log", "回写", "审批", "版本", "审计"],
+                    ),
+                    "if_missing": "Ask the writeback target, approval chain, version rule, effective date, and audit trail before treating a TDI workflow as executable.",
+                },
+            ],
+        }
+        checks.extend(department_specific_checks.get(department_key, []))
         missing = [check["key"] for check in checks if not check["ready"]]
         return {
             "enabled": True,
+            "department_specific_evidence": department_key if department_key in department_specific_checks else "",
             "missing_evidence": missing,
             "checks": checks,
             "mandatory_rules": [
