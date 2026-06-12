@@ -14,6 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUIREMENT_COLLECTOR = ROOT / "app" / "services" / "requirement_collector.py"
+API = ROOT / "app" / "api.py"
 FRONTEND_APP = ROOT / "frontend" / "src" / "App.vue"
 REQUIREMENT_PREVIEW = ROOT / "frontend" / "src" / "components" / "RequirementMarkdownPreview.vue"
 
@@ -45,6 +46,7 @@ def require_all(text: str, snippets: list[str], label: str) -> None:
 
 def main() -> None:
     collector = REQUIREMENT_COLLECTOR.read_text(encoding="utf-8")
+    api = API.read_text(encoding="utf-8")
     frontend = FRONTEND_APP.read_text(encoding="utf-8")
     preview = REQUIREMENT_PREVIEW.read_text(encoding="utf-8")
 
@@ -72,6 +74,11 @@ def main() -> None:
     evidence_appendix_formatter = method_body(collector, "_format_ic_substrate_prd_evidence_appendix")
     stream_prd_document = method_body(collector, "stream_prd_document")
     build_prd_document = method_body(collector, "build_prd_document")
+    create_session_service = method_body(collector, "create_session")
+    starter_department_seed = method_body(collector, "_seed_session_from_starter_department")
+    starter_department_normalizer = method_body(collector, "_normalize_ic_substrate_starter_department")
+    structured_model_track = method_body(collector, "_ic_substrate_intent_track_from_structured_model")
+    chain_state = method_body(collector, "build_conversation_chain_state")
     readiness_gate = method_body(collector, "_ic_substrate_readiness_evidence_gate")
     browser_handoff = method_body(collector, "build_browser_handoff_payload")
     implementation_context = method_body(collector, "build_implementation_context")
@@ -102,6 +109,41 @@ def main() -> None:
         "_ic_substrate_readiness_evidence_gate" in document_quality_gate
         and "ic_substrate_readiness_evidence" in document_quality_gate,
         "document quality gate does not expose IC Substrate readiness evidence",
+    )
+    require_all(
+        api,
+        ["starter_department", "starter_department=starter_department"],
+        "API starter department payload",
+    )
+    require_all(
+        frontend,
+        ["starterDepartment", "starter_department", "startIcSubstrateNewChat(department", "starterDepartmentDraft"],
+        "frontend starter department handoff",
+    )
+    require_all(
+        create_session_service,
+        ["starter_department", "_seed_session_from_starter_department", "_template_matches_ic_substrate_focus"],
+        "service starter department seeding",
+    )
+    require_all(
+        starter_department_seed,
+        ["requesting_department", "STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY", "message_count", "0"],
+        "starter department structured cache seed",
+    )
+    require_all(
+        starter_department_normalizer,
+        ["production", "quality", "tdi", "general"],
+        "starter department normalizer",
+    )
+    require_all(
+        structured_model_track,
+        ["product_context", "requesting_department", "_ic_substrate_intent_track_from_text"],
+        "structured model starter track routing",
+    )
+    require_all(
+        chain_state,
+        ["_ic_substrate_intent_track_from_structured_model", "not has_user_messages and not intent_track"],
+        "chain state starter department routing",
     )
     require_all(
         build_prd_document,

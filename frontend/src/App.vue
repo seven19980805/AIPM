@@ -1863,7 +1863,9 @@ async function syncCurrentSessionDetail(targetSessionId: string) {
   }
 }
 
-async function createSession(options: { templateId?: string; templateStartMode?: 'guided' | 'example' } = {}) {
+async function createSession(
+  options: { templateId?: string; templateStartMode?: 'guided' | 'example'; starterDepartment?: string } = {},
+) {
   if (messagePipelineActive.value || generatingDocuments.value || loadingSession.value) {
     return
   }
@@ -1879,6 +1881,7 @@ async function createSession(options: { templateId?: string; templateStartMode?:
         language: currentLanguage.value,
         ...(options.templateId ? { template_id: options.templateId } : {}),
         ...(options.templateStartMode ? { template_start_mode: options.templateStartMode } : {}),
+        ...(options.starterDepartment ? { starter_department: options.starterDepartment } : {}),
       }),
     })
 
@@ -1970,6 +1973,12 @@ function starterDepartmentDraft(department: string): string {
   if (currentLanguage.value === 'zh') {
     return `${department} 想做：`
   }
+  if (currentLanguage.value === 'de') {
+    return `${department} moechte bauen: `
+  }
+  if (currentLanguage.value === 'ms') {
+    return `${department} mahu bina: `
+  }
   return `${department} wants to build: `
 }
 
@@ -1987,7 +1996,10 @@ async function startIcSubstrateNewChat(department = '') {
   }
 
   closeNewChatChooser()
-  const created = await launchBusinessTemplateSession(templateItem.template_id, { startMode: 'guided' })
+  const created = await launchBusinessTemplateSession(templateItem.template_id, {
+    startMode: 'guided',
+    starterDepartment: department,
+  })
   if (created && department) {
     inputText.value = starterDepartmentDraft(department)
     await nextTick()
@@ -2061,7 +2073,7 @@ function closeBusinessTemplateDialog() {
 
 async function launchBusinessTemplateSession(
   templateId: string,
-  options: { closeDialog?: boolean; startMode?: 'guided' | 'example' } = {},
+  options: { closeDialog?: boolean; startMode?: 'guided' | 'example'; starterDepartment?: string } = {},
 ) {
   if (
     !templateId ||
@@ -2082,6 +2094,7 @@ async function launchBusinessTemplateSession(
     const created = await createSession({
       templateId,
       templateStartMode: options.startMode ?? 'guided',
+      starterDepartment: options.starterDepartment,
     })
     if (created) {
       currentWorkspaceView.value = 'chat'

@@ -899,6 +899,7 @@ class RequirementCollectorService:
         template_id: str | None = None,
         language: str = "zh",
         template_start_mode: str = TEMPLATE_START_MODE_GUIDED,
+        starter_department: str | None = None,
     ) -> Session:
         session_id = str(uuid.uuid4())
         created_at = datetime.now(timezone.utc).isoformat()
@@ -943,7 +944,64 @@ class RequirementCollectorService:
             record = self.session_store.get_session(session_id)
             if record is None:
                 raise RuntimeError("Failed to load seeded session.")
+        elif template_detail is not None:
+            starter_department_key = self._normalize_ic_substrate_starter_department(starter_department)
+            if starter_department_key and self._template_matches_ic_substrate_focus(template_detail):
+                self._seed_session_from_starter_department(
+                    session_id=session_id,
+                    department=starter_department_key,
+                    language=normalized_language,
+                )
+                record = self.session_store.get_session(session_id)
+                if record is None:
+                    raise RuntimeError("Failed to load starter-department session.")
         return self._session_from_record(record)
+
+    def _normalize_ic_substrate_starter_department(self, department: str | None) -> str:
+        normalized = str(department or "").strip().lower()
+        aliases = {
+            "production": "production",
+            "prod": "production",
+            "quality": "quality",
+            "qdm": "quality",
+            "tdi": "tdi",
+            "general": "general",
+        }
+        return aliases.get(normalized, "")
+
+    def _seed_session_from_starter_department(
+        self,
+        session_id: str,
+        department: str,
+        language: str,
+    ) -> None:
+        model = self._empty_structured_requirement_model()
+        department_label = self._ic_substrate_department_label(department, language)
+        model["product_context"]["requesting_department"] = department_label
+        if self._normalize_language(language) == "zh":
+            model["background"]["summary"] = f"用户已选择 {department_label} 作为首版 IC Substrate 专业链路入口。"
+            model["open_questions"] = [f"请确认 {department_label} 的业务 owner、首版软件场景和验收 owner。"]
+        elif self._normalize_language(language) == "de":
+            model["background"]["summary"] = f"Der Nutzer hat {department_label} als First-Version Einstieg fuer die IC Substrate Expertenkette gewaehlt."
+            model["open_questions"] = [f"Business Owner, First-Version Software-Szenario und Acceptance Owner fuer {department_label} bestaetigen."]
+        elif self._normalize_language(language) == "ms":
+            model["background"]["summary"] = f"Pengguna memilih {department_label} sebagai entry versi pertama untuk rantaian pakar IC Substrate."
+            model["open_questions"] = [f"Sahkan business owner, senario software versi pertama dan acceptance owner untuk {department_label}."]
+        else:
+            model["background"]["summary"] = f"The user selected {department_label} as the first-version entry for the IC Substrate expert chain."
+            model["open_questions"] = [f"Confirm the business owner, first-version software scenario, and acceptance owner for {department_label}."]
+        self._save_structured_requirement_model_cache(
+            session_id=session_id,
+            cache_key=STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
+            message_count=0,
+            structured_requirement_model=model,
+        )
+        self._save_structured_requirement_model_cache(
+            session_id=session_id,
+            cache_key=self._normalize_language(language),
+            message_count=0,
+            structured_requirement_model=model,
+        )
 
     def get_session(self, session_id: str) -> Session | None:
         record = self.session_store.get_session(session_id)
@@ -2866,10 +2924,12 @@ class RequirementCollectorService:
         intent_product_shape = ""
         if mode == "ic_substrate":
             intent_track = self._ic_substrate_intent_track_from_latest_user_message(session)
+            if not intent_track:
+                intent_track = self._ic_substrate_intent_track_from_structured_model(model)
             intent_focus = self._ic_substrate_intent_focus_from_latest_user_message(session)
             intent_product_shape = self._ic_substrate_product_shape_from_latest_user_message(session)
             has_user_messages = self._session_has_user_messages(session)
-            if not has_user_messages:
+            if not has_user_messages and not intent_track:
                 current_index = -1
                 current_node_override = self._ic_substrate_scope_triage_node(normalized_language)
             elif not intent_track and not intent_focus:
@@ -4017,6 +4077,14 @@ class RequirementCollectorService:
         ):
             return prior_track
         return latest_track
+
+    def _ic_substrate_intent_track_from_structured_model(self, model: dict[str, Any]) -> str:
+        product_context = model.get("product_context") if isinstance(model.get("product_context"), dict) else {}
+        department = str(product_context.get("requesting_department", "")).strip()
+        if not department:
+            return ""
+        track = self._ic_substrate_intent_track_from_text(department)
+        return track if self._ic_substrate_is_department(track) else ""
 
     def _user_message_texts(self, session: Session) -> list[str]:
         return [
