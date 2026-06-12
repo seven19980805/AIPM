@@ -61,6 +61,8 @@ def main() -> None:
     conversation_prompt = method_body(collector, "_conversation_chain_state_for_prompt")
     structured_prompt = method_body(collector, "_structured_requirement_model_prompt")
     prd_prompt = method_body(collector, "_prd_doc_prompt")
+    document_quality_gate = method_body(collector, "_document_quality_gate")
+    readiness_gate = method_body(collector, "_ic_substrate_readiness_evidence_gate")
     expert_gate = method_body(collector, "_ic_substrate_expert_prd_quality_gate_for_prompt")
     department_playbook = method_body(collector, "_ic_substrate_production_tdi_quality_playbook_guidance")
     extraction_contract = method_body(collector, "_ic_substrate_structured_extraction_contract")
@@ -77,6 +79,11 @@ def main() -> None:
     require(
         "_ic_substrate_prd_document_contract" in prd_prompt,
         "PRD prompt does not include IC Substrate document contract",
+    )
+    require(
+        "_ic_substrate_readiness_evidence_gate" in document_quality_gate
+        and "ic_substrate_readiness_evidence" in document_quality_gate,
+        "document quality gate does not expose IC Substrate readiness evidence",
     )
 
     expert_gate_terms = [
@@ -119,6 +126,21 @@ def main() -> None:
     )
     require_all(extraction_contract, extraction_terms, "structured extraction contract")
     require_all(document_contract, document_terms, "PRD document contract")
+    require_all(
+        readiness_gate,
+        [
+            "entry_owner",
+            "business_action",
+            "object_grain",
+            "workflow_state_owner",
+            "data_reconciliation",
+            "acceptance_evidence",
+            "uncertainty_handling",
+            "source of truth",
+            "Never invent formulas",
+        ],
+        "IC Substrate readiness evidence gate",
+    )
 
     language_markers = ['normalized_language == "zh"', 'normalized_language == "de"', 'normalized_language == "ms"']
     for label, body in {

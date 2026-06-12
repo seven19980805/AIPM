@@ -5819,6 +5819,215 @@ class RequirementCollectorService:
             )
         return "Applied business template:\n" + json.dumps(template, ensure_ascii=False)
 
+    def _ic_substrate_readiness_evidence_gate(
+        self,
+        session: Session | None,
+        structured_requirement_model: dict[str, Any],
+    ) -> dict[str, Any]:
+        if session is None:
+            return {}
+
+        template = self._resolve_business_template(session)
+        template_context = template or {
+            "template_id": session.applied_template_id,
+            "template_name": session.applied_template_name,
+        }
+        if not self._template_matches_ic_substrate_focus(template_context):
+            return {}
+
+        model = normalize_structured_requirement_model(structured_requirement_model)
+        product_context = model.get("product_context", {})
+        collection_status = model.get("collection_status", {})
+
+        def collect_text(value: Any) -> list[str]:
+            if isinstance(value, str):
+                return [value]
+            if isinstance(value, list):
+                items: list[str] = []
+                for entry in value:
+                    items.extend(collect_text(entry))
+                return items
+            if isinstance(value, dict):
+                items = []
+                for entry in value.values():
+                    items.extend(collect_text(entry))
+                return items
+            return []
+
+        def first_evidence(values: list[Any], keywords: list[str] | None = None) -> str:
+            texts = [text.strip() for value in values for text in collect_text(value) if text.strip()]
+            if not texts:
+                return ""
+            if keywords:
+                normalized_keywords = [keyword.lower() for keyword in keywords]
+                for text in texts:
+                    lowered = text.lower()
+                    if any(keyword in lowered for keyword in normalized_keywords):
+                        return text[:220]
+            return texts[0][:220]
+
+        all_text = "\n".join(collect_text(model)).lower()
+        data_text = "\n".join(collect_text(model.get("data_and_dependencies", []))).lower()
+        acceptance_text = "\n".join(collect_text(model.get("acceptance_criteria", []))).lower()
+        department = str(product_context.get("requesting_department", "")).strip().lower()
+        has_pending_or_conflict = any(
+            isinstance(item, dict)
+            and str(item.get("status", "")).strip().lower() in {"pending_confirmation", "conflict"}
+            for item in collection_status.values()
+        )
+        has_missing = any(
+            isinstance(item, dict)
+            and str(item.get("status", "")).strip().lower() == "missing"
+            for item in collection_status.values()
+        )
+        checks = [
+            {
+                "key": "entry_owner",
+                "label": "Confirmed entry department and business/acceptance owner",
+                "ready": department in ACTIVE_IC_SUBSTRATE_DEPARTMENTS
+                and bool(
+                    str(product_context.get("business_owner", "")).strip()
+                    or str(product_context.get("acceptance_owner", "")).strip()
+                ),
+                "evidence": first_evidence(
+                    [
+                        product_context.get("requesting_department", ""),
+                        product_context.get("business_owner", ""),
+                        product_context.get("acceptance_owner", ""),
+                    ]
+                ),
+                "if_missing": "Ask which entry owns v1 and who signs off; do not assume owner roles.",
+            },
+            {
+                "key": "business_action",
+                "label": "Business action or decision the software supports",
+                "ready": bool(str(product_context.get("decision_or_action", "")).strip()),
+                "evidence": first_evidence([product_context.get("decision_or_action", "")]),
+                "if_missing": "Ask the specific business decision/action before detailing pages or technology.",
+            },
+            {
+                "key": "object_grain",
+                "label": "Business object and grain",
+                "ready": any(
+                    keyword in all_text
+                    for keyword in [
+                        "lot",
+                        "panel",
+                        "unit",
+                        "case",
+                        "route",
+                        "station",
+                        "对象",
+                        "粒度",
+                        "工序",
+                        "站点",
+                        "批",
+                    ]
+                ),
+                "evidence": first_evidence(
+                    collect_text(model),
+                    ["lot", "panel", "unit", "case", "route", "station", "对象", "粒度", "工序", "站点"],
+                ),
+                "if_missing": "Ask the lot/panel/unit/case grain and the route/station/time-window boundary.",
+            },
+            {
+                "key": "workflow_state_owner",
+                "label": "Workflow states, owner, and exception handling",
+                "ready": any(
+                    keyword in all_text
+                    for keyword in [
+                        "state",
+                        "status",
+                        "owner",
+                        "hold",
+                        "release",
+                        "closure",
+                        "rework",
+                        "scrap",
+                        "状态",
+                        "责任",
+                        "放行",
+                        "关闭",
+                        "返工",
+                        "报废",
+                    ]
+                ),
+                "evidence": first_evidence(
+                    collect_text(model),
+                    ["state", "status", "owner", "hold", "release", "closure", "状态", "责任", "放行", "关闭"],
+                ),
+                "if_missing": "Ask current state names, responsible owner, and how exceptions are closed.",
+            },
+            {
+                "key": "data_reconciliation",
+                "label": "Data source, source of truth, refresh, and reconciliation boundary",
+                "ready": bool(data_text)
+                and any(
+                    keyword in data_text
+                    for keyword in [
+                        "source",
+                        "truth",
+                        "refresh",
+                        "reconciliation",
+                        "interface",
+                        "system",
+                        "数据源",
+                        "刷新",
+                        "对账",
+                        "接口",
+                        "系统",
+                    ]
+                ),
+                "evidence": first_evidence(
+                    [model.get("data_and_dependencies", [])],
+                    ["source", "truth", "refresh", "reconciliation", "interface", "数据源", "刷新", "对账", "接口"],
+                ),
+                "if_missing": "Ask source of truth, refresh frequency, reconciliation rule, and unconfirmed interfaces.",
+            },
+            {
+                "key": "acceptance_evidence",
+                "label": "Business-verifiable acceptance evidence",
+                "ready": bool(acceptance_text)
+                and any(
+                    keyword in acceptance_text
+                    for keyword in [
+                        "accept",
+                        "evidence",
+                        "sign-off",
+                        "verify",
+                        "验收",
+                        "证据",
+                        "签核",
+                        "验证",
+                    ]
+                ),
+                "evidence": first_evidence(
+                    [model.get("acceptance_criteria", [])],
+                    ["accept", "evidence", "sign-off", "verify", "验收", "证据", "签核", "验证"],
+                ),
+                "if_missing": "Ask which evidence proves the PRD is correct: main flow, exceptions, data accuracy, export/download, sign-off, and retention.",
+            },
+            {
+                "key": "uncertainty_handling",
+                "label": "Unconfirmed terms remain visible",
+                "ready": bool(model.get("open_questions")) or has_pending_or_conflict or not has_missing,
+                "evidence": first_evidence([model.get("open_questions", [])])
+                or ("pending_confirmation/conflict exists" if has_pending_or_conflict else ""),
+                "if_missing": "If any formula, status, system, station, SLA, or owner is not confirmed, list it in Open Questions or assumptions.",
+            },
+        ]
+        missing = [check["key"] for check in checks if not check["ready"]]
+        return {
+            "enabled": True,
+            "missing_evidence": missing,
+            "checks": checks,
+            "mandatory_rules": [
+                "Treat each ready check as evidence, not as permission to invent nearby facts.",
+                "If a check is not ready, include its if_missing text in Open Questions or assumptions.",
+                "Never invent formulas, station names, system/table names, state names, SLA values, or owner roles to satisfy this gate.",
+            ],
+        }
+
     def _structured_requirement_model_prompt(self, session: Session, language: str) -> str:
         prompt_parts = [build_structured_requirement_model_prompt(language)]
         prompt_parts.append(self._structured_requirement_skill_extraction_guidance(language))
@@ -5854,6 +6063,7 @@ class RequirementCollectorService:
             structured_requirement_model,
             progress,
             draft_mode,
+            session,
         )
         return [
             {"role": "system", "content": self._design_doc_prompt(session, language)},
@@ -5881,6 +6091,7 @@ class RequirementCollectorService:
         structured_requirement_model: dict[str, Any],
         progress: dict[str, Any],
         draft_mode: str,
+        session: Session | None = None,
     ) -> dict[str, Any]:
         model = normalize_structured_requirement_model(structured_requirement_model)
         collection_status = model.get("collection_status", {})
@@ -5913,7 +6124,7 @@ class RequirementCollectorService:
                     }
                 )
 
-        return {
+        gate = {
             "generation_mode": draft_mode,
             "progress": progress,
             "confirmed_items": confirmed_items,
@@ -5928,6 +6139,10 @@ class RequirementCollectorService:
                 "Keep document sections complete enough for review, but label uncertainty visibly.",
             ],
         }
+        ic_substrate_gate = self._ic_substrate_readiness_evidence_gate(session, model)
+        if ic_substrate_gate:
+            gate["ic_substrate_readiness_evidence"] = ic_substrate_gate
+        return gate
 
     def _document_quality_gate_block_markdown(
         self,
@@ -7197,6 +7412,7 @@ class RequirementCollectorService:
             structured_requirement_model,
             progress,
             draft_mode,
+            session,
         )
         return [
             {"role": "system", "content": self._prd_doc_prompt(session, language)},
