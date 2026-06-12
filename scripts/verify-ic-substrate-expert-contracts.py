@@ -61,6 +61,8 @@ def main() -> None:
     )
 
     conversation_prompt = method_body(collector, "_conversation_chain_state_for_prompt")
+    send_user_message = method_body(collector, "send_user_message")
+    stream_user_message = method_body(collector, "stream_user_message")
     structured_prompt = method_body(collector, "_structured_requirement_model_prompt")
     prd_prompt = method_body(collector, "_prd_doc_prompt")
     document_quality_gate = method_body(collector, "_document_quality_gate")
@@ -69,6 +71,9 @@ def main() -> None:
     browser_handoff = method_body(collector, "build_browser_handoff_payload")
     implementation_context = method_body(collector, "build_implementation_context")
     implementation_prompt = method_body(collector, "_build_implementation_prompt")
+    language_router = method_body(collector, "_language_for_user_message")
+    choice_formatter = method_body(collector, "_ensure_choice_question_format")
+    fallback_choice_block = method_body(collector, "_fallback_choice_block")
     expert_gate = method_body(collector, "_ic_substrate_expert_prd_quality_gate_for_prompt")
     department_playbook = method_body(collector, "_ic_substrate_production_tdi_quality_playbook_guidance")
     extraction_contract = method_body(collector, "_ic_substrate_structured_extraction_contract")
@@ -90,6 +95,44 @@ def main() -> None:
         "_ic_substrate_readiness_evidence_gate" in document_quality_gate
         and "ic_substrate_readiness_evidence" in document_quality_gate,
         "document quality gate does not expose IC Substrate readiness evidence",
+    )
+    require_all(
+        language_router,
+        ["_ = user_message", "return self._normalize_language(language)"],
+        "UI language lock for user message responses",
+    )
+    require_all(
+        send_user_message,
+        [
+            "response_language = self._language_for_user_message(language, user_message)",
+            "assistant_text = self._ensure_choice_question_format(assistant_text, response_language)",
+        ],
+        "non-streaming assistant choice fallback",
+    )
+    require_all(
+        stream_user_message,
+        [
+            "response_language = self._language_for_user_message(language, user_message)",
+            "formatted_assistant_text = self._ensure_choice_question_format(assistant_text, response_language)",
+            "yield {\"event\": \"content\", \"delta\": assistant_delta}",
+            "assistant_text = formatted_assistant_text",
+        ],
+        "streaming assistant choice fallback",
+    )
+    require_all(
+        choice_formatter,
+        ["_looks_like_clarification_question", "_has_choice_options", "_fallback_choice_block"],
+        "assistant choice formatter",
+    )
+    require_all(
+        fallback_choice_block,
+        [
+            "A. Use the suggested interpretation",
+            "A. 同意按上面的建议口径",
+            "A. Die oben genannte Empfehlung",
+            "A. Terima cadangan",
+        ],
+        "four-language fallback choice blocks",
     )
 
     expert_gate_terms = [
