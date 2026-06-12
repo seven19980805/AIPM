@@ -2067,6 +2067,19 @@ class RequirementCollectorService:
         design_path, design_filename = design_result
         prd_absolute_path = str(prd_path.resolve())
         design_absolute_path = str(design_path.resolve())
+        message_count = self._message_count(session.messages)
+        structured_requirement_model = (
+            self._get_latest_cached_structured_requirement_model(
+                session_id,
+                STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
+                message_count,
+            )
+            or self._empty_structured_requirement_model()
+        )
+        ic_substrate_evidence = self._ic_substrate_readiness_evidence_gate(
+            session,
+            structured_requirement_model,
+        )
 
         return {
             "session_id": session_id,
@@ -2088,7 +2101,9 @@ class RequirementCollectorService:
                 prd_path=prd_absolute_path,
                 design_path=design_absolute_path,
                 language=language,
+                ic_substrate_evidence=ic_substrate_evidence,
             ),
+            "ic_substrate_evidence": ic_substrate_evidence,
         }
 
     def build_browser_handoff_payload(self, session_id: str, language: str = "zh") -> dict[str, Any]:
@@ -2117,12 +2132,26 @@ class RequirementCollectorService:
         normalized_language = self._normalize_language(language)
         prd_path, prd_filename = prd_result
         design_path, design_filename = design_result
+        message_count = self._message_count(session.messages)
+        structured_requirement_model = (
+            self._get_latest_cached_structured_requirement_model(
+                session_id,
+                STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
+                message_count,
+            )
+            or self._empty_structured_requirement_model()
+        )
+        ic_substrate_evidence = self._ic_substrate_readiness_evidence_gate(
+            session,
+            structured_requirement_model,
+        )
         implementation_prompt = self._build_implementation_prompt(
             session_id=session_id,
             session_title=session.title,
             prd_path=prd_filename,
             design_path=design_filename,
             language=normalized_language,
+            ic_substrate_evidence=ic_substrate_evidence,
         )
         now = datetime.now(timezone.utc)
         expires_at = (now + timedelta(minutes=DEFAULT_HANDOFF_TTL_MINUTES)).isoformat()
@@ -2149,6 +2178,7 @@ class RequirementCollectorService:
                     "download_url": self._legacy_document_download_url(session_id, DESIGN_MESSAGE_KIND),
                 },
             ],
+            "ic_substrate_evidence": ic_substrate_evidence,
             "expires_at": expires_at,
         }
 
@@ -6809,15 +6839,44 @@ class RequirementCollectorService:
         prd_path: str,
         design_path: str,
         language: str,
+        ic_substrate_evidence: dict[str, Any] | None = None,
     ) -> str:
         normalized = self._normalize_language(language)
         template = IMPLEMENTATION_PROMPT_TEMPLATE_BY_LANGUAGE.get(normalized, IMPLEMENTATION_PROMPT_TEMPLATE_EN)
-        return template.format(
+        prompt = template.format(
             session_id=session_id,
             session_title=session_title or "Untitled Session",
             prd_path=prd_path,
             design_path=design_path,
         )
+        if not ic_substrate_evidence:
+            return prompt
+
+        if normalized == "zh":
+            evidence_note = (
+                "IC Substrate handoff evidence:\n"
+                "- The handoff payload may include `ic_substrate_evidence` with readiness checks such as entry_owner, business_action, object_grain, workflow_state_owner, data_reconciliation, acceptance_evidence, and uncertainty_handling.\n"
+                "- 实现前请先读取该 evidence package；ready 项可作为实现证据，missing 项必须进入 README/ASSUMPTIONS/Open Questions，不要自造公式、站点、系统名、状态、SLA 或 owner。"
+            )
+        elif normalized == "de":
+            evidence_note = (
+                "IC Substrate handoff evidence:\n"
+                "- The handoff payload may include `ic_substrate_evidence` with readiness checks such as entry_owner, business_action, object_grain, workflow_state_owner, data_reconciliation, acceptance_evidence, and uncertainty_handling.\n"
+                "- Vor der Implementierung dieses Evidence Package lesen. Ready-Items sind Implementierungsevidenz; missing Items gehoeren in README/ASSUMPTIONS/Open Questions. Keine Formeln, Stationen, Systeme, States, SLAs oder Owner erfinden."
+            )
+        elif normalized == "ms":
+            evidence_note = (
+                "IC Substrate handoff evidence:\n"
+                "- The handoff payload may include `ic_substrate_evidence` with readiness checks such as entry_owner, business_action, object_grain, workflow_state_owner, data_reconciliation, acceptance_evidence, and uncertainty_handling.\n"
+                "- Baca evidence package ini sebelum implementasi. Item ready boleh digunakan sebagai evidence; item missing mesti masuk README/ASSUMPTIONS/Open Questions. Jangan reka formula, station, system, state, SLA atau owner."
+            )
+        else:
+            evidence_note = (
+                "IC Substrate handoff evidence:\n"
+                "- The handoff payload may include `ic_substrate_evidence` with readiness checks such as entry_owner, business_action, object_grain, workflow_state_owner, data_reconciliation, acceptance_evidence, and uncertainty_handling.\n"
+                "- Read that evidence package before implementation. Treat ready checks as implementation evidence; put missing checks into README/ASSUMPTIONS/Open Questions. Do not invent formulas, stations, systems, states, SLAs, or owners."
+            )
+        return f"{prompt}\n\n{evidence_note}"
 
     def _normalize_language(self, language: str | None) -> str:
         normalized = str(language or "").strip().lower()

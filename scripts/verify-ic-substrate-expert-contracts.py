@@ -66,6 +66,9 @@ def main() -> None:
     document_quality_gate = method_body(collector, "_document_quality_gate")
     quality_gate_block = method_body(collector, "_document_quality_gate_block_markdown")
     readiness_gate = method_body(collector, "_ic_substrate_readiness_evidence_gate")
+    browser_handoff = method_body(collector, "build_browser_handoff_payload")
+    implementation_context = method_body(collector, "build_implementation_context")
+    implementation_prompt = method_body(collector, "_build_implementation_prompt")
     expert_gate = method_body(collector, "_ic_substrate_expert_prd_quality_gate_for_prompt")
     department_playbook = method_body(collector, "_ic_substrate_production_tdi_quality_playbook_guidance")
     extraction_contract = method_body(collector, "_ic_substrate_structured_extraction_contract")
@@ -143,6 +146,21 @@ def main() -> None:
             "Never invent formulas",
         ],
         "IC Substrate readiness evidence gate",
+    )
+    require_all(
+        browser_handoff,
+        ["ic_substrate_evidence", "STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY"],
+        "browser coding handoff evidence payload",
+    )
+    require_all(
+        implementation_context,
+        ["ic_substrate_evidence", "STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY"],
+        "implementation context evidence payload",
+    )
+    require_all(
+        implementation_prompt,
+        ["ic_substrate_evidence", "Read that evidence package", "Do not invent formulas"],
+        "implementation prompt evidence instructions",
     )
     require_all(
         quality_gate_block,
