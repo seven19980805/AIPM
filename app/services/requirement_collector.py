@@ -5204,6 +5204,10 @@ class RequirementCollectorService:
             chain_state,
             normalized_language,
         )
+        expert_prd_quality_gate = self._ic_substrate_expert_prd_quality_gate_for_prompt(
+            chain_state,
+            normalized_language,
+        )
         runtime_guardrails = self._ic_substrate_runtime_guardrails_for_prompt(
             chain_state,
             normalized_language,
@@ -5233,6 +5237,8 @@ class RequirementCollectorService:
                 state_text += "\n" + product_shape_guidance
             if node_question_guidance:
                 state_text += "\n" + node_question_guidance
+            if expert_prd_quality_gate:
+                state_text += "\n" + expert_prd_quality_gate
             if runtime_guardrails:
                 state_text += "\n" + runtime_guardrails
             if convergence_guidance:
@@ -5259,6 +5265,8 @@ class RequirementCollectorService:
                 state_text += "\n" + product_shape_guidance
             if node_question_guidance:
                 state_text += "\n" + node_question_guidance
+            if expert_prd_quality_gate:
+                state_text += "\n" + expert_prd_quality_gate
             if runtime_guardrails:
                 state_text += "\n" + runtime_guardrails
             if convergence_guidance:
@@ -5285,6 +5293,8 @@ class RequirementCollectorService:
                 state_text += "\n" + product_shape_guidance
             if node_question_guidance:
                 state_text += "\n" + node_question_guidance
+            if expert_prd_quality_gate:
+                state_text += "\n" + expert_prd_quality_gate
             if runtime_guardrails:
                 state_text += "\n" + runtime_guardrails
             if convergence_guidance:
@@ -5310,6 +5320,8 @@ class RequirementCollectorService:
             state_text += "\n" + product_shape_guidance
         if node_question_guidance:
             state_text += "\n" + node_question_guidance
+        if expert_prd_quality_gate:
+            state_text += "\n" + expert_prd_quality_gate
         if runtime_guardrails:
             state_text += "\n" + runtime_guardrails
         if convergence_guidance:
@@ -5503,6 +5515,124 @@ class RequirementCollectorService:
             "- Implementation Decisions describe product, interface, data, and workflow decisions; do not include fragile code file paths.\n"
             "- Testing / Acceptance should verify externally observable behavior, main flow, exception flow, data definitions, roles/owners, and the documented acceptance standards.\n"
             "- Out of Scope must explicitly state what this version will not do, especially unopened departments, unconfirmed formulas, unconfirmed system integrations, and unconfirmed state flows."
+        )
+
+    def _ic_substrate_expert_prd_quality_gate_for_prompt(
+        self,
+        chain_state: dict[str, Any],
+        language: str | None = None,
+    ) -> str:
+        if chain_state.get("mode") != "ic_substrate":
+            return ""
+
+        track = str(chain_state.get("intent_track") or chain_state.get("current_track") or "").strip().lower()
+        if track not in {"production", "tdi", "quality", "general"}:
+            track = "general"
+
+        normalized_language = self._normalize_language(language)
+        if normalized_language == "zh":
+            track_checks = {
+                "production": (
+                    "Production 专家追问优先补齐：1) 首版业务动作是排产/派工、WIP hold 处置、Finished Lot 判定、产量节拍监控还是成本/效率复盘；"
+                    "2) 对象粒度是 lot/panel/unit/route/station/shift/day 哪一层；"
+                    "3) WIP、hold、rework、scrap、release、finished 的现场状态名和责任人；"
+                    "4) 数量、时间窗、跨 Production/Quality/Warehouse 的对账和验收证据。"
+                ),
+                "tdi": (
+                    "TDI 专家追问优先补齐：1) 用户现场 TDI 的业务定义和 case 触发边界；"
+                    "2) case 分类、优先级、状态机、owner/SLA 起止点；"
+                    "3) input/output、handoff、approval、verification、writeback、closure/reopen 规则；"
+                    "4) 关闭证据、跨部门签核和历史 case 迁移边界。"
+                ),
+                "quality": (
+                    "Quality 专家追问优先补齐：1) 首版要解决的是 inspection coverage、defect disposition、release gate、MRB/CAPA、root cause 还是质量趋势分析；"
+                    "2) defect taxonomy、spec limit、sampling/full inspection、lot genealogy、waiver/deviation 的现场定义；"
+                    "3) retest/rework/scrap/release 的判定规则和 owner；"
+                    "4) 质量放行、关闭验证、客户/内部签核和证据留存。"
+                ),
+                "general": (
+                    "General 专家追问优先补齐：1) 发起部门/业务 owner；2) 首版软件形态和目标用户；"
+                    "3) 这个系统要支撑的业务动作或决策；4) 能进入 URD/PRD 的范围边界、验收证据和明确不做事项。"
+                ),
+            }
+            return (
+                "IC Substrate 专家 PM 质量门：\n"
+                "- 下一问必须补齐一个可写进 URD/PRD 的字段，而不是泛泛展示行业知识。\n"
+                "- 追问优先级：业务动作/决策 -> 目标用户/owner -> 业务对象与粒度 -> KPI/公式/状态定义 -> 流程状态与责任边界 -> 数据来源/对账/刷新频率 -> 验收证据/签核/不做范围。\n"
+                f"- 当前轨道校验：{track_checks[track]}\n"
+                "- A/B/C 选项只能用于确认路径、口径或待确认事实；不得把未确认的公式、站点、状态、系统名、SLA 或 owner 伪装成事实。\n"
+                "- 如果关键字段已足够生成首版文档，不要继续发散追问；转为请用户确认是否生成 URD/PRD。"
+            )
+
+        if normalized_language == "de":
+            track_checks = {
+                "production": (
+                    "Production: zuerst klaeren, ob v1 Scheduling/Dispatch, WIP-Hold-Disposition, Finished-Lot-Entscheidung, Output-Rhythmus-Monitoring oder Kosten-/Effizienz-Review stuetzt; danach Objektgranularitaet, Site-State-Namen, Owner, Reconciliation und Acceptance Evidence."
+                ),
+                "tdi": (
+                    "TDI: zuerst die TDI-Definition des Nutzers und die Case-Trigger-Grenze bestaetigen; danach Case-Klasse, Prioritaet, State Machine, Owner/SLA-Start-Ende, Handoff, Approval, Verification, Writeback, Closure/Reopen und Evidence."
+                ),
+                "quality": (
+                    "Quality: zuerst klaeren, ob v1 Inspection Coverage, Defect Disposition, Release Gate, MRB/CAPA, Root Cause oder Quality Trend Analysis abdeckt; danach Taxonomy, Spec/Sampling, Disposition Owner, Release Evidence und Sign-off."
+                ),
+                "general": (
+                    "General: zuerst anfordernden Bereich/Business Owner, v1-Softwareform, Zielnutzer, Business Decision/Action, Scope Boundary, Acceptance Evidence und explizite Out-of-Scope-Punkte klaeren."
+                ),
+            }
+            return (
+                "IC Substrate Expert-PM-Quality-Gate:\n"
+                "- Die naechste Frage muss ein URD/PRD-faehiges Feld fuellen, nicht nur Domainwissen zeigen.\n"
+                "- Prioritaet: Business Action/Decision -> User/Owner -> Business Object and Grain -> KPI/Formula/State Definition -> Workflow and Ownership Boundary -> Data Source/Reconciliation/Refresh -> Acceptance Evidence/Sign-off/Out-of-Scope.\n"
+                f"- Aktueller Track-Check: {track_checks[track]}\n"
+                "- A/B/C-Optionen duerfen nur Pfade, Definitionen oder Unbekanntes bestaetigen. Keine unbestaetigten Formeln, Stationen, States, Systeme, SLAs oder Owner als Fakten darstellen.\n"
+                "- Wenn die Schluesselfelder fuer ein erstes Dokument reichen, nicht weiter ausweiten; den Nutzer um Bestaetigung zur URD/PRD-Generierung bitten."
+            )
+
+        if normalized_language == "ms":
+            track_checks = {
+                "production": (
+                    "Production: sahkan dahulu sama ada v1 menyokong scheduling/dispatch, WIP hold disposition, Finished Lot decision, output rhythm monitoring atau cost/efficiency review; kemudian object grain, nama state di site, owner, reconciliation dan acceptance evidence."
+                ),
+                "tdi": (
+                    "TDI: sahkan dahulu definisi TDI pengguna dan trigger boundary case; kemudian case class, priority, state machine, owner/SLA start-end, handoff, approval, verification, writeback, closure/reopen dan evidence."
+                ),
+                "quality": (
+                    "Quality: sahkan dahulu sama ada v1 meliputi inspection coverage, defect disposition, release gate, MRB/CAPA, root cause atau quality trend analysis; kemudian taxonomy, spec/sampling, disposition owner, release evidence dan sign-off."
+                ),
+                "general": (
+                    "General: kenal pasti requesting department/business owner, first-version software shape, target user, business decision/action, scope boundary, acceptance evidence dan explicit out-of-scope items."
+                ),
+            }
+            return (
+                "IC Substrate Expert PM quality gate:\n"
+                "- Soalan seterusnya mesti melengkapkan satu field yang sedia masuk URD/PRD, bukan sekadar menunjukkan pengetahuan domain.\n"
+                "- Keutamaan: business action/decision -> user/owner -> business object and grain -> KPI/formula/state definition -> workflow and ownership boundary -> data source/reconciliation/refresh -> acceptance evidence/sign-off/out-of-scope.\n"
+                f"- Semakan track semasa: {track_checks[track]}\n"
+                "- Pilihan A/B/C hanya untuk mengesahkan path, definition atau unknowns. Jangan jadikan formula, station, state, system, SLA atau owner yang belum disahkan sebagai fakta.\n"
+                "- Jika key fields sudah cukup untuk first document, berhenti mengembangkan soalan dan minta pengguna sahkan penjanaan URD/PRD."
+            )
+
+        track_checks = {
+            "production": (
+                "Production expert check: first clarify whether v1 supports scheduling/dispatch, WIP hold disposition, Finished Lot decision, output rhythm monitoring, or cost/efficiency review; then object grain, site state names, owners, reconciliation, and acceptance evidence."
+            ),
+            "tdi": (
+                "TDI expert check: first confirm the user's TDI definition and case trigger boundary; then case class, priority, state machine, owner/SLA start-end, handoff, approval, verification, writeback, closure/reopen, and evidence."
+            ),
+            "quality": (
+                "Quality expert check: first clarify whether v1 covers inspection coverage, defect disposition, release gate, MRB/CAPA, root cause, or quality trend analysis; then taxonomy, spec/sampling, disposition owner, release evidence, and sign-off."
+            ),
+            "general": (
+                "General expert check: first identify requesting department/business owner, first-version software shape, target user, supported business decision/action, scope boundary, acceptance evidence, and explicit out-of-scope items."
+            ),
+        }
+        return (
+            "IC Substrate expert PM quality gate:\n"
+            "- The next question must fill one URD/PRD-ready field, not merely show domain knowledge.\n"
+            "- Priority: business action/decision -> user/owner -> business object and grain -> KPI/formula/state definition -> workflow and ownership boundary -> data source/reconciliation/refresh -> acceptance evidence/sign-off/out-of-scope.\n"
+            f"- Current track check: {track_checks[track]}\n"
+            "- A/B/C options may confirm paths, definitions, or unknowns only. Do not present unconfirmed formulas, stations, states, systems, SLAs, or owners as facts.\n"
+            "- If the key fields are ready for a first document, stop expanding and ask the user to confirm URD/PRD generation."
         )
 
     def _ic_substrate_runtime_guardrails_for_prompt(
