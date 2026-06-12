@@ -62,6 +62,7 @@ def main() -> None:
     structured_prompt = method_body(collector, "_structured_requirement_model_prompt")
     prd_prompt = method_body(collector, "_prd_doc_prompt")
     expert_gate = method_body(collector, "_ic_substrate_expert_prd_quality_gate_for_prompt")
+    department_playbook = method_body(collector, "_ic_substrate_production_tdi_quality_playbook_guidance")
     extraction_contract = method_body(collector, "_ic_substrate_structured_extraction_contract")
     document_contract = method_body(collector, "_ic_substrate_prd_document_contract")
 
@@ -104,6 +105,18 @@ def main() -> None:
         "Acceptance Criteria",
     ]
     require_all(expert_gate, expert_gate_terms, "expert quality gate")
+    require_all(
+        department_playbook,
+        [
+            "专家追问梯子",
+            "Expert question ladder",
+            "source of truth",
+            "Finished Lot",
+            "defect taxonomy",
+            "closure/reopen",
+        ],
+        "department expert playbook",
+    )
     require_all(extraction_contract, extraction_terms, "structured extraction contract")
     require_all(document_contract, document_terms, "PRD document contract")
 
