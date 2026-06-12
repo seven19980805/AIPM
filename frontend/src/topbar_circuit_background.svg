@@ -1,0 +1,60 @@
+<svg width="1440" height="120" viewBox="0 0 1440 120" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="topbarBg" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#124b83"/>
+      <stop offset="0.28" stop-color="#0d3e76"/>
+      <stop offset="0.5" stop-color="#07305f"/>
+      <stop offset="1" stop-color="#041527"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="52%" cy="48%" r="58%">
+      <stop offset="0" stop-color="#1eb7ff" stop-opacity="0.32"/>
+      <stop offset="0.55" stop-color="#0d6dcc" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#041527" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1440" height="120" fill="url(#topbarBg)"/>
+  <rect width="1440" height="120" fill="url(#glow)"/>
+
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <g opacity="0.28" stroke="#67d2ff" stroke-width="1.2">
+      <path d="M340 34H472L510 72H650"/>
+      <path d="M436 84H566L596 54H742"/>
+      <path d="M718 24H842L876 58H1010"/>
+      <path d="M812 92H944L980 56H1128"/>
+      <path d="M1038 30H1156L1184 58H1276"/>
+    </g>
+
+    <g opacity="0.2" stroke="#9be8ff" stroke-width="1">
+      <path d="M486 34V16H596"/>
+      <path d="M650 72V100H734"/>
+      <path d="M876 58V84H910"/>
+      <path d="M980 56V24H1078"/>
+      <path d="M1184 58V92H1236"/>
+    </g>
+  </g>
+
+  <g opacity="0.36" fill="#5ccfff">
+    <circle cx="472" cy="34" r="2.5"/>
+    <circle cx="596" cy="54" r="2.5"/>
+    <circle cx="742" cy="54" r="2"/>
+    <circle cx="842" cy="24" r="2.5"/>
+    <circle cx="944" cy="92" r="2"/>
+    <circle cx="1128" cy="56" r="2.5"/>
+    <circle cx="1276" cy="58" r="2"/>
+  </g>
+
+  <g opacity="0.14" stroke="#9be8ff" stroke-width="1" fill="none">
+    <rect x="650" y="36" width="58" height="42" rx="7"/>
+    <path d="M650 48H628M650 60H628M650 72H628"/>
+    <path d="M708 48H730M708 60H730M708 72H730"/>
+    <path d="M664 36V20M679 36V20M694 36V20"/>
+    <path d="M664 78V94M679 78V94M694 78V94"/>
+  </g>
+
+  <g opacity="0.12" stroke="#7bdcff" stroke-width="1">
+    <path d="M64 102H176"/>
+    <path d="M1264 18H1376"/>
+    <path d="M118 18H228"/>
+  </g>
+</svg>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1740 365" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="title">
+  <title id="title">AT&amp;S AI Platform</title>
+  <defs>
+    <linearGradient id="brandLeft" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#06365f"/>
+      <stop offset="1" stop-color="#082846"/>
+    </linearGradient>
+    <linearGradient id="brandRight" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0aa7dc"/>
+      <stop offset="1" stop-color="#06a4d7"/>
+    </linearGradient>
+  </defs>
+  <rect width="610" height="365" fill="url(#brandLeft)"/>
+  <rect x="610" width="1130" height="365" fill="url(#brandRight)"/>
+  <text x="74" y="188" textLength="462" lengthAdjust="spacing" dominant-baseline="middle" fill="#fff" font-family="Segoe UI, Arial, Helvetica, sans-serif" font-size="196" font-weight="400">AT&amp;S</text>
+  <text x="690" y="188" textLength="940" lengthAdjust="spacingAndGlyphs" dominant-baseline="middle" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="180" font-weight="300">AI Platform</text>
+</svg>

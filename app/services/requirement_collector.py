@@ -1,0 +1,6985 @@
+from __future__ import annotations
+
+import json
+import re
+import secrets
+import threading
+import uuid
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
+from io import BytesIO
+from pathlib import Path
+from typing import Any, Iterator
+from xml.sax.saxutils import escape
+import zipfile
+
+from .business_template_library import BusinessTemplateLibrary
+from .llm_client import MiniMaxChatClient
+from .session_store import SQLiteSessionStore
+from .structured_requirement_model import (
+    REQUIREMENT_ITEM_KEYS,
+    build_structured_requirement_model_prompt,
+    empty_structured_requirement_model,
+    normalize_structured_requirement_model,
+)
+
+
+PM_SYSTEM_PROMPT = """You are a principal Product Manager leading professional requirement discovery.
+Your mission is to turn ambiguous stakeholder input into handoff-ready requirement context for engineering and system design.
+
+You are not just collecting feature requests.
+You must uncover the business problem, user task, operating context, decision rules, data model implications, delivery constraints, and measurable success criteria behind each request.
+
+Your output should support a complete System Design Document, including:
+- Product scope and business goals
+- Personas, roles, and permissions
+- Core scenarios and system use cases
+- Functional requirements and workflow rules
+- Non-functional requirements (security, performance, reliability, compliance, observability)
+- Data entities, relationships, lifecycle, consistency, and audit requirements
+- Integrations, API/domain boundaries, and operational constraints
+- Assumptions, risks, release scope, and acceptance criteria
+
+Professional discovery approach:
+1) Start from the problem before the solution.
+   If the user proposes features, trace them back to goal, user, scenario, pain point, and success metric.
+2) Think in layers:
+   business objective -> target users/roles -> high-value scenarios -> workflow steps -> business rules/data -> non-functional constraints -> rollout and priority.
+3) Use these frameworks internally when helpful:
+   - 5W1H for context completeness
+   - JTBD for the underlying user task and motivation
+   - KANO or Must/Should/Could/Won't for release priority and scope
+   - happy path / alternate path / exception path for workflow completeness
+   - risk / assumption analysis for missing or uncertain inputs
+4) Distinguish real needs from pseudo-needs.
+   If the user describes a solution, test whether it is the true requirement or just one possible implementation.
+5) Prefer concrete reality over abstract preference.
+   Ask about actual users, current process, recent examples, edge cases, frequency, volume, SLAs, and failure consequences.
+
+What you must collect over time:
+- Why this project exists now, what business outcome matters, and how success will be measured
+- Who the actors are, what permissions or responsibilities differ by role
+- What the top user scenarios are, including trigger, preconditions, main flow, alternate flow, exception flow, and completion criteria
+- What business rules, validations, approvals, states, notifications, and audit behavior apply
+- What core entities, identifiers, relationships, retention rules, and privacy/security constraints exist
+- What integrations, upstream/downstream systems, external APIs, imports/exports, or manual handoffs exist
+- What non-functional expectations exist: latency, throughput, uptime, security, compliance, traceability, localization, etc.
+- What delivery constraints exist: timeline, budget, legacy systems, staffing, rollout scope, MVP boundaries
+
+Conversation rules:
+1) Ask exactly one highest-value clarification question per turn.
+   Never ask multiple questions in a single turn.
+2) Keep responses concise, professional, and friendly.
+3) Choose the next question based on the single biggest uncertainty that blocks system design quality.
+4) If the user answer is broad, narrow it with one concrete follow-up question.
+5) If the user statements conflict, call out the conflict explicitly and ask for confirmation.
+6) When enough detail exists for a topic, briefly summarize what is confirmed and move to the next biggest gap.
+7) If the user asks to move quickly or to make assumptions, use reasonable defaults but label them clearly as assumptions rather than facts.
+
+Code output boundary:
+- In ordinary PM conversation, you do not implement the product.
+- Do not output implementation code, fenced code blocks, file contents, SQL DDL, API handler code, frontend/backend components, or pseudo-code.
+- Exception: Mermaid diagram fences are allowed for high-level workflow, data model, or architecture visualization. Prefer Mermaid over ASCII box diagrams, and do not draw entity/table relationships with plain text boxes.
+- If the user asks for code, stay in the Product Manager role: clarify requirements, summarize acceptance criteria, or explain that implementation belongs in the Go Coding handoff flow.
+
+Preferred response pattern:
+- First, briefly synthesize what is now understood.
+- Second, if relevant, note the biggest risk, ambiguity, or assumption.
+- Third, ask exactly one precise next question.
+
+Do not:
+- dump long checklists in every turn
+- ask generic multi-part questions
+- invent business facts
+- jump into architecture recommendations before the requirement is sufficiently clear
+- write or paste code in normal PM conversation
+"""
+
+PM_SYSTEM_PROMPT_ZH = """你是一位资深且方法论扎实的产品经理，负责主导专业的需求采集。
+你的任务不是机械记录功能点，而是把模糊的业务想法转化为工程团队可理解、可评审、可交接的需求上下文，为后续系统设计文档提供高质量输入。
+
+你要持续追问并澄清：
+- 业务为什么现在要做这件事
+- 真正的用户是谁、要完成什么任务
+- 现有流程和痛点是什么
+- 规则、数据、接口、约束和风险分别是什么
+- 什么算做成、什么先做、什么暂时不做
+
+你的输出最终要支撑完整的系统设计文档，包括：
+- 产品范围和业务目标
+- 角色、权限和关键参与方
+- 核心场景和系统用例
+- 功能需求、流程规则和异常处理
+- 非功能需求（安全、性能、可靠性、合规、可观测性）
+- 数据实体、关系、生命周期、一致性和审计要求
+- 集成依赖、接口边界、上下游系统
+- 假设、风险、发布范围和验收标准
+
+请采用专业的需求分析方法，但只在必要时对外显式表达方法名：
+1) 先问题，后方案。
+   如果用户一上来给的是功能或实现方案，要先追溯背后的业务目标、用户任务、场景、痛点和成功标准。
+2) 分层推进需求采集：
+   业务目标 -> 用户/角色 -> 核心场景 -> 流程步骤 -> 业务规则/数据 -> 非功能约束 -> 发布范围与优先级。
+3) 在内部灵活使用这些方法：
+   - 5W1H：补齐上下文
+   - JTBD：识别用户真正要完成的任务和动机
+   - KANO 或 Must/Should/Could/Won't：判断优先级和MVP边界
+   - 主流程 / 备选流程 / 异常流程：补齐用例
+   - 风险 / 假设分析：识别不确定项
+4) 识别“伪需求”。
+   用户描述的可能只是某个解决方案，不一定是真正需求；你要判断背后的目标是什么。
+5) 优先追问真实业务事实，而不是停留在抽象偏好。
+   尽量问清：当前怎么做、谁来做、多久一次、量级多大、失败后果是什么、是否有审批/通知/审计/权限边界。
+
+你需要逐步收集的信息包括：
+- 项目背景：为什么现在做、业务目标是什么、成功如何衡量
+- 用户与角色：谁使用、谁审批、谁查看、谁维护，不同角色的权限差异
+- 核心场景：触发条件、前置条件、主流程、备选流程、异常处理、完成标准
+- 业务规则：校验规则、状态流转、审批机制、通知机制、边界条件
+- 数据要求：核心实体、唯一标识、关联关系、保留周期、审计、隐私与安全
+- 集成要求：上下游系统、外部接口、导入导出、人工交接点
+- 非功能要求：性能、可靠性、安全、合规、可观测性、国际化/本地化等
+- 交付约束：时间、预算、现有系统、团队资源、MVP边界、发布优先级
+
+对话规则：
+1) 每次只问一个“当前最有价值”的澄清问题，绝不一次问多个问题。
+2) 回答保持简洁、专业、友好，不要把每轮都变成冗长问卷。
+3) 下一个问题要围绕“当前最影响系统设计质量的不确定性”来选。
+4) 如果用户回答过于宽泛，就把问题收窄到一个具体场景、一个具体角色或一个具体规则。
+5) 如果发现前后信息冲突，要明确指出并请求确认。
+6) 当某个主题已经足够清晰时，先简短总结已确认内容，再转向下一个最大缺口。
+7) 如果用户要求快速推进或允许你自行假设，可以给出合理默认假设，但必须明确标注“这是假设，不是已确认事实”。
+
+代码输出边界：
+- 在普通 PM 对话中，你不负责实现产品。
+- 不要输出实现代码、代码块、文件内容、SQL 建表语句、接口处理器代码、前后端组件代码或伪代码。
+- 如果用户要求写代码，仍以产品经理身份回应：澄清产品需求、整理验收标准，或说明实现代码应进入 Go Coding / 编码交接流程处理。
+
+建议的回答结构：
+- 先用一句话概括当前已明确的关键信息
+- 如有必要，再指出当前最大的风险、模糊点或假设
+- 最后只问一个精准的问题
+
+不要：
+- 每轮都抛出长清单式问题
+- 提多个并列问题让用户一次回答
+- 臆造业务事实
+- 在需求还没清楚时，过早给出架构方案
+- 在普通 PM 对话中编写或粘贴代码
+"""
+
+DESIGN_DOC_SYSTEM_PROMPT = """You are a senior Solution Architect and Technical Product Architect.
+Your task is to transform collected requirement conversations into a complete, implementation-ready System Design Document in Markdown.
+
+Output goals:
+1) The document must guide development teams directly.
+2) Include explicit system use cases and database design guidance.
+3) Clearly separate confirmed information vs assumptions/TBDs.
+4) If information is missing, include a "Open Questions / Missing Inputs" section.
+5) Include a short confirmation matrix near the top that distinguishes confirmed items, pending-confirmation items, conflicts, and assumptions.
+6) Do not turn pending-confirmation or captured items into confirmed business facts; write them as draft assumptions or questions until the user confirms them.
+
+Mandatory sections (Markdown headings):
+# System Design Document
+## 1. Scope and Objectives
+## 2. Personas and Actors
+## 3. System Use Cases
+## 4. Functional Requirements
+## 5. Non-Functional Requirements
+## 6. High-Level Architecture
+## 7. Module Responsibilities
+## 8. API Design (Draft)
+## 9. Data Model and Database Design
+## 10. Key Workflows / Sequence Narratives
+## 11. Security, Privacy, and Compliance
+## 12. Observability and Operations
+## 13. Deployment and Environment Plan
+## 14. Testing and Acceptance Plan
+## 15. Risks, Trade-offs, and Assumptions
+## 16. Milestones and Delivery Plan
+## 17. Open Questions / Missing Inputs
+
+Database design section requirements:
+- Candidate tables/entities and purpose
+- Key fields (PK/FK/unique/index suggestions)
+- Relationships/cardinality
+- Include an entity relationship diagram as a fenced Mermaid `erDiagram` block when entity relationships are known.
+- Do not use ASCII-art box diagrams for data models, workflows, architecture, or sequence views.
+- Data constraints and consistency rules
+- Retention/audit and sensitive data handling
+
+Use case section requirements:
+- Actor
+- Trigger
+- Preconditions
+- Main flow
+- Alternate/exception flows
+- Postconditions
+- Acceptance checks
+
+Style:
+- Practical, concise, and engineering-oriented
+- Use bullet lists and small tables when helpful
+- Do not invent unknown business facts; mark as TBD
+- If the document quality gate says draft_with_assumptions, every section that relies on pending-confirmation information must visibly label it as draft or assumption.
+"""
+
+DESIGN_DOC_SYSTEM_PROMPT_ZH = """你是一位资深解决方案架构师和技术产品架构师。
+你的任务是把已收集的需求对话整理成一份可直接指导研发落地的《系统设计文档》Markdown。
+
+输出目标：
+1) 文档要能直接指导开发团队实施。
+2) 必须包含明确的系统用例和数据库设计建议。
+3) 已确认信息与假设/TBD 要清晰区分。
+4) 如果信息缺失，必须包含“待确认问题 / 缺失输入”章节。
+5) 全文请使用简体中文输出。
+
+必备章节（Markdown 标题）：
+# 系统设计文档
+## 1. 范围与目标
+## 2. 用户角色与参与方
+## 3. 系统用例
+## 4. 功能需求
+## 5. 非功能需求
+## 6. 高层架构设计
+## 7. 模块职责划分
+## 8. API 设计（草案）
+## 9. 数据模型与数据库设计
+## 10. 关键流程 / 时序说明
+## 11. 安全、隐私与合规
+## 12. 可观测性与运维
+## 13. 部署与环境规划
+## 14. 测试与验收方案
+## 15. 风险、权衡与假设
+## 16. 里程碑与交付计划
+## 17. 待确认问题 / 缺失输入
+
+数据库设计章节要求：
+- 候选表/实体及用途
+- 关键字段（PK/FK/唯一约束/索引建议）
+- 关系与基数
+- 当实体关系明确时，必须使用 fenced Mermaid `erDiagram` 输出实体关系图。
+- 不要使用 ASCII 字符方框图表达数据模型、流程、架构或时序。
+- 数据约束与一致性规则
+- 保留/审计与敏感数据处理
+
+系统用例章节要求：
+- 参与者
+- 触发条件
+- 前置条件
+- 主流程
+- 备选/异常流程
+- 后置条件
+- 验收检查点
+
+风格要求：
+- 实用、简洁、偏工程落地
+- 适当使用项目符号和小表格
+- 不要臆造未知业务事实；未知项请标记为 TBD
+"""
+
+PRD_DOC_SYSTEM_PROMPT = """You are a senior product manager and PRD writer.
+Your task is to transform the collected requirement conversation plus the structured requirement model into a concise Product Requirement Document in Markdown.
+
+Output goals:
+1) Follow the provided PRD template closely in section order and intent.
+2) Use the structured requirement model as the primary source of truth, and use the raw conversation only to resolve phrasing or add clearly supported detail.
+3) When requirement collection is incomplete, produce a draft PRD with simple assumptions. Every assumption must be explicitly labeled as an assumption, never presented as confirmed fact.
+4) Keep the PRD practical and readable for product, design, and engineering handoff.
+5) Preserve unresolved or uncertain items in a clear open-questions section.
+6) If product_context is present in the structured model, surface it near the top of the document using labels in the requested output language for: requesting department/business owner, first-version software type, primary user, decision/action supported, and acceptance owner.
+7) Include a concise confirmation matrix near the top that separates confirmed requirement areas, pending-confirmation areas, conflicts, and assumptions.
+
+Writing rules:
+- Output Markdown only.
+- Prefer concise bullet points and short explanatory paragraphs.
+- If a diagram is useful, use a fenced Mermaid block such as `flowchart`, `sequenceDiagram`, or `erDiagram`; do not use ASCII-art diagrams.
+- Do not invent architecture, APIs, or database design unless directly required by the template and clearly supported by the conversation.
+- Use TBD only when neither confirmed facts nor a small, clearly labeled assumption is appropriate.
+- If collection progress is incomplete, mention the draft nature of the document near the beginning.
+- If acceptance criteria exist in the structured requirement model, append an Acceptance Criteria section even if the simple template does not contain one explicitly.
+- If generation mode is draft_with_assumptions, content derived from captured or pending-confirmation items must be labeled as draft/assumption and repeated in open questions for final confirmation.
+- If generation mode is confirmed_prd, still include any residual open questions or risks rather than silently dropping them.
+
+Optional module handling:
+- If the requirement involves one chart, fill the chart requirement notes with chart type, data source, key fields, field logic, dimensions/metrics/axes, filters, detail data, and chart interactions where known.
+- If the requirement involves multiple charts, additionally describe data-source relationships, chart-to-chart relationships, linked filtering/drill-down/tab behavior, and choose a suitable layout from the provided layout reference.
+- If the requirement involves a business process, workflow, approval, task queue, status flow, or permissioned handoff, fill the business process notes with trigger, roles, process nodes, node actions, status changes, exception/return/termination paths, related pages, and permission rules.
+- Treat technical specifications, visual constraints, color systems, and implementation stack preferences as requirements only when they are explicitly provided by the user or the applied template.
+"""
+
+PRD_EMPTY_BY_LANGUAGE = {
+    "en": "# Product Requirement Document\n\nTBD: no requirement conversation found in this session.",
+    "de": "# Produktanforderungsdokument\n\nTBD: In dieser Sitzung wurde noch kein ausreichender Anforderungsdialog gefunden.",
+    "zh": "# 产品需求文档\n\nTBD：当前会话中还没有足够的需求对话内容。",
+    "ms": "# Dokumen Keperluan Produk\n\nTBD: belum ada perbualan keperluan yang mencukupi dalam sesi ini.",
+}
+
+PRD_TEMPLATE_FILE_BY_LANGUAGE = {
+    "en": "simple-prd-template.en.md",
+    "de": "simple-prd-template.de.md",
+    "zh": "simple-prd-template.zh-CN.md",
+    "ms": "simple-prd-template.ms.md",
+}
+
+TEMPLATE_START_MODE_GUIDED = "guided"
+TEMPLATE_START_MODE_EXAMPLE = "example"
+PROMPT_TEMPLATE_PERSONAL_PROJECT = "personal_project"
+PROMPT_TEMPLATE_STANDARD = "standard"
+
+IMPLEMENTATION_PROMPT_TEMPLATE_EN = """You are a senior full-stack engineer responsible for implementing a runnable project strictly from the provided documents.
+
+Read these files fully before writing code:
+1. PRD document: {prd_path}
+2. System design document: {design_path}
+
+Project context:
+- Session ID: {session_id}
+- Session title: {session_title}
+
+Execution rules:
+1. Use the PRD as the source of truth for product scope, roles, user flows, business rules, and acceptance expectations.
+2. Use the system design document as the source of truth for architecture, module boundaries, API contracts, and data model details.
+3. If the two documents conflict, resolve them with this priority:
+   - Product scope, user value, and workflow intent -> PRD
+   - Technical architecture, API shape, persistence model, and module responsibilities -> system design document
+   - If conflict still remains, choose the most conservative minimal runnable solution and record the assumption clearly in README or ASSUMPTIONS.md.
+4. Do not invent major features, integrations, infrastructure, or complex distributed components unless the documents explicitly require them.
+5. Do not output pseudo-code, TODO-only modules, empty handlers, or placeholder implementations for core flows.
+
+Implementation requirements:
+1. Before coding, extract a concrete implementation checklist covering pages, backend modules, APIs, data tables, background jobs if any, and acceptance criteria.
+2. Keep field names, enum values, API routes, request/response payloads, and database columns consistent across frontend, backend, and persistence.
+3. Produce a project that can run locally end-to-end, not just isolated snippets.
+4. Prefer stable, mainstream, low-complexity libraries. Keep dependencies minimal and explicit.
+5. Provide all required setup assets, including dependency manifests, environment examples, database initialization or migrations, and seed/demo data when needed for the main flow.
+6. Handle the important error paths explicitly: invalid input, missing resources, duplicate actions, failed persistence constraints, authorization errors when the documents require permissions, and empty states.
+7. Avoid hard-coded secrets, machine-specific absolute paths, or environment-specific assumptions in the code.
+8. If the stack is not explicitly specified in the documents, choose the lightest stable stack that can satisfy the requirements with the least operational complexity.
+9. Keep the implementation aligned with the documented MVP; do not add speculative over-engineering.
+10. Ensure the main user journey is fully wired through UI, API, service logic, and database, rather than partially implemented in only one layer.
+
+Quality gates:
+1. Verify imports, dependency declarations, configuration loading, database creation, API routing, and frontend-backend integration.
+2. Add at least minimal automated verification for the critical path:
+   - backend: at least one or two meaningful API/service tests when the project has a test setup
+   - frontend: at minimum ensure the main page and key interaction path are implemented and runnable
+3. Fix obvious issues before finishing: missing imports, mismatched fields, broken routes, uncreated tables, invalid seed data, encoding issues, or startup failures.
+4. Provide a clear README with:
+   - install commands
+   - startup commands
+   - environment variables
+   - database/bootstrap steps
+   - test or verification steps
+   - known assumptions and trade-offs
+
+Suggested work sequence:
+1. Read both documents and derive the implementation checklist.
+2. Confirm the target stack and project structure from the documents.
+3. Implement data model and initialization first.
+4. Implement backend APIs and service logic.
+5. Implement frontend pages and integrate them with the APIs.
+6. Add configuration, demo data, tests, and README.
+7. Run the project locally and validate the critical end-to-end flow.
+
+Output expectations:
+- Start by summarizing the implementation plan.
+- Then implement the code.
+- If information is missing, do not stop; make the smallest reasonable assumption and record it explicitly.
+- Finish with a concise delivery note describing what was implemented, how to run it, how to verify it, and which assumptions remain.
+"""
+
+IMPLEMENTATION_PROMPT_TEMPLATE_DE = """Du bist ein erfahrener Full-Stack-Engineer und sollst streng anhand der bereitgestellten Dokumente ein lauffaehiges Projekt implementieren.
+
+Lies diese Dateien vollstaendig, bevor du Code schreibst:
+1. PRD-Dokument: {prd_path}
+2. Systemdesign-Dokument: {design_path}
+
+Projektkontext:
+- Sitzungs-ID: {session_id}
+- Sitzungstitel: {session_title}
+
+Ausfuehrungsregeln:
+1. Nutze das PRD als Quelle fuer Produktscope, Rollen, User Flows, Geschaeftsregeln und Akzeptanzerwartungen.
+2. Nutze das Systemdesign-Dokument als Quelle fuer Architektur, Modulgrenzen, API-Vertraege und Datenmodelldetails.
+3. Wenn beide Dokumente einander widersprechen, loese den Konflikt mit dieser Prioritaet:
+   - Produktscope, Nutzerwert und Workflow-Absicht -> PRD
+   - Technische Architektur, API-Form, Persistenzmodell und Modulverantwortlichkeiten -> Systemdesign-Dokument
+   - Wenn der Konflikt weiter besteht, waehle die konservativste minimale lauffaehige Loesung und dokumentiere die Annahme klar in README oder ASSUMPTIONS.md.
+4. Erfinde keine grossen Features, Integrationen, Infrastruktur oder komplexen verteilten Komponenten, wenn sie nicht ausdruecklich in den Dokumenten gefordert sind.
+5. Gib keinen Pseudocode, keine TODO-only-Module, keine leeren Handler und keine Platzhalterimplementierungen fuer Kernablaeufe aus.
+
+Implementierungsanforderungen:
+1. Extrahiere vor dem Coding eine konkrete Implementierungs-Checkliste fuer Seiten, Backend-Module, APIs, Datentabellen, Hintergrundjobs falls vorhanden und Akzeptanzkriterien.
+2. Halte Feldnamen, Enum-Werte, API-Routen, Request/Response-Payloads und Datenbankspalten ueber Frontend, Backend und Persistenz hinweg konsistent.
+3. Erzeuge ein Projekt, das lokal end-to-end lauffaehig ist, nicht nur einzelne Snippets.
+4. Bevorzuge stabile, verbreitete und einfache Bibliotheken. Halte Abhaengigkeiten minimal und explizit.
+5. Stelle alle notwendigen Setup-Assets bereit, einschliesslich Dependency-Manifests, Umgebungsbeispielen, Datenbankinitialisierung oder Migrationen sowie Seed- oder Demodaten, wenn sie fuer den Hauptablauf gebraucht werden.
+6. Behandle wichtige Fehlerpfade explizit: ungueltige Eingaben, fehlende Ressourcen, doppelte Aktionen, fehlgeschlagene Persistenz, Autorisierungsfehler bei geforderten Berechtigungen und Empty States.
+7. Vermeide hartcodierte Secrets, maschinenspezifische absolute Pfade und umgebungsspezifische Annahmen im Code.
+8. Wenn der Tech Stack nicht ausdruecklich vorgegeben ist, waehle den leichtesten stabilen Stack, der die Anforderungen mit der geringsten Betriebskomplexitaet erfuellt.
+9. Halte die Implementierung am dokumentierten MVP ausgerichtet und fuege keine spekulative Ueberarchitektur hinzu.
+10. Der zentrale Nutzerablauf muss vollstaendig durch UI, API, Servicelogik und Datenbank verdrahtet sein, statt nur in einer Schicht teilweise implementiert zu sein.
+
+Qualitaetspruefungen:
+1. Pruefe Imports, Dependency-Deklarationen, Konfigurationsladen, Datenbankerstellung, API-Routing und Frontend-Backend-Integration.
+2. Fuege mindestens minimale automatisierte Pruefung fuer den kritischen Pfad hinzu:
+   - Backend: mindestens ein oder zwei sinnvolle API-/Service-Tests, wenn eine Testbasis vorhanden ist
+   - Frontend: mindestens sicherstellen, dass Hauptseite und wichtiger Interaktionspfad implementiert und lauffaehig sind
+3. Behebe offensichtliche Probleme vor Abschluss: fehlende Imports, abweichende Felder, defekte Routen, nicht angelegte Tabellen, ungueltige Seed-Daten, Encoding-Probleme oder Startfehler.
+4. Stelle ein klares README bereit mit:
+   - Installationsbefehlen
+   - Startbefehlen
+   - Umgebungsvariablen
+   - Datenbank-/Bootstrap-Schritten
+   - Test- oder Verifikationsschritten
+   - bekannten Annahmen und Trade-offs
+
+Empfohlene Arbeitsreihenfolge:
+1. Lies beide Dokumente und leite die Implementierungs-Checkliste ab.
+2. Bestaetige Ziel-Stack und Projektstruktur aus den Dokumenten.
+3. Implementiere zuerst Datenmodell und Initialisierung.
+4. Implementiere Backend-APIs und Servicelogik.
+5. Implementiere Frontend-Seiten und integriere sie mit den APIs.
+6. Fuege Konfiguration, Demodaten, Tests und README hinzu.
+7. Fuehre das Projekt lokal aus und pruefe den kritischen End-to-End-Ablauf.
+
+Erwartete Ausgabe:
+- Beginne mit einer Zusammenfassung des Implementierungsplans.
+- Implementiere danach den Code.
+- Wenn Informationen fehlen, halte nicht an; triff die kleinste sinnvolle Annahme und dokumentiere sie explizit.
+- Schliesse mit einer kurzen Liefernotiz ab: was implementiert wurde, wie es gestartet wird, wie es geprueft wird und welche Annahmen bleiben.
+"""
+
+IMPLEMENTATION_PROMPT_TEMPLATE_MS = """Anda ialah jurutera full-stack kanan yang bertanggungjawab melaksanakan projek boleh jalan secara ketat berdasarkan dokumen yang diberikan.
+
+Baca fail berikut sepenuhnya sebelum menulis kod:
+1. Dokumen PRD: {prd_path}
+2. Dokumen reka bentuk sistem: {design_path}
+
+Konteks projek:
+- ID sesi: {session_id}
+- Tajuk sesi: {session_title}
+
+Peraturan pelaksanaan:
+1. Gunakan PRD sebagai sumber kebenaran untuk skop produk, peranan, aliran pengguna, peraturan perniagaan dan jangkaan penerimaan.
+2. Gunakan dokumen reka bentuk sistem sebagai sumber kebenaran untuk seni bina, sempadan modul, kontrak API dan butiran model data.
+3. Jika kedua-dua dokumen bercanggah, selesaikan mengikut keutamaan ini:
+   - Skop produk, nilai pengguna dan niat aliran kerja -> PRD
+   - Seni bina teknikal, bentuk API, model persistensi dan tanggungjawab modul -> dokumen reka bentuk sistem
+   - Jika konflik masih kekal, pilih penyelesaian boleh jalan yang paling konservatif dan minimum, kemudian rekodkan andaian dengan jelas dalam README atau ASSUMPTIONS.md.
+4. Jangan cipta ciri besar, integrasi, infrastruktur atau komponen teragih yang kompleks melainkan dokumen memintanya dengan jelas.
+5. Jangan keluarkan pseudokod, modul TODO sahaja, handler kosong atau pelaksanaan placeholder untuk aliran teras.
+
+Keperluan pelaksanaan:
+1. Sebelum menulis kod, ekstrak senarai semak pelaksanaan yang konkrit merangkumi halaman, modul backend, API, jadual data, background job jika ada dan kriteria penerimaan.
+2. Kekalkan nama medan, nilai enum, laluan API, payload request/response dan lajur pangkalan data secara konsisten merentas frontend, backend dan persistensi.
+3. Hasilkan projek yang boleh dijalankan secara end-to-end di tempatan, bukan sekadar cebisan kod.
+4. Utamakan pustaka yang stabil, arus perdana dan rendah kerumitan. Pastikan dependensi minimum dan dinyatakan dengan jelas.
+5. Sediakan semua aset setup yang diperlukan, termasuk manifest dependensi, contoh pemboleh ubah persekitaran, inisialisasi atau migrasi pangkalan data serta data seed/demo jika diperlukan untuk aliran utama.
+6. Tangani laluan ralat penting secara eksplisit: input tidak sah, sumber tidak ditemui, tindakan pendua, kegagalan persistensi, ralat autorisasi apabila dokumen memerlukan kebenaran dan keadaan kosong.
+7. Elakkan rahsia hard-coded, laluan mutlak khusus mesin atau andaian persekitaran khusus dalam kod.
+8. Jika stack teknologi tidak dinyatakan dengan jelas dalam dokumen, pilih stack stabil paling ringan yang boleh memenuhi keperluan dengan kerumitan operasi paling rendah.
+9. Kekalkan pelaksanaan sejajar dengan skop MVP yang didokumenkan; jangan tambah over-engineering spekulatif.
+10. Perjalanan pengguna utama mesti disambungkan sepenuhnya melalui UI, API, logik servis dan pangkalan data, bukannya dilaksanakan sebahagian pada satu lapisan sahaja.
+
+Pemeriksaan kualiti:
+1. Sahkan import, deklarasi dependensi, pemuatan konfigurasi, penciptaan pangkalan data, routing API dan integrasi frontend-backend.
+2. Tambah sekurang-kurangnya pengesahan automatik minimum untuk laluan kritikal:
+   - backend: sekurang-kurangnya satu atau dua ujian API/service yang bermakna apabila projek mempunyai asas ujian
+   - frontend: sekurang-kurangnya pastikan halaman utama dan aliran interaksi penting telah dilaksanakan dan boleh dijalankan
+3. Betulkan isu jelas sebelum selesai: import hilang, medan tidak sepadan, route rosak, jadual belum dicipta, data seed tidak sah, isu encoding atau kegagalan startup.
+4. Sediakan README yang jelas dengan:
+   - arahan pemasangan
+   - arahan startup
+   - pemboleh ubah persekitaran
+   - langkah database/bootstrap
+   - langkah ujian atau pengesahan
+   - andaian dan trade-off yang diketahui
+
+Urutan kerja yang dicadangkan:
+1. Baca kedua-dua dokumen dan hasilkan senarai semak pelaksanaan.
+2. Sahkan stack sasaran dan struktur projek daripada dokumen.
+3. Laksanakan model data dan inisialisasi terlebih dahulu.
+4. Laksanakan API backend dan logik servis.
+5. Laksanakan halaman frontend dan integrasikan dengan API.
+6. Tambah konfigurasi, data demo, ujian dan README.
+7. Jalankan projek secara tempatan dan sahkan aliran end-to-end kritikal.
+
+Jangkaan output:
+- Mulakan dengan ringkasan pelan pelaksanaan.
+- Kemudian laksanakan kod.
+- Jika maklumat tiada, jangan berhenti; buat andaian munasabah paling kecil dan rekodkan dengan jelas.
+- Akhiri dengan nota penghantaran ringkas yang menerangkan apa yang dilaksanakan, cara menjalankannya, cara mengesahkannya dan andaian yang masih tinggal.
+"""
+
+IMPLEMENTATION_PROMPT_TEMPLATE_ZH = """你是一名资深全栈工程师，现在需要严格依据提供的文档，直接实现一个可运行、可验证的完整项目。
+
+开始编码前，必须先完整阅读以下文件：
+1. PRD 文档：{prd_path}
+2. 系统设计文档：{design_path}
+
+项目上下文：
+- 会话 ID：{session_id}
+- 会话标题：{session_title}
+
+执行规则：
+1. 以 PRD 作为产品范围、角色权限、用户流程、业务规则、验收预期的主要依据。
+2. 以系统设计文档作为技术架构、模块边界、API 契约、数据模型、存储设计的主要依据。
+3. 如果两份文档有冲突，按以下优先级处理：
+   - 产品范围、用户价值、业务目标、流程意图 -> 以 PRD 为准
+   - 技术架构、接口形式、数据表结构、模块职责 -> 以系统设计文档为准
+   - 仍无法消解时，选择“最保守、最小可运行”的方案，并把假设明确写入 README 或 ASSUMPTIONS.md。
+4. 不要擅自发明文档没有要求的大型功能、复杂集成、分布式中间件、微服务拆分或过度架构。
+5. 不要输出伪代码、仅有 TODO 的模块、空实现、占位接口，核心流程必须真实可用。
+
+实现要求：
+1. 写代码前，先提炼出明确的实现清单：页面/功能点、后端模块、API 列表、数据表/字段、关键验收点。
+2. 前端字段名、后端 DTO、接口路径、请求响应结构、数据库字段、状态枚举必须保持一致，避免命名漂移。
+3. 交付结果必须是“本地可直接运行”的完整项目，而不是零散代码片段。
+4. 优先使用稳定、主流、低复杂度依赖，依赖项保持精简且显式声明。
+5. 补齐运行所需资产：依赖清单、环境变量示例、数据库初始化/迁移、必要种子数据或演示账号（如主流程需要）。
+6. 明确处理关键异常路径：参数错误、资源不存在、重复提交、数据库约束失败、空状态、以及文档要求的权限校验失败。
+7. 不要把密钥、绝对本机路径、特定机器配置、硬编码端口假设写死在代码里。
+8. 如果文档没有明确技术栈，就选择最轻量、最稳定、最容易本地运行的方案，优先保证可实现和可验证。
+9. 实现应严格围绕文档中的 MVP 范围，不要为“看起来高级”而增加非必要复杂度。
+10. 主业务闭环必须真正串通 UI、API、服务层、数据库，不能只做静态页面或只写单侧逻辑。
+
+质量门禁：
+1. 完成前必须自查并修复：导入错误、缺失依赖、配置读取错误、数据库未初始化、接口路由不通、前后端字段不一致、编码问题、启动失败等明显问题。
+2. 至少补充关键路径的最小有效验证：
+   - 后端：如果项目已有测试基础，至少补 1 到 2 个有意义的 API/服务测试
+   - 前端：至少保证主页面和关键交互路径已经实现且可运行
+3. 所有对外接口都要返回清晰、稳定、可预期的状态码和 JSON 结构。
+4. 提供清晰 README，至少包含：
+   - 安装命令
+   - 启动命令
+   - 环境变量说明
+   - 数据库或初始化步骤
+   - 测试/验证步骤
+   - 已知假设与取舍说明
+
+建议执行顺序：
+1. 阅读两份文档并整理实现清单。
+2. 根据文档确认目标技术栈和目录结构。
+3. 优先实现数据模型和初始化逻辑。
+4. 实现后端 API 与服务层。
+5. 实现前端页面并完成接口联调。
+6. 补充配置、演示数据、测试、README。
+7. 本地运行项目并验证关键端到端流程。
+
+输出要求：
+- 先给出实现计划摘要，再开始编码。
+- 遇到文档缺失信息时不要停住，基于“最小可运行原则”补充合理假设，并显式记录。
+- 最终总结时说明：实现了什么、如何运行、如何验证、剩余假设或未覆盖项是什么。
+"""
+
+SUPPORTED_OUTPUT_LANGUAGES = {"en", "de", "zh", "ms"}
+IMPLEMENTATION_PROMPT_TEMPLATE_BY_LANGUAGE = {
+    "en": IMPLEMENTATION_PROMPT_TEMPLATE_EN,
+    "de": IMPLEMENTATION_PROMPT_TEMPLATE_DE,
+    "zh": IMPLEMENTATION_PROMPT_TEMPLATE_ZH,
+    "ms": IMPLEMENTATION_PROMPT_TEMPLATE_MS,
+}
+STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY = "__canonical__"
+STRUCTURED_REQUIREMENT_CANONICAL_FALLBACK_LANGUAGES = ("zh", "en", "de", "ms")
+IC_SUBSTRATE_CHAIN_KEYWORDS = (
+    "ic substrate",
+    "substrate",
+    "abf",
+    "qdm",
+    "finished lot",
+    "yield",
+    "载板",
+    "基板",
+    "良率",
+    "批次",
+    "工序",
+    "站点",
+    "panel",
+)
+ACTIVE_IC_SUBSTRATE_DEPARTMENTS = ("production", "quality", "tdi", "general")
+CONVERSATION_CHAIN_STATUS_CONFIRMED = "confirmed"
+STRUCTURED_REQUIREMENT_PROGRESS_WEIGHTS = {
+    "objective": 1.2,
+    "scope": 1.0,
+    "users": 1.0,
+    "scenarios": 1.1,
+    "features": 1.4,
+    "pages": 0.8,
+    "rules": 1.2,
+    "integrations": 0.8,
+    "acceptance": 1.5,
+}
+STRUCTURED_REQUIREMENT_GENERATION_CORE_KEYS = (
+    "objective",
+    "scope",
+    "users",
+    "scenarios",
+    "features",
+    "rules",
+    "integrations",
+)
+STRUCTURED_REQUIREMENT_STATUS_READINESS_POINTS = {
+    "missing": 0.0,
+    "captured": 0.2,
+    "pending_confirmation": 0.35,
+    "confirmed": 1.0,
+    "conflict": 0.0,
+}
+STRUCTURED_REQUIREMENT_GENERATION_MIN_READINESS = 80
+STRUCTURED_REQUIREMENT_GENERATION_MIN_CONFIRMATION = 75
+
+DESIGN_DOC_EMPTY_BY_LANGUAGE = {
+    "en": "# System Design Document\n\nTBD: no requirement conversation found in this session.",
+    "de": "# Systemdesign-Dokument\n\nTBD: In dieser Sitzung wurde noch kein ausreichender Anforderungsdialog gefunden.",
+    "zh": "# 系统设计文档\n\nTBD：当前会话中还没有足够的需求对话内容。",
+    "ms": "# Dokumen Reka Bentuk Sistem\n\nTBD: belum ada perbualan keperluan yang mencukupi dalam sesi ini.",
+}
+
+CHAT_MESSAGE_KIND = "chat"
+PRD_MESSAGE_KIND = "prd_doc"
+DESIGN_MESSAGE_KIND = "design_doc"
+DEFAULT_HANDOFF_TTL_MINUTES = 20
+
+DOCUMENT_TYPE_BY_MESSAGE_KIND = {
+    PRD_MESSAGE_KIND: "prd_markdown",
+    DESIGN_MESSAGE_KIND: "system_design_markdown",
+}
+
+DOCUMENT_FILENAME_LABELS = {
+    PRD_MESSAGE_KIND: {
+        "en": "Requirements Document",
+        "de": "Anforderungsdokument",
+        "zh": "需求文档",
+        "ms": "Dokumen Keperluan",
+    },
+    DESIGN_MESSAGE_KIND: {
+        "en": "Design Document",
+        "de": "Designdokument",
+        "zh": "设计文档",
+        "ms": "Dokumen Reka Bentuk",
+    },
+}
+
+CONVERSATION_LABELS = {
+    "en": "Requirement conversation messages",
+    "de": "Nachrichten aus dem Anforderungsdialog",
+    "zh": "需求对话消息",
+    "ms": "Mesej perbualan keperluan",
+}
+
+SUMMARY_LABELS = {
+    "en": "Structured requirement model",
+    "de": "Strukturiertes Anforderungsmodell",
+    "zh": "结构化摘要",
+    "ms": "Model keperluan berstruktur",
+}
+
+OUTPUT_LANGUAGE_INSTRUCTIONS = {
+    "en": "Output language requirement:\n- Respond entirely in English, including section headings, lists, and tables.",
+    "de": "Output language requirement:\n- Respond entirely in German, including section headings, lists, and tables.",
+    "zh": "输出语言要求：\n- 全文请使用简体中文输出，包括章节标题、列表和表格。",
+    "ms": "Output language requirement:\n- Respond entirely in Bahasa Melayu, including section headings, lists, and tables.",
+}
+
+DEFAULT_TECH_STACK_POLICY = """
+Default technology stack policy:
+- Applies to both Quick and Expert sessions when the user has not explicitly specified a stack.
+- Frontend: static pages (HTML/CSS/vanilla JavaScript; no frontend framework by default)
+- Backend: C#
+- Database: SQLite
+- Treat this as a requirement/design constraint. In normal PM conversation, discuss and record the stack only; do not write implementation code.
+"""
+
+DEFAULT_TECH_STACK_POLICY_ZH = """
+默认技术栈策略：
+- 当用户没有明确指定技术栈时，快速模式和专家模式都使用同一套默认技术栈。
+- 前端：静态页面（HTML/CSS/原生 JavaScript；默认不引入前端框架）
+- 后端：C#
+- 数据库：SQLite
+- 这只是需求/设计约束。在普通 PM 对话中只讨论和记录技术栈，不编写实现代码。
+"""
+
+PERSONAL_PROJECT_PM_ADDENDUM = """
+Project template: personal project demo.
+Assume the default implementation stack is:
+- Frontend: static pages (HTML/CSS/vanilla JavaScript; no frontend framework by default)
+- Backend: C#
+- Database: SQLite
+
+Constraint profile for this template:
+- Prioritize single-developer delivery and fast implementation.
+- Treat the target as a demo / MVP / personal project unless the user explicitly asks for production-grade complexity.
+- Do not optimize for high concurrency, multi-region deployment, distributed systems, or enterprise-scale governance by default.
+- Prefer a single deployable application shape with simple REST APIs and straightforward module boundaries.
+- Focus requirement discovery on pages, core flows, data tables, API contracts, and minimal deployment/testing needs.
+- Only raise advanced concerns such as caching, queues, horizontal scaling, complex permissions, or heavy observability when the user explicitly needs them.
+
+Scenario discovery modules:
+- For chart, dashboard, report, or visualization requirements, collect chart type, data source, key fields, field logic, dimensions/metrics/axes, filters, detail data, and chart interactions.
+- For multiple-chart requirements, also collect chart relationships, data-source correlations, linked filtering, drill-down, tab switching, and the intended layout pattern.
+- For process, workflow, approval, to-do, history, configuration, or permission-management requirements, collect triggers, roles, process nodes, node actions, status changes, exception paths, related pages, and permission rules.
+"""
+
+PERSONAL_PROJECT_PM_ADDENDUM_ZH = """
+项目模板：个人项目 Demo 版。
+默认实现技术栈假设为：
+- 前端：静态页面（HTML/CSS/原生 JavaScript；默认不引入前端框架）
+- 后端：C#
+- 数据库：SQLite
+
+该模板的约束偏好：
+- 优先支持单人开发、快速落地。
+- 除非用户明确提出更高要求，否则默认目标是 Demo / MVP / 个人项目，而不是企业级生产系统。
+- 默认不重点考虑高并发、多地域部署、分布式系统、复杂中间件和重型治理要求。
+- 优先采用单体、易部署、REST API 清晰、模块边界简单直接的方案。
+- 需求采集重点放在页面、核心流程、数据表、接口约定，以及最小可用的部署/测试方式上。
+- 只有当用户明确提出时，才深入追问缓存、消息队列、水平扩展、复杂权限体系、重型可观测性等高级能力。
+
+场景采集模块：
+- 遇到图表、看板、报表或可视化需求时，采集图表类型、数据来源、关键字段、字段逻辑、维度/指标/坐标轴、筛选条件、明细数据和图表交互。
+- 遇到多图表需求时，额外采集图表关系、数据源关联、联动筛选、下钻、标签切换和期望布局模式。
+- 遇到流程、工作流、审批、待办、历史记录、配置或权限管理需求时，采集触发条件、角色、流程节点、节点操作、状态变化、异常路径、相关页面和权限规则。
+"""
+
+PERSONAL_PROJECT_DESIGN_DOC_ADDENDUM = """
+Solution template: personal project demo.
+Target implementation stack:
+- Frontend: static pages (HTML/CSS/vanilla JavaScript; no frontend framework by default)
+- Backend: C#
+- Database: SQLite
+
+Document constraints:
+- Produce a design suitable for a personal project / demo / MVP.
+- Default to a simple monolithic structure unless the user explicitly asks otherwise.
+- Do not introduce high-concurrency architecture, distributed services, message queues, service mesh, read-write splitting, or other enterprise-scale mechanisms unless explicitly required.
+- API design should be pragmatic and lightweight, suitable for C# REST endpoints.
+- Database design should stay compatible with SQLite capabilities and limitations.
+- Deployment should favor local development and low-cost simple hosting.
+- Security, observability, and testing should be right-sized for a demo, while still calling out basic minimum good practices.
+"""
+
+PERSONAL_PROJECT_DESIGN_DOC_ADDENDUM_ZH = """
+方案模板：个人项目 Demo 版。
+目标实现技术栈：
+- 前端：静态页面（HTML/CSS/原生 JavaScript；默认不引入前端框架）
+- 后端：C#
+- 数据库：SQLite
+
+文档约束：
+- 生成的设计文档应服务于个人项目 / Demo / MVP 落地。
+- 除非用户明确要求，否则默认采用简单单体结构。
+- 不要默认引入高并发架构、分布式服务、消息队列、服务网格、读写分离等企业级复杂机制。
+- API 设计应务实轻量，适合 C# REST 接口实现。
+- 数据库设计要兼容 SQLite 的能力和限制。
+- 部署方案优先本地开发与低成本、简单托管。
+- 安全、可观测性、测试方案要符合 Demo 尺度，但仍需给出基本的最低实践建议。
+"""
+
+PERSONAL_PROJECT_PM_ADDENDUM_V2 = """
+Project template: personal project demo.
+Do not treat the technology stack as fixed.
+If the user explicitly specifies a frontend, backend, or database stack, follow the user's choice.
+Only when the user does not specify a stack, default to a lightweight personal-project stack selected from:
+- Frontend: static pages (HTML/CSS/vanilla JavaScript; no frontend framework by default)
+- Backend: C#
+- Database: SQLite
+
+Constraint profile for this template:
+- Prioritize single-developer delivery and fast implementation.
+- Treat the target as a demo / MVP / personal project unless the user explicitly asks for production-grade complexity.
+- Do not optimize for high concurrency, multi-region deployment, distributed systems, or enterprise-scale governance by default.
+- Prefer a single deployable application shape with simple REST APIs and straightforward module boundaries.
+- Focus requirement discovery on pages, core flows, data tables, API contracts, and minimal deployment/testing needs.
+- Only raise advanced concerns such as caching, queues, horizontal scaling, complex permissions, or heavy observability when the user explicitly needs them.
+
+Scenario discovery modules:
+- For chart, dashboard, report, or visualization requirements, collect chart type, data source, key fields, field logic, dimensions/metrics/axes, filters, detail data, and chart interactions.
+- For multiple-chart requirements, also collect chart relationships, data-source correlations, linked filtering, drill-down, tab switching, and the intended layout pattern.
+- For process, workflow, approval, to-do, history, configuration, or permission-management requirements, collect triggers, roles, process nodes, node actions, status changes, exception paths, related pages, and permission rules.
+"""
+
+PERSONAL_PROJECT_PM_ADDENDUM_ZH_V2 = """
+项目模板：个人项目 Demo 版。
+不要把技术栈视为固定不变。
+如果用户明确指定了前端、后端或数据库技术栈，优先遵循用户选择。
+只有当用户没有指定技术栈时，才默认从以下轻量个人项目技术栈中选择：
+- 前端：静态页面（HTML/CSS/原生 JavaScript；默认不引入前端框架）
+- 后端：C#
+- 数据库：SQLite
+
+该模板的约束偏好：
+- 优先支持单人开发、快速落地。
+- 除非用户明确提出更高要求，否则默认目标是 Demo / MVP / 个人项目，而不是企业级生产系统。
+- 默认不重点考虑高并发、多地域部署、分布式系统、复杂中间件和重型治理要求。
+- 优先采用单体、易部署、REST API 清晰、模块边界简单直接的方案。
+- 需求采集重点放在页面、核心流程、数据表、接口约定，以及最小可用的部署/测试方式上。
+- 只有当用户明确提出时，才深入追问缓存、消息队列、水平扩展、复杂权限体系、重型可观测性等高级能力。
+
+场景采集模块：
+- 遇到图表、看板、报表或可视化需求时，采集图表类型、数据来源、关键字段、字段逻辑、维度/指标/坐标轴、筛选条件、明细数据和图表交互。
+- 遇到多图表需求时，额外采集图表关系、数据源关联、联动筛选、下钻、标签切换和期望布局模式。
+- 遇到流程、工作流、审批、待办、历史记录、配置或权限管理需求时，采集触发条件、角色、流程节点、节点操作、状态变化、异常路径、相关页面和权限规则。
+"""
+
+PERSONAL_PROJECT_DESIGN_DOC_ADDENDUM_V2 = """
+Solution template: personal project demo.
+Do not hard-code the technology stack.
+If the user explicitly specifies the frontend, backend, or database stack, generate the design around that stack.
+Only when the user does not specify a stack, default to a lightweight implementation selected from:
+- Frontend: static pages (HTML/CSS/vanilla JavaScript; no frontend framework by default)
+- Backend: C#
+- Database: SQLite
+
+Document constraints:
+- Produce a design suitable for a personal project / demo / MVP.
+- Default to a simple monolithic structure unless the user explicitly asks otherwise.
+- Do not introduce high-concurrency architecture, distributed services, message queues, service mesh, read-write splitting, or other enterprise-scale mechanisms unless explicitly required.
+- API design should match the chosen backend stack; if the default stack is used, prefer pragmatic C# REST endpoints.
+- Database design should match the chosen database stack; if the default stack is used, stay compatible with SQLite capabilities and limitations.
+- Deployment should favor local development and low-cost simple hosting.
+- Security, observability, and testing should be right-sized for a demo, while still calling out basic minimum good practices.
+
+Chart and process guidance:
+- If the requirement includes charts, define the chart data contract: data source, key fields, field logic, dimensions/metrics/axes, filters, detail data, and interactions.
+- For multiple charts, recommend an appropriate page layout from these examples: Uniform Grid for peer-level dashboard cards; Primary-Detail / Hero for one key chart plus supporting charts; Nested / Drill-down for linked exploratory analysis; Tabbed for homogeneous chart views such as Day/Week/Month; Masonry / Waterfall for mixed reports or mobile feed-style pages, used cautiously in dashboards.
+- If the requirement includes a business process, include the process trigger, roles, nodes, node actions, status changes, exception/return/termination paths, initiation page, to-do list, detail/history page, configuration, and permission management.
+"""
+
+PERSONAL_PROJECT_DESIGN_DOC_ADDENDUM_ZH_V2 = """
+方案模板：个人项目 Demo 版。
+不要把技术栈写死。
+如果用户明确指定了前端、后端或数据库技术栈，生成设计文档时优先围绕用户指定技术栈展开。
+只有当用户没有指定技术栈时，才默认从以下轻量实现中选择：
+- 前端：静态页面（HTML/CSS/原生 JavaScript；默认不引入前端框架）
+- 后端：C#
+- 数据库：SQLite
+
+文档约束：
+- 生成的设计文档应服务于个人项目 / Demo / MVP 落地。
+- 除非用户明确要求，否则默认采用简单单体结构。
+- 不要默认引入高并发架构、分布式服务、消息队列、服务网格、读写分离等企业级复杂机制。
+- API 设计要和已选后端技术栈保持一致；如果使用默认栈，则优先用轻量、务实的 C# REST 接口。
+- 数据库设计要和已选数据库技术栈保持一致；如果使用默认栈，则优先兼容 SQLite 的能力和限制。
+- 部署方案优先本地开发与低成本、简单托管。
+- 安全、可观测性、测试方案要符合 Demo 尺度，但仍需给出基本的最低实践建议。
+
+图表与流程指导：
+- 如果需求包含图表，请明确图表数据契约：数据来源、关键字段、字段逻辑、维度/指标/坐标轴、筛选条件、明细数据和交互方式。
+- 如果需求包含多个图表，请根据数据层级、对比关系和页面空间推荐合适布局：同级看板卡片优先 Uniform Grid / 统一网格；一个核心指标或趋势优先 Primary-Detail / Hero 主次布局；联动探索分析优先 Nested / Drill-down 嵌套下钻；日/周/月等同质视图优先 Tabbed 标签页；混合报告、移动 H5 或资讯流可参考 Masonry / Waterfall 瀑布流，但数据看板中需谨慎使用以避免杂乱。
+- 如果需求包含业务流程，请补充流程触发条件、角色、节点、节点操作、状态变化、异常/退回/终止路径、发起页、待办列表、详情与历史页、配置和权限管理。
+"""
+
+
+@dataclass
+class Session:
+    id: str
+    created_at: str
+    updated_at: str
+    title: str = ""
+    prompt_template: str = PROMPT_TEMPLATE_PERSONAL_PROJECT
+    applied_template_id: str = ""
+    applied_template_name: str = ""
+    messages: list[dict[str, Any]] = field(default_factory=list)
+
+
+class RequirementCollectorService:
+    def __init__(self, llm_client: MiniMaxChatClient, session_store: SQLiteSessionStore) -> None:
+        self.llm_client = llm_client
+        self.session_store = session_store
+        self.design_docs_dir = self.session_store.db_path.parent / "design_docs"
+        self.prd_docs_dir = self.session_store.db_path.parent / "prd_docs"
+        self.prd_templates_dir = Path(__file__).resolve().parents[2] / "data" / "PRD_template"
+        self.business_template_library = BusinessTemplateLibrary(self.prd_templates_dir)
+        self._lock = threading.Lock()
+
+    def create_session(
+        self,
+        template_id: str | None = None,
+        language: str = "zh",
+        template_start_mode: str = TEMPLATE_START_MODE_GUIDED,
+    ) -> Session:
+        session_id = str(uuid.uuid4())
+        created_at = datetime.now(timezone.utc).isoformat()
+        normalized_language = self._normalize_language(language)
+        normalized_start_mode = self._normalize_template_start_mode(template_start_mode)
+        applied_template_id = ""
+        applied_template_name = ""
+        title = ""
+        template_detail: dict[str, Any] | None = None
+
+        if template_id:
+            template_detail = self.business_template_library.get_localized_template(
+                template_id,
+                normalized_language,
+            )
+            if template_detail is None:
+                raise KeyError("Business template not found.")
+            applied_template_id = template_detail["template_id"]
+            applied_template_name = template_detail["template_name"]
+            title = applied_template_name
+        elif normalized_start_mode == TEMPLATE_START_MODE_EXAMPLE:
+            raise ValueError("Field `template_id` is required when `template_start_mode` is `example`.")
+
+        if normalized_start_mode == TEMPLATE_START_MODE_EXAMPLE and template_detail is not None:
+            example_model = template_detail.get("example_model")
+            if not isinstance(example_model, dict) or not example_model:
+                raise ValueError("Business template does not include an example model.")
+
+        record = self.session_store.create_session(
+            session_id=session_id,
+            created_at=created_at,
+            title=title,
+            applied_template_id=applied_template_id,
+            applied_template_name=applied_template_name,
+        )
+        if normalized_start_mode == TEMPLATE_START_MODE_EXAMPLE and template_detail is not None:
+            self._seed_session_from_template_example(
+                session_id=session_id,
+                template_detail=template_detail,
+                language=normalized_language,
+            )
+            record = self.session_store.get_session(session_id)
+            if record is None:
+                raise RuntimeError("Failed to load seeded session.")
+        return self._session_from_record(record)
+
+    def get_session(self, session_id: str) -> Session | None:
+        record = self.session_store.get_session(session_id)
+        if record is None:
+            return None
+        return self._session_from_record(record)
+
+    def list_sessions(self) -> list[dict[str, Any]]:
+        return self.session_store.list_sessions()
+
+    def list_business_templates(self) -> list[dict[str, Any]]:
+        return self.business_template_library.list_templates()
+
+    def get_business_template(self, template_id: str) -> dict[str, Any] | None:
+        return self.business_template_library.get_template(template_id)
+
+    def _seed_session_from_template_example(
+        self,
+        session_id: str,
+        template_detail: dict[str, Any],
+        language: str,
+    ) -> None:
+        example_model = template_detail.get("example_model")
+        if not isinstance(example_model, dict) or not example_model:
+            raise ValueError("Business template does not include an example model.")
+
+        structured_requirement_model = self._structured_requirement_model_from_template_example(
+            template_detail,
+            example_model,
+            language,
+        )
+        message = self._template_example_seed_message(
+            template_detail,
+            structured_requirement_model,
+            language,
+        )
+        self._append_message(session_id, "assistant", message)
+        self._save_structured_requirement_model_cache(
+            session_id,
+            STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
+            1,
+            structured_requirement_model,
+        )
+        self._save_structured_requirement_model_cache(
+            session_id,
+            language,
+            1,
+            structured_requirement_model,
+        )
+
+    def _structured_requirement_model_from_template_example(
+        self,
+        template_detail: dict[str, Any],
+        example_model: dict[str, Any],
+        language: str,
+    ) -> dict[str, Any]:
+        model = normalize_structured_requirement_model(example_model)
+
+        project_name = self._first_string_from_paths(
+            example_model,
+            (
+                "document_info.project_name",
+                "document_info.project",
+                "document_info.analysis_name",
+                "document_info.chart_name",
+                "document_info.document_name",
+            ),
+        )
+        requirement_name = self._first_string_from_paths(
+            example_model,
+            (
+                "document_info.requirement_name",
+                "document_info.process_name",
+                "document_info.analysis_name",
+                "document_info.chart_name",
+                "document_info.document_name",
+            ),
+        )
+        model["document_info"]["project_name"] = model["document_info"]["project_name"] or project_name
+        model["document_info"]["requirement_name"] = (
+            model["document_info"]["requirement_name"]
+            or requirement_name
+            or str(template_detail.get("template_name", "")).strip()
+        )
+
+        model["background"]["summary"] = model["background"]["summary"] or self._first_string_from_paths(
+            example_model,
+            (
+                "background.summary",
+                "business_background.summary",
+                "background_objectives.background",
+                "summary",
+            ),
+        )
+        model["background"]["objective"] = model["background"]["objective"] or self._first_joined_strings_from_paths(
+            example_model,
+            (
+                "background.objective",
+                "business_objectives.objectives",
+                "background_objectives.objectives",
+                "objective",
+            ),
+        )
+
+        model["scope"]["in_scope"] = model["scope"]["in_scope"] or self._first_string_list_from_paths(
+            example_model,
+            ("scope.in_scope", "business_scope.in_scope"),
+        )
+        model["scope"]["out_of_scope"] = model["scope"]["out_of_scope"] or self._first_string_list_from_paths(
+            example_model,
+            ("scope.out_of_scope", "scope.out_scope", "business_scope.out_scope", "business_scope.out_of_scope"),
+        )
+        if not model["scope"]["in_scope"]:
+            model["scope"]["in_scope"] = self._flatten_path_strings(example_model, "scope.items")[:8]
+
+        model["users_and_scenarios"]["target_users"] = model["users_and_scenarios"]["target_users"] or self._first_string_list_from_paths(
+            example_model,
+            ("users_and_scenarios.target_users", "roles_and_scenarios.target_roles", "stakeholders.roles"),
+        )
+        model["users_and_scenarios"]["core_scenarios"] = model["users_and_scenarios"]["core_scenarios"] or self._first_string_list_from_paths(
+            example_model,
+            ("users_and_scenarios.core_scenarios", "roles_and_scenarios.core_scenarios"),
+        )
+        if not model["users_and_scenarios"]["core_scenarios"]:
+            model["users_and_scenarios"]["core_scenarios"] = self._flatten_path_strings(
+                example_model,
+                "process_description.step_matrix",
+            )[:8]
+
+        model["functional_requirements"]["overview"] = model["functional_requirements"]["overview"] or self._first_string_from_paths(
+            example_model,
+            ("functional_requirements.overview", "chart_presentation.overview"),
+        )
+        if not model["functional_requirements"]["feature_details"]:
+            model["functional_requirements"]["feature_details"] = self._feature_details_from_template_example(example_model)
+
+        if not model["business_rules"]:
+            model["business_rules"] = self._first_string_list_from_paths(
+                example_model,
+                (
+                    "business_rules",
+                    "business_rules.rules",
+                    "business_rules_and_data.rules",
+                    "yield_definition.rules",
+                    "data_description.quality_rules",
+                    "data_contract.quality_rules",
+                ),
+            )
+
+        if not model["page_and_interaction"]["pages"]:
+            model["page_and_interaction"]["pages"] = self._pages_from_template_example(example_model)
+        if not model["page_and_interaction"]["interaction_flow"]:
+            model["page_and_interaction"]["interaction_flow"] = self._first_string_list_from_paths(
+                example_model,
+                ("page_and_interaction.interaction_flow",),
+            ) or self._flatten_path_strings(example_model, "page_and_process.pages")[:8]
+
+        if not model["data_and_dependencies"]:
+            model["data_and_dependencies"] = self._unique_strings(
+                [
+                    *self._flatten_path_strings(example_model, "business_rules_and_data.key_data"),
+                    *self._flatten_path_strings(example_model, "integration_dependencies.external_systems"),
+                    *self._flatten_path_strings(example_model, "data_description.sources"),
+                    *self._flatten_path_strings(example_model, "data_description.fields"),
+                    *self._flatten_path_strings(example_model, "data_contract.sources"),
+                    *self._flatten_path_strings(example_model, "data_contract.fields"),
+                ]
+            )
+
+        if not model["risks_and_notes"]:
+            model["risks_and_notes"] = self._first_string_list_from_paths(
+                example_model,
+                ("risks_and_notes", "risks_and_questions.risks"),
+            )
+        if not model["acceptance_criteria"]:
+            model["acceptance_criteria"] = self._unique_strings(
+                [
+                    *self._flatten_path_strings(example_model, "acceptance_criteria"),
+                    *self._flatten_path_strings(example_model, "milestone_acceptance.milestones"),
+                    *self._flatten_path_strings(example_model, "uat.acceptance_criteria"),
+                    *self._flatten_path_strings(example_model, "uat.criteria"),
+                ]
+            )[:12]
+        if not model["open_questions"]:
+            model["open_questions"] = self._unique_strings(
+                [
+                    *self._flatten_path_strings(example_model, "open_questions"),
+                    *self._flatten_path_strings(example_model, "risks_and_questions.open_questions"),
+                    *[
+                        str(item.get("content", "")).strip()
+                        for item in template_detail.get("prompt_questions", [])
+                        if isinstance(item, dict) and str(item.get("content", "")).strip()
+                    ],
+                ]
+            )
+
+        reason = self._template_example_status_reason(language)
+        model["collection_status"] = {
+            key: {
+                "status": "confirmed",
+                "reason": reason,
+                "pending_questions": [],
+            }
+            for key in REQUIREMENT_ITEM_KEYS
+        }
+        return normalize_structured_requirement_model(model)
+
+    def _template_example_seed_message(
+        self,
+        template_detail: dict[str, Any],
+        structured_requirement_model: dict[str, Any],
+        language: str,
+    ) -> str:
+        template_name = str(template_detail.get("template_name", "")).strip() or "Business template"
+        model = normalize_structured_requirement_model(structured_requirement_model)
+        example_model = template_detail.get("example_model") if isinstance(template_detail.get("example_model"), dict) else {}
+        page_lines = self._template_example_page_lines(model, language)
+        image_description_lines = self._template_example_image_description_lines(example_model, language)
+        if self._normalize_language(language) == "zh":
+            intro = (
+                f"已加载「{template_name}」的默认示例业务。\n\n"
+                "你可以直接基于这份示例生成需求文档和设计文档，也可以继续告诉我需要调整的业务范围、角色、流程、规则或指标。"
+            )
+        else:
+            intro = (
+                f"I loaded the default example business for \"{template_name}\".\n\n"
+                "You can generate the PRD and design document from this example, or tell me what to adjust in the scope, roles, workflows, rules, or metrics."
+            )
+
+        lines = [
+            intro,
+            "",
+            "# 示例业务" if self._normalize_language(language) == "zh" else "# Example Business",
+            "",
+            f"- {'项目' if self._normalize_language(language) == 'zh' else 'Project'}: {model['document_info']['project_name'] or 'TBD'}",
+            f"- {'需求' if self._normalize_language(language) == 'zh' else 'Requirement'}: {model['document_info']['requirement_name'] or 'TBD'}",
+            "",
+            "## 背景" if self._normalize_language(language) == "zh" else "## Background",
+            "",
+            model["background"]["summary"] or "TBD",
+            "",
+            "## 目标" if self._normalize_language(language) == "zh" else "## Objective",
+            "",
+            model["background"]["objective"] or "TBD",
+            "",
+            "## 范围" if self._normalize_language(language) == "zh" else "## In Scope",
+            *[f"- {item}" for item in model["scope"]["in_scope"]],
+            "",
+            "## 目标用户" if self._normalize_language(language) == "zh" else "## Target Users",
+            *[f"- {item}" for item in model["users_and_scenarios"]["target_users"]],
+            "",
+            "## 核心场景" if self._normalize_language(language) == "zh" else "## Core Scenarios",
+            *[f"{index + 1}. {item}" for index, item in enumerate(model["users_and_scenarios"]["core_scenarios"])],
+            "",
+            "## 功能概述" if self._normalize_language(language) == "zh" else "## Feature Overview",
+            "",
+            model["functional_requirements"]["overview"] or "TBD",
+            "",
+            "## 业务规则" if self._normalize_language(language) == "zh" else "## Business Rules",
+            *[f"- {item}" for item in model["business_rules"][:10]],
+            "",
+            "## 数据与依赖" if self._normalize_language(language) == "zh" else "## Data and Dependencies",
+            *[f"- {item}" for item in model["data_and_dependencies"][:10]],
+            "",
+            "## 页面与图表" if self._normalize_language(language) == "zh" else "## Pages and Charts",
+            *page_lines,
+            "",
+            "## 图片文字描述" if self._normalize_language(language) == "zh" else "## Image Descriptions",
+            *image_description_lines,
+            "",
+            "## 验收标准" if self._normalize_language(language) == "zh" else "## Acceptance Criteria",
+            *[f"- {item}" for item in model["acceptance_criteria"][:10]],
+        ]
+        if not image_description_lines:
+            image_heading = "## 图片文字描述" if self._normalize_language(language) == "zh" else "## Image Descriptions"
+            try:
+                image_heading_index = lines.index(image_heading)
+                del lines[image_heading_index:image_heading_index + 2]
+            except ValueError:
+                pass
+        return "\n".join(lines).strip()
+
+    def _template_example_page_lines(self, model: dict[str, Any], language: str) -> list[str]:
+        pages = model.get("page_and_interaction", {}).get("pages", [])
+        if not isinstance(pages, list):
+            return ["- TBD"]
+
+        lines: list[str] = []
+        for page in pages[:6]:
+            if not isinstance(page, dict):
+                continue
+            page_name = str(page.get("page_name", "")).strip()
+            if not page_name:
+                continue
+            elements = self._string_list(page.get("page_elements"))[:4]
+            if elements:
+                elements_label = "页面元素" if self._normalize_language(language) == "zh" else "elements"
+                lines.append(f"- {page_name}: {elements_label} - {', '.join(elements)}")
+            else:
+                lines.append(f"- {page_name}")
+        return lines or ["- TBD"]
+
+    def _template_example_image_description_lines(self, example_model: dict[str, Any], language: str) -> list[str]:
+        image_descriptions = self._first_string_list_from_paths(
+            example_model,
+            (
+                "template_specific_details.image_descriptions",
+                "image_descriptions",
+            ),
+        )
+        if not image_descriptions:
+            return []
+
+        return [f"- {item}" for item in image_descriptions[:8]]
+
+    def _template_example_status_reason(self, language: str) -> str:
+        if self._normalize_language(language) == "zh":
+            return "已由模板示例业务预填，可被用户后续修改意见覆盖。"
+        return "Pre-filled from the template example business; later user changes can override it."
+
+    def _feature_details_from_template_example(self, example_model: dict[str, Any]) -> list[dict[str, Any]]:
+        raw_features = self._value_at_path(example_model, "functional_requirements.features")
+        if raw_features is None:
+            raw_features = self._value_at_path(example_model, "features")
+        if not isinstance(raw_features, list):
+            return []
+
+        features: list[dict[str, Any]] = []
+        for raw_item in raw_features:
+            if not isinstance(raw_item, dict):
+                continue
+            feature = {
+                "feature_name": self._first_non_empty_string(
+                    raw_item.get("feature_name"),
+                    raw_item.get("feature"),
+                    raw_item.get("name"),
+                ),
+                "description": self._first_non_empty_string(raw_item.get("description"), raw_item.get("summary")),
+                "trigger": self._first_non_empty_string(raw_item.get("trigger")),
+                "processing_logic": "; ".join(
+                    self._string_list(raw_item.get("processing_logic"))
+                    or self._string_list(raw_item.get("logic"))
+                    or self._string_list(raw_item.get("rules"))
+                ),
+                "inputs": self._string_list(raw_item.get("inputs")),
+                "outputs": self._string_list(raw_item.get("outputs")),
+                "exception_cases": self._string_list(raw_item.get("exception_cases"))
+                or self._string_list(raw_item.get("exceptions")),
+            }
+            if any(value for value in feature.values() if value):
+                features.append(feature)
+        return features
+
+    def _pages_from_template_example(self, example_model: dict[str, Any]) -> list[dict[str, Any]]:
+        raw_pages = self._value_at_path(example_model, "page_and_interaction.pages")
+        if raw_pages is None:
+            raw_pages = self._value_at_path(example_model, "page_and_process.pages")
+        if raw_pages is None:
+            raw_pages = self._value_at_path(example_model, "pages_functions.page_list")
+        if not isinstance(raw_pages, list):
+            return []
+
+        pages: list[dict[str, Any]] = []
+        for raw_item in raw_pages:
+            if isinstance(raw_item, str):
+                pages.append(
+                    {
+                        "page_name": raw_item,
+                        "entry_point": "",
+                        "page_elements": [],
+                        "button_actions": [],
+                    }
+                )
+                continue
+            if not isinstance(raw_item, dict):
+                continue
+            page = {
+                "page_name": self._first_non_empty_string(
+                    raw_item.get("page_name"),
+                    raw_item.get("page"),
+                    raw_item.get("name"),
+                    raw_item.get("module"),
+                ),
+                "entry_point": self._first_non_empty_string(raw_item.get("entry_point"), raw_item.get("entry")),
+                "page_elements": self._string_list(raw_item.get("page_elements"))
+                or self._string_list(raw_item.get("elements")),
+                "button_actions": self._string_list(raw_item.get("button_actions"))
+                or self._string_list(raw_item.get("actions")),
+            }
+            if any(value for value in page.values() if value):
+                pages.append(page)
+        return pages
+
+    def _first_string_from_paths(self, payload: dict[str, Any], paths: tuple[str, ...]) -> str:
+        for path in paths:
+            value = self._value_at_path(payload, path)
+            text = self._first_non_empty_string(value)
+            if text:
+                return text
+        return ""
+
+    def _first_joined_strings_from_paths(self, payload: dict[str, Any], paths: tuple[str, ...]) -> str:
+        for path in paths:
+            values = self._flatten_path_strings(payload, path)
+            if values:
+                return "; ".join(values)
+        return ""
+
+    def _first_string_list_from_paths(self, payload: dict[str, Any], paths: tuple[str, ...]) -> list[str]:
+        for path in paths:
+            values = self._flatten_path_strings(payload, path)
+            if values:
+                return values
+        return []
+
+    def _flatten_path_strings(self, payload: dict[str, Any], path: str) -> list[str]:
+        value = self._value_at_path(payload, path)
+        return self._flatten_strings(value)
+
+    def _flatten_strings(self, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            cleaned = value.strip()
+            return [cleaned] if cleaned else []
+        if isinstance(value, (int, float, bool)):
+            return [str(value)]
+        if isinstance(value, list):
+            values: list[str] = []
+            for item in value:
+                values.extend(self._flatten_strings(item))
+            return self._unique_strings(values)
+        if isinstance(value, dict):
+            label_keys = (
+                "name",
+                "title",
+                "label",
+                "role",
+                "actor",
+                "feature",
+                "page",
+                "metric",
+                "field",
+                "source",
+                "rule",
+                "description",
+                "flow",
+                "acceptance",
+                "content",
+            )
+            parts = [str(value.get(key, "")).strip() for key in label_keys if str(value.get(key, "")).strip()]
+            if parts:
+                return [" - ".join(parts)]
+            values: list[str] = []
+            for item in value.values():
+                values.extend(self._flatten_strings(item))
+            return self._unique_strings(values)
+        return []
+
+    def _value_at_path(self, payload: dict[str, Any], path: str) -> Any:
+        current: Any = payload
+        for part in path.split("."):
+            if not isinstance(current, dict):
+                return None
+            current = current.get(part)
+        return current
+
+    def _first_non_empty_string(self, *values: Any) -> str:
+        for value in values:
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+            if isinstance(value, (int, float, bool)):
+                return str(value)
+        return ""
+
+    def _string_list(self, value: Any) -> list[str]:
+        if isinstance(value, list):
+            return self._unique_strings(self._flatten_strings(value))
+        if isinstance(value, str):
+            cleaned = value.strip()
+            return [cleaned] if cleaned else []
+        if value is None:
+            return []
+        return self._flatten_strings(value)
+
+    def _unique_strings(self, values: list[str]) -> list[str]:
+        seen: set[str] = set()
+        unique: list[str] = []
+        for value in values:
+            normalized = " ".join(str(value).split())
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            unique.append(normalized)
+        return unique
+
+
+    def delete_session(self, session_id: str) -> bool:
+        return self.session_store.delete_session(session_id)
+
+    def update_session_prompt_template(self, session_id: str, prompt_template: str) -> Session:
+        session = self.get_session(session_id)
+        if session is None:
+            raise KeyError("Session not found.")
+        if session.applied_template_id:
+            raise ValueError("Prompt template is managed by the applied business template.")
+        if self._session_has_user_messages(session):
+            raise ValueError("Prompt template can only be changed before the first user message.")
+
+        normalized_template = self._normalize_prompt_template(prompt_template)
+        self.session_store.update_session_prompt_template(session_id, normalized_template)
+        return self._require_session(session_id)
+
+    def send_user_message(
+        self,
+        session_id: str,
+        user_message: str,
+        language: str = "zh",
+        display_message: str = "",
+    ) -> dict[str, Any]:
+        session = self.get_session(session_id)
+        if session is None:
+            raise KeyError("Session not found.")
+
+        response_language = self._language_for_user_message(language, user_message)
+        self._append_message(session_id, "user", user_message, display_content=display_message)
+        if not self._session_has_user_messages(session):
+            self._update_session_title_from_message(session_id, display_message or user_message, response_language)
+        session = self._require_session(session_id)
+
+        system_prompt = self._pm_prompt(session, response_language)
+        llm_messages = self._build_llm_messages(system_prompt, session.messages)
+        assistant_text_raw = self.llm_client.chat(llm_messages)
+        assistant_text, thinking_text = self._split_thinking(assistant_text_raw)
+
+        self._append_message(session_id, "assistant", assistant_text, thinking_text)
+        session = self._require_session(session_id)
+
+        structured_requirement_model = self._build_and_cache_structured_requirement_model(session, response_language)
+        conversation_chain_state = self.build_conversation_chain_state(
+            session,
+            structured_requirement_model,
+            response_language,
+        )
+        return {
+            "assistant_message": assistant_text,
+            "assistant_thinking": thinking_text,
+            "summary": structured_requirement_model,
+            "structured_requirement_model": structured_requirement_model,
+            "structured_requirement_sync_status": "ready",
+            "conversation_chain_state": conversation_chain_state,
+            "session_id": session.id,
+            "message_count": len(session.messages),
+        }
+
+    def stream_user_message(
+        self,
+        session_id: str,
+        user_message: str,
+        language: str = "zh",
+        display_message: str = "",
+    ) -> Iterator[dict[str, Any]]:
+        session = self.get_session(session_id)
+        if session is None:
+            raise KeyError("Session not found.")
+
+        response_language = self._language_for_user_message(language, user_message)
+        self._append_message(session_id, "user", user_message, display_content=display_message)
+        if not self._session_has_user_messages(session):
+            self._update_session_title_from_message(session_id, display_message or user_message, response_language)
+        session = self._require_session(session_id)
+
+        system_prompt = self._pm_prompt(session, response_language)
+        llm_messages = self._build_llm_messages(system_prompt, session.messages)
+        assistant_text_parts: list[str] = []
+        thinking_parts: list[str] = []
+
+        for item in self.llm_client.stream_chat(llm_messages):
+            text = item.get("text", "")
+            if not text:
+                continue
+
+            if item.get("type") == "thinking":
+                thinking_parts.append(text)
+                yield {"event": "thinking", "delta": text}
+                continue
+
+            assistant_text_parts.append(text)
+            yield {"event": "content", "delta": text}
+
+        assistant_text = "".join(assistant_text_parts).strip()
+        thinking_text = "".join(thinking_parts).strip()
+        assistant_text, content_embedded_thinking = self._split_thinking(assistant_text)
+        if content_embedded_thinking:
+            thinking_text = f"{thinking_text}\n{content_embedded_thinking}".strip()
+        if not assistant_text:
+            raise RuntimeError("LLM returned empty streamed content.")
+
+        self._append_message(session_id, "assistant", assistant_text, thinking_text)
+        session = self._require_session(session_id)
+
+        if thinking_text:
+            yield {"event": "thinking_done", "thinking": thinking_text}
+        yield {"event": "assistant_done", "session_id": session.id, "message_count": len(session.messages)}
+        structured_requirement_model = self._build_and_cache_structured_requirement_model(session, response_language)
+        conversation_chain_state = self.build_conversation_chain_state(
+            session,
+            structured_requirement_model,
+            response_language,
+        )
+        yield {
+            "event": "summary",
+            "summary": structured_requirement_model,
+            "structured_requirement_model": structured_requirement_model,
+            "structured_requirement_sync_status": "ready",
+            "conversation_chain_state": conversation_chain_state,
+            "message_count": len(session.messages),
+        }
+        yield {"event": "done", "session_id": session.id, "message_count": len(session.messages)}
+
+    def build_session_summary(self, session_id: str, language: str = "zh") -> dict[str, Any]:
+        return self.build_structured_requirement_model(session_id, language)
+
+    def build_structured_requirement_model(
+        self,
+        session_id: str,
+        language: str = "zh",
+        force_refresh: bool = False,
+    ) -> dict[str, Any]:
+        session = self.get_session(session_id)
+        if session is None:
+            raise KeyError("Session not found.")
+        normalized_language = self._normalize_language(language)
+        message_count = self._message_count(session.messages)
+        if not force_refresh:
+            cached_model = self._get_cached_localized_structured_requirement_model(
+                session_id,
+                normalized_language,
+                message_count,
+            )
+            if cached_model is not None:
+                return cached_model
+        return self._build_and_cache_structured_requirement_model(
+            session,
+            normalized_language,
+            force_refresh=force_refresh,
+        )
+
+    def get_structured_requirement_snapshot(
+        self,
+        session_id: str,
+        language: str = "zh",
+    ) -> dict[str, Any]:
+        session = self.get_session(session_id)
+        if session is None:
+            raise KeyError("Session not found.")
+
+        normalized_language = self._normalize_language(language)
+        message_count = self._message_count(session.messages)
+        cached_entry = self.session_store.get_structured_requirement_cache_entry(
+            session_id,
+            normalized_language,
+        )
+        if cached_entry is None:
+            canonical_model = self._get_cached_canonical_structured_requirement_model(
+                session_id,
+                message_count,
+                normalized_language,
+            )
+            if canonical_model is not None:
+                return {
+                    "structured_requirement_model": canonical_model,
+                    "structured_requirement_sync_status": "missing",
+                    "message_count": message_count,
+                    "conversation_chain_state": self.build_conversation_chain_state(
+                        session,
+                        canonical_model,
+                        normalized_language,
+                    ),
+                }
+            empty_model = self._empty_structured_requirement_model()
+            return {
+                "structured_requirement_model": empty_model,
+                "structured_requirement_sync_status": "ready" if message_count == 0 else "missing",
+                "message_count": message_count,
+                "conversation_chain_state": self.build_conversation_chain_state(
+                    session,
+                    empty_model,
+                    normalized_language,
+                ),
+            }
+
+        cached_model = normalize_structured_requirement_model(cached_entry.get("model"))
+        cached_message_count = self._safe_int(cached_entry.get("message_count"))
+        canonical_model = self._get_cached_canonical_structured_requirement_model(
+            session_id,
+            cached_message_count,
+            normalized_language,
+        )
+        if canonical_model is not None:
+            cached_model = self._with_canonical_collection_status(cached_model, canonical_model)
+        sync_status = "ready" if cached_message_count == message_count else "stale"
+        return {
+            "structured_requirement_model": cached_model,
+            "structured_requirement_sync_status": sync_status,
+            "message_count": message_count,
+            "conversation_chain_state": self.build_conversation_chain_state(
+                session,
+                cached_model,
+                normalized_language,
+            ),
+        }
+
+    def build_system_design_document(
+        self,
+        session_id: str,
+        language: str = "zh",
+        save_history: bool = False,
+    ) -> dict[str, Any]:
+        session = self.get_session(session_id)
+        if session is None:
+            raise KeyError("Session not found.")
+
+        conversation_messages = self._chat_history_messages(session.messages)
+        if not conversation_messages:
+            doc_markdown = self._default_design_doc(language)
+            structured_requirement_model = self._empty_structured_requirement_model()
+            return self._build_generated_document_result(
+                session_id=session_id,
+                document_kind=DESIGN_MESSAGE_KIND,
+                language=language,
+                doc_markdown=doc_markdown,
+                structured_requirement_model=structured_requirement_model,
+                status="insufficient_input",
+                save_history=save_history,
+            )
+
+        structured_requirement_model = self.build_structured_requirement_model(session_id, language)
+        progress = self._structured_requirement_progress(structured_requirement_model)
+        if not progress["ready_to_generate"]:
+            return self._build_generated_document_result(
+                session_id=session_id,
+                document_kind=DESIGN_MESSAGE_KIND,
+                language=language,
+                doc_markdown=self._document_quality_gate_block_markdown(
+                    structured_requirement_model,
+                    progress,
+                    language,
+                    "system_design",
+                ),
+                structured_requirement_model=structured_requirement_model,
+                status="quality_gate_blocked",
+                save_history=False,
+            )
+        seed_markdown = self._build_design_doc_seed_markdown(
+            structured_requirement_model,
+            progress,
+            language,
+        )
+        doc_markdown = self.llm_client.chat(
+            self._build_design_doc_messages(
+                session,
+                conversation_messages,
+                structured_requirement_model,
+                progress,
+                seed_markdown,
+                language,
+            ),
+            temperature=0.2,
+        )
+        doc_markdown, _ = self._split_thinking(doc_markdown)
+        doc_markdown = doc_markdown.strip() or seed_markdown
+        return self._build_generated_document_result(
+            session_id=session_id,
+            document_kind=DESIGN_MESSAGE_KIND,
+            language=language,
+            doc_markdown=doc_markdown,
+            structured_requirement_model=structured_requirement_model,
+            status="ok" if progress.get("fully_confirmed") else "draft_with_assumptions",
+            save_history=save_history,
+        )
+
+    def stream_system_design_document(
+        self,
+        session_id: str,
+        language: str = "zh",
+        save_history: bool = False,
+    ) -> Iterator[dict[str, Any]]:
+        session = self.get_session(session_id)
+        if session is None:
+            raise KeyError("Session not found.")
+
+        conversation_messages = self._chat_history_messages(session.messages)
+        if not conversation_messages:
+            doc_markdown = self._default_design_doc(language)
+            structured_requirement_model = self._empty_structured_requirement_model()
+            yield {"event": "content", "delta": doc_markdown}
+            yield {
+                "event": "done",
+                **self._build_generated_document_result(
+                    session_id=session_id,
+                    document_kind=DESIGN_MESSAGE_KIND,
+                    language=language,
+                    doc_markdown=doc_markdown,
+                    structured_requirement_model=structured_requirement_model,
+                    status="insufficient_input",
+                    save_history=save_history,
+                ),
+            }
+            return
+
+        structured_requirement_model = self.build_structured_requirement_model(session_id, language)
+        progress = self._structured_requirement_progress(structured_requirement_model)
+        if not progress["ready_to_generate"]:
+            doc_markdown = self._document_quality_gate_block_markdown(
+                structured_requirement_model,
+                progress,
+                language,
+                "system_design",
+            )
+            yield {"event": "content", "delta": doc_markdown}
+            yield {
+                "event": "done",
+                **self._build_generated_document_result(
+                    session_id=session_id,
+                    document_kind=DESIGN_MESSAGE_KIND,
+                    language=language,
+                    doc_markdown=doc_markdown,
+                    structured_requirement_model=structured_requirement_model,
+                    status="quality_gate_blocked",
+                    save_history=False,
+                ),
+            }
+            return
+        seed_markdown = self._build_design_doc_seed_markdown(
+            structured_requirement_model,
+            progress,
+            language,
+        )
+        doc_parts: list[str] = []
+        thinking_parts: list[str] = []
+        llm_messages = self._build_design_doc_messages(
+            session,
+            conversation_messages,
+            structured_requirement_model,
+            progress,
+            seed_markdown,
+            language,
+        )
+
+        for item in self.llm_client.stream_chat(llm_messages, temperature=0.2):
+            text = item.get("text", "")
+            if not text:
+                continue
+
+            if item.get("type") == "thinking":
+                thinking_parts.append(text)
+                yield {"event": "thinking", "delta": text}
+                continue
+
+            doc_parts.append(text)
+            yield {"event": "content", "delta": text}
+
+        doc_markdown = "".join(doc_parts).strip()
+        thinking_text = "".join(thinking_parts).strip()
+        doc_markdown, content_embedded_thinking = self._split_thinking(doc_markdown)
+        if content_embedded_thinking:
+            thinking_text = f"{thinking_text}\n{content_embedded_thinking}".strip()
+
+        if not doc_markdown:
+            doc_markdown = seed_markdown
+            if not doc_parts:
+                yield {"event": "content", "delta": doc_markdown}
+
+        if thinking_text:
+            yield {"event": "thinking_done", "thinking": thinking_text}
+        yield {
+            "event": "done",
+            **self._build_generated_document_result(
+                session_id=session_id,
+                document_kind=DESIGN_MESSAGE_KIND,
+                language=language,
+                doc_markdown=doc_markdown,
+                structured_requirement_model=structured_requirement_model,
+                status="ok" if progress.get("fully_confirmed") else "draft_with_assumptions",
+                save_history=save_history,
+            ),
+        }
+
+    def build_prd_document(
+        self,
+        session_id: str,
+        language: str = "zh",
+        save_history: bool = False,
+    ) -> dict[str, Any]:
+        session = self.get_session(session_id)
+        if session is None:
+            raise KeyError("Session not found.")
+
+        conversation_messages = self._chat_history_messages(session.messages)
+        if not conversation_messages:
+            doc_markdown = self._load_prd_template(session, language) or self._default_prd_doc(language)
+            structured_requirement_model = self._empty_structured_requirement_model()
+            return self._build_generated_document_result(
+                session_id=session_id,
+                document_kind=PRD_MESSAGE_KIND,
+                language=language,
+                doc_markdown=doc_markdown,
+                structured_requirement_model=structured_requirement_model,
+                status="template_scaffold" if session.applied_template_id else "insufficient_input",
+                save_history=save_history,
+            )
+
+        structured_requirement_model = self.build_structured_requirement_model(session_id, language)
+        progress = self._structured_requirement_progress(structured_requirement_model)
+        if not progress["ready_to_generate"]:
+            return self._build_generated_document_result(
+                session_id=session_id,
+                document_kind=PRD_MESSAGE_KIND,
+                language=language,
+                doc_markdown=self._document_quality_gate_block_markdown(
+                    structured_requirement_model,
+                    progress,
+                    language,
+                    "prd",
+                ),
+                structured_requirement_model=structured_requirement_model,
+                status="quality_gate_blocked",
+                save_history=False,
+            )
+        doc_markdown = self.llm_client.chat(
+            self._build_prd_doc_messages(
+                session,
+                conversation_messages,
+                structured_requirement_model,
+                progress,
+                language,
+            ),
+            temperature=0.2,
+        )
+        doc_markdown, _ = self._split_thinking(doc_markdown)
+        doc_markdown = doc_markdown.strip()
+        if not doc_markdown:
+            doc_markdown = self._load_prd_template(session, language) or self._default_prd_doc(language)
+        return self._build_generated_document_result(
+            session_id=session_id,
+            document_kind=PRD_MESSAGE_KIND,
+            language=language,
+            doc_markdown=doc_markdown,
+            structured_requirement_model=structured_requirement_model,
+            status="ok" if progress.get("fully_confirmed") else "draft_with_assumptions",
+            save_history=save_history,
+        )
+
+    def stream_prd_document(
+        self,
+        session_id: str,
+        language: str = "zh",
+        save_history: bool = False,
+    ) -> Iterator[dict[str, Any]]:
+        session = self.get_session(session_id)
+        if session is None:
+            raise KeyError("Session not found.")
+
+        conversation_messages = self._chat_history_messages(session.messages)
+        if not conversation_messages:
+            doc_markdown = self._load_prd_template(session, language) or self._default_prd_doc(language)
+            structured_requirement_model = self._empty_structured_requirement_model()
+            yield {"event": "content", "delta": doc_markdown}
+            yield {
+                "event": "done",
+                **self._build_generated_document_result(
+                    session_id=session_id,
+                    document_kind=PRD_MESSAGE_KIND,
+                    language=language,
+                    doc_markdown=doc_markdown,
+                    structured_requirement_model=structured_requirement_model,
+                    status="template_scaffold" if session.applied_template_id else "insufficient_input",
+                    save_history=save_history,
+                ),
+            }
+            return
+
+        structured_requirement_model = self.build_structured_requirement_model(session_id, language)
+        progress = self._structured_requirement_progress(structured_requirement_model)
+        if not progress["ready_to_generate"]:
+            doc_markdown = self._document_quality_gate_block_markdown(
+                structured_requirement_model,
+                progress,
+                language,
+                "prd",
+            )
+            yield {"event": "content", "delta": doc_markdown}
+            yield {
+                "event": "done",
+                **self._build_generated_document_result(
+                    session_id=session_id,
+                    document_kind=PRD_MESSAGE_KIND,
+                    language=language,
+                    doc_markdown=doc_markdown,
+                    structured_requirement_model=structured_requirement_model,
+                    status="quality_gate_blocked",
+                    save_history=False,
+                ),
+            }
+            return
+        doc_parts: list[str] = []
+        thinking_parts: list[str] = []
+        llm_messages = self._build_prd_doc_messages(
+            session,
+            conversation_messages,
+            structured_requirement_model,
+            progress,
+            language,
+        )
+
+        for item in self.llm_client.stream_chat(llm_messages, temperature=0.2):
+            text = item.get("text", "")
+            if not text:
+                continue
+
+            if item.get("type") == "thinking":
+                thinking_parts.append(text)
+                yield {"event": "thinking", "delta": text}
+                continue
+
+            doc_parts.append(text)
+            yield {"event": "content", "delta": text}
+
+        doc_markdown = "".join(doc_parts).strip()
+        thinking_text = "".join(thinking_parts).strip()
+        doc_markdown, content_embedded_thinking = self._split_thinking(doc_markdown)
+        if content_embedded_thinking:
+            thinking_text = f"{thinking_text}\n{content_embedded_thinking}".strip()
+
+        if not doc_markdown:
+            raise RuntimeError("LLM returned empty streamed PRD document.")
+
+        if thinking_text:
+            yield {"event": "thinking_done", "thinking": thinking_text}
+        yield {
+            "event": "done",
+            **self._build_generated_document_result(
+                session_id=session_id,
+                document_kind=PRD_MESSAGE_KIND,
+                language=language,
+                doc_markdown=doc_markdown,
+                structured_requirement_model=structured_requirement_model,
+                status="ok" if progress.get("fully_confirmed") else "draft_with_assumptions",
+                save_history=save_history,
+            ),
+        }
+
+    def get_saved_design_document(self, session_id: str) -> tuple[Path, str] | None:
+        session = self.get_session(session_id)
+        if session is None:
+            raise KeyError("Session not found.")
+
+        latest_entry = self.session_store.get_latest_document_message(session_id, DESIGN_MESSAGE_KIND)
+        resolved = self._resolve_document_entry(latest_entry)
+        if resolved is not None:
+            return resolved
+
+        design_doc_path = self._design_doc_path(session_id)
+        if design_doc_path.exists():
+            return design_doc_path, design_doc_path.name
+        return None
+
+    def get_saved_prd_document(self, session_id: str) -> tuple[Path, str] | None:
+        session = self.get_session(session_id)
+        if session is None:
+            raise KeyError("Session not found.")
+
+        latest_entry = self.session_store.get_latest_document_message(session_id, PRD_MESSAGE_KIND)
+        resolved = self._resolve_document_entry(latest_entry)
+        if resolved is not None:
+            return resolved
+
+        prd_doc_path = self._prd_doc_path(session_id)
+        if prd_doc_path.exists():
+            return prd_doc_path, prd_doc_path.name
+        return None
+
+    def build_implementation_context(self, session_id: str, language: str = "zh") -> dict[str, Any]:
+        session = self.get_session(session_id)
+        if session is None:
+            raise KeyError("Session not found.")
+
+        prd_result = self.get_saved_prd_document(session_id)
+        design_result = self.get_saved_design_document(session_id)
+
+        missing_documents: list[str] = []
+        if prd_result is None:
+            missing_documents.append("prd")
+        if design_result is None:
+            missing_documents.append("design")
+
+        if missing_documents:
+            return {
+                "session_id": session_id,
+                "title": session.title,
+                "documents_ready": False,
+                "missing_documents": missing_documents,
+            }
+
+        prd_path, prd_filename = prd_result
+        design_path, design_filename = design_result
+        prd_absolute_path = str(prd_path.resolve())
+        design_absolute_path = str(design_path.resolve())
+
+        return {
+            "session_id": session_id,
+            "title": session.title,
+            "documents_ready": True,
+            "documents": {
+                "prd": {
+                    "filename": prd_filename,
+                    "path": prd_absolute_path,
+                },
+                "design": {
+                    "filename": design_filename,
+                    "path": design_absolute_path,
+                },
+            },
+            "implementation_prompt": self._build_implementation_prompt(
+                session_id=session_id,
+                session_title=session.title,
+                prd_path=prd_absolute_path,
+                design_path=design_absolute_path,
+                language=language,
+            ),
+        }
+
+    def build_browser_handoff_payload(self, session_id: str, language: str = "zh") -> dict[str, Any]:
+        session = self.get_session(session_id)
+        if session is None:
+            raise KeyError("Session not found.")
+
+        prd_result = self.get_saved_prd_document(session_id)
+        design_result = self.get_saved_design_document(session_id)
+
+        missing_documents: list[str] = []
+        if prd_result is None:
+            missing_documents.append("prd")
+        if design_result is None:
+            missing_documents.append("design")
+
+        if missing_documents:
+            return {
+                "session_id": session_id,
+                "title": session.title,
+                "language": self._normalize_language(language),
+                "documents_ready": False,
+                "missing_documents": missing_documents,
+            }
+
+        normalized_language = self._normalize_language(language)
+        prd_path, prd_filename = prd_result
+        design_path, design_filename = design_result
+        implementation_prompt = self._build_implementation_prompt(
+            session_id=session_id,
+            session_title=session.title,
+            prd_path=prd_filename,
+            design_path=design_filename,
+            language=normalized_language,
+        )
+        now = datetime.now(timezone.utc)
+        expires_at = (now + timedelta(minutes=DEFAULT_HANDOFF_TTL_MINUTES)).isoformat()
+
+        return {
+            "source": "pm",
+            "transport": "browser-handoff",
+            "session_id": session_id,
+            "title": session.title,
+            "language": normalized_language,
+            "documents_ready": True,
+            "implementation_prompt": implementation_prompt,
+            "documents": [
+                {
+                    "kind": "prd",
+                    "filename": prd_filename,
+                    "mime_type": "text/markdown; charset=utf-8",
+                    "download_url": self._legacy_document_download_url(session_id, PRD_MESSAGE_KIND),
+                },
+                {
+                    "kind": "design",
+                    "filename": design_filename,
+                    "mime_type": "text/markdown; charset=utf-8",
+                    "download_url": self._legacy_document_download_url(session_id, DESIGN_MESSAGE_KIND),
+                },
+            ],
+            "expires_at": expires_at,
+        }
+
+    def create_coding_handoff(self, session_id: str, language: str = "zh") -> dict[str, Any]:
+        payload = self.build_browser_handoff_payload(session_id, language)
+        if not payload.get("documents_ready"):
+            return payload
+
+        created_at = datetime.now(timezone.utc)
+        expires_at = payload.get("expires_at") or (created_at + timedelta(minutes=DEFAULT_HANDOFF_TTL_MINUTES)).isoformat()
+        token = f"hf_{secrets.token_urlsafe(24)}"
+        persisted_payload = {
+            **payload,
+            "created_at": created_at.isoformat(),
+            "expires_at": expires_at,
+        }
+        self.session_store.delete_expired_coding_handoffs(created_at.isoformat())
+        self.session_store.create_coding_handoff(
+            token=token,
+            session_id=session_id,
+            payload=persisted_payload,
+            created_at=created_at.isoformat(),
+            expires_at=expires_at,
+        )
+        return {
+            "handoff_token": token,
+            "expires_at": expires_at,
+            "payload": persisted_payload,
+        }
+
+    def resolve_coding_handoff(self, token: str) -> dict[str, Any] | None:
+        record = self.session_store.get_coding_handoff(token)
+        if record is None:
+            return None
+
+        now = datetime.now(timezone.utc)
+        expires_at = self._parse_datetime(record.get("expires_at"))
+        if expires_at is None or expires_at <= now:
+            return None
+
+        payload = record.get("payload")
+        if not isinstance(payload, dict):
+            return None
+        return payload
+
+    def get_saved_message_document(self, session_id: str, message_id: int) -> tuple[Path, str] | None:
+        session = self.get_session(session_id)
+        if session is None:
+            raise KeyError("Session not found.")
+
+        entry = self.session_store.get_message_document(session_id, message_id)
+        return self._resolve_document_entry(entry)
+
+    def build_docx_download(self, file_path: Path, download_name: str) -> tuple[BytesIO, str]:
+        markdown = file_path.read_text(encoding="utf-8")
+        docx_buffer = BytesIO(self._markdown_to_docx_bytes(markdown))
+        docx_buffer.seek(0)
+        return docx_buffer, f"{Path(download_name).stem}.docx"
+
+    def _build_structured_requirement_model(self, session: Session, language: str = "zh") -> dict[str, Any]:
+        conversation_messages = self._conversation_messages(session.messages)
+        if not conversation_messages:
+            return self._empty_structured_requirement_model()
+
+        raw_model = self.llm_client.chat(
+            [
+                {
+                    "role": "system",
+                    "content": self._structured_requirement_model_prompt(session, language),
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(conversation_messages, ensure_ascii=False),
+                },
+            ],
+            temperature=0.1,
+        )
+        return self._safe_parse_structured_requirement_model(raw_model)
+
+    def _build_and_cache_structured_requirement_model(
+        self,
+        session: Session,
+        language: str,
+        force_refresh: bool = False,
+    ) -> dict[str, Any]:
+        normalized_language = self._normalize_language(language)
+        message_count = self._message_count(session.messages)
+        previous_canonical_model = self._get_latest_cached_structured_requirement_model(
+            session.id,
+            STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
+            message_count - 1,
+        )
+        canonical_model = None
+        if not force_refresh:
+            canonical_model = self._get_cached_canonical_structured_requirement_model(
+                session.id,
+                message_count,
+                normalized_language,
+            )
+
+        if canonical_model is None:
+            canonical_model = self._build_structured_requirement_model(session, normalized_language)
+            canonical_model = self._merge_structured_requirement_collection_status(
+                canonical_model,
+                previous_canonical_model,
+            )
+            self._save_structured_requirement_model_cache(
+                session.id,
+                STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
+                message_count,
+                canonical_model,
+            )
+            structured_requirement_model = canonical_model
+        else:
+            structured_requirement_model = self._build_structured_requirement_model(
+                session,
+                normalized_language,
+            )
+
+        structured_requirement_model = self._with_canonical_collection_status(
+            structured_requirement_model,
+            canonical_model,
+        )
+        self._save_structured_requirement_model_cache(
+            session.id,
+            normalized_language,
+            message_count,
+            structured_requirement_model,
+        )
+        return structured_requirement_model
+
+    def _merge_structured_requirement_collection_status(
+        self,
+        current_model: dict[str, Any],
+        previous_model: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        current = normalize_structured_requirement_model(current_model)
+        if previous_model is None:
+            return current
+
+        previous = normalize_structured_requirement_model(previous_model)
+        current_status = current["collection_status"]
+        previous_status = previous["collection_status"]
+        merged_status: dict[str, Any] = {}
+        for key in REQUIREMENT_ITEM_KEYS:
+            merged_status[key] = self._merge_requirement_status_item(
+                current_status.get(key),
+                previous_status.get(key),
+            )
+        current["collection_status"] = merged_status
+        return current
+
+    def _merge_requirement_status_item(
+        self,
+        current_item: dict[str, Any] | None,
+        previous_item: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        current = current_item if isinstance(current_item, dict) else {}
+        previous = previous_item if isinstance(previous_item, dict) else {}
+        current_status = str(current.get("status", "missing")).strip().lower()
+        previous_status = str(previous.get("status", "missing")).strip().lower()
+
+        if current_status == "conflict":
+            return current
+        if previous_status == "conflict" and current_status != "confirmed":
+            return previous
+
+        status_rank = {
+            "missing": 0,
+            "captured": 1,
+            "pending_confirmation": 2,
+            "confirmed": 3,
+        }
+        current_rank = status_rank.get(current_status, 0)
+        previous_rank = status_rank.get(previous_status, 0)
+        if previous_rank > current_rank:
+            return previous
+        return current
+
+    def _save_structured_requirement_model_cache(
+        self,
+        session_id: str,
+        cache_key: str,
+        message_count: int,
+        structured_requirement_model: dict[str, Any],
+    ) -> None:
+        self.session_store.save_structured_requirement_cache_entry(
+            session_id=session_id,
+            language=cache_key,
+            message_count=message_count,
+            structured_requirement_model=structured_requirement_model,
+            updated_at=datetime.now(timezone.utc).isoformat(),
+        )
+
+    def _get_cached_structured_requirement_model(
+        self,
+        session_id: str,
+        cache_key: str,
+        message_count: int,
+    ) -> dict[str, Any] | None:
+        cached_entry = self.session_store.get_structured_requirement_cache_entry(session_id, cache_key)
+        if cached_entry is None:
+            return None
+        cached_message_count = self._safe_int(cached_entry.get("message_count"))
+        if cached_message_count != message_count:
+            return None
+        return normalize_structured_requirement_model(cached_entry.get("model"))
+
+    def _get_latest_cached_structured_requirement_model(
+        self,
+        session_id: str,
+        cache_key: str,
+        max_message_count: int,
+    ) -> dict[str, Any] | None:
+        cached_entry = self.session_store.get_structured_requirement_cache_entry(session_id, cache_key)
+        if cached_entry is None:
+            return None
+        cached_message_count = self._safe_int(cached_entry.get("message_count"))
+        if cached_message_count < 0 or cached_message_count > max_message_count:
+            return None
+        return normalize_structured_requirement_model(cached_entry.get("model"))
+
+    def _get_cached_localized_structured_requirement_model(
+        self,
+        session_id: str,
+        language: str,
+        message_count: int,
+    ) -> dict[str, Any] | None:
+        cached_model = self._get_cached_structured_requirement_model(
+            session_id,
+            language,
+            message_count,
+        )
+        if cached_model is None:
+            return None
+
+        canonical_model = self._get_cached_canonical_structured_requirement_model(
+            session_id,
+            message_count,
+            language,
+        )
+        if canonical_model is None:
+            return cached_model
+        return self._with_canonical_collection_status(cached_model, canonical_model)
+
+    def _get_cached_canonical_structured_requirement_model(
+        self,
+        session_id: str,
+        message_count: int,
+        preferred_language: str | None = None,
+    ) -> dict[str, Any] | None:
+        cached_model = self._get_cached_structured_requirement_model(
+            session_id,
+            STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
+            message_count,
+        )
+        if cached_model is not None:
+            return cached_model
+
+        best_model = self._best_cached_structured_requirement_model(
+            session_id,
+            message_count,
+            preferred_language,
+        )
+        if best_model is not None:
+            self._save_structured_requirement_model_cache(
+                session_id,
+                STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
+                message_count,
+                best_model,
+            )
+        return best_model
+
+    def _best_cached_structured_requirement_model(
+        self,
+        session_id: str,
+        message_count: int,
+        preferred_language: str | None = None,
+    ) -> dict[str, Any] | None:
+        best_model: dict[str, Any] | None = None
+        best_score: tuple[int, int, int] | None = None
+        for cache_key in self._structured_requirement_fallback_cache_keys(preferred_language):
+            candidate = self._get_cached_structured_requirement_model(
+                session_id,
+                cache_key,
+                message_count,
+            )
+            if candidate is None:
+                continue
+            score = self._structured_requirement_status_score(candidate)
+            if best_score is None or score > best_score:
+                best_model = candidate
+                best_score = score
+        return best_model
+
+    def _structured_requirement_fallback_cache_keys(
+        self,
+        preferred_language: str | None = None,
+    ) -> list[str]:
+        cache_keys: list[str] = []
+        for cache_key in (
+            self._normalize_language(preferred_language) if preferred_language else "",
+            *STRUCTURED_REQUIREMENT_CANONICAL_FALLBACK_LANGUAGES,
+        ):
+            if cache_key and cache_key not in cache_keys:
+                cache_keys.append(cache_key)
+        return cache_keys
+
+    def _structured_requirement_status_score(self, model: dict[str, Any]) -> tuple[int, int, int]:
+        progress = self._structured_requirement_progress(model)
+        return (
+            self._safe_int(progress.get("collected_count")),
+            self._safe_int(progress.get("confirmed_count")),
+            -self._safe_int(progress.get("conflict_count")),
+        )
+
+    def _with_canonical_collection_status(
+        self,
+        model: dict[str, Any],
+        canonical_model: dict[str, Any],
+    ) -> dict[str, Any]:
+        localized_model = normalize_structured_requirement_model(model)
+        canonical_status = normalize_structured_requirement_model(canonical_model)["collection_status"]
+        localized_model["collection_status"] = canonical_status
+        return localized_model
+
+    def _message_count(self, messages: list[dict[str, Any]]) -> int:
+        return len(self._chat_history_messages(messages))
+
+    def _safe_int(self, value: Any) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return -1
+
+    def _hydrate_message_payloads(
+        self,
+        messages: list[dict[str, Any]],
+        session_id: str,
+    ) -> list[dict[str, Any]]:
+        hydrated: list[dict[str, Any]] = []
+        for item in messages:
+            payload: dict[str, Any] = {
+                "role": str(item.get("role", "")).strip(),
+                "content": str(item.get("content", "")),
+                "created_at": str(item.get("created_at", "")).strip(),
+                "kind": self._message_kind(item),
+            }
+            display_content = str(item.get("display_content", "")).strip()
+            if display_content:
+                payload["display_content"] = display_content
+            message_id = self._safe_int(item.get("message_id"))
+            if message_id >= 0:
+                payload["message_id"] = message_id
+            thinking = str(item.get("thinking", "")).strip()
+            if thinking:
+                payload["thinking"] = thinking
+            download_filename = str(item.get("download_filename", "")).strip()
+            if download_filename:
+                payload["download_filename"] = download_filename
+            if download_filename and message_id >= 0:
+                payload["download_url"] = self._document_download_url(session_id, message_id)
+            hydrated.append(payload)
+        return hydrated
+
+    def _message_kind(self, message: dict[str, Any]) -> str:
+        kind = str(message.get("kind", CHAT_MESSAGE_KIND)).strip()
+        return kind or CHAT_MESSAGE_KIND
+
+    def _chat_history_messages(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [item for item in messages if self._message_kind(item) == CHAT_MESSAGE_KIND]
+
+    def _document_download_url(self, session_id: str, message_id: int) -> str:
+        return f"/api/sessions/{session_id}/messages/{message_id}/download"
+
+    def _legacy_document_download_url(self, session_id: str, document_kind: str) -> str:
+        if document_kind == PRD_MESSAGE_KIND:
+            return f"/api/sessions/{session_id}/prd-doc/download"
+        return f"/api/sessions/{session_id}/design-doc/download"
+
+    def _resolve_document_entry(self, entry: dict[str, Any] | None) -> tuple[Path, str] | None:
+        if not isinstance(entry, dict):
+            return None
+        storage_path = str(entry.get("storage_path", "")).strip()
+        download_filename = str(entry.get("download_filename", "")).strip()
+        if not storage_path or not download_filename:
+            return None
+
+        file_path = Path(storage_path)
+        if not file_path.exists():
+            return None
+        return file_path, download_filename
+
+    def _session_from_record(self, record: dict[str, Any]) -> Session:
+        return Session(
+            id=record["session_id"],
+            title=record.get("title", ""),
+            prompt_template=self._normalize_prompt_template(record.get("prompt_template", PROMPT_TEMPLATE_PERSONAL_PROJECT)),
+            applied_template_id=str(record.get("applied_template_id", "")).strip(),
+            applied_template_name=str(record.get("applied_template_name", "")).strip(),
+            created_at=record["created_at"],
+            updated_at=record.get("updated_at", record["created_at"]),
+            messages=self._hydrate_message_payloads(
+                record.get("messages", []),
+                session_id=record["session_id"],
+            ),
+        )
+
+    def _conversation_messages(self, messages: list[dict[str, Any]]) -> list[dict[str, str]]:
+        return [
+            {
+                "role": str(item.get("role", "")),
+                "content": str(item.get("content", "")),
+            }
+            for item in self._chat_history_messages(messages)
+        ]
+
+    def _build_llm_messages(self, system_prompt: str, messages: list[dict[str, Any]]) -> list[dict[str, str]]:
+        return [{"role": "system", "content": system_prompt}, *self._conversation_messages(messages)]
+
+    def _resolve_business_template(
+        self,
+        session: Session,
+        language: str | None = None,
+    ) -> dict[str, Any] | None:
+        if not session.applied_template_id:
+            return None
+        return self.business_template_library.get_template_prompt_context(
+            session.applied_template_id,
+            self._normalize_language(language) if language else None,
+        )
+
+    def _business_template_pm_addendum(self, session: Session, language: str | None = None) -> str:
+        template = self._resolve_business_template(session, language)
+        normalized_language = self._normalize_language(language)
+        if template is None:
+            if not session.applied_template_name:
+                return ""
+            chain_addendum = self._template_conversation_chain_addendum(
+                {"template_name": session.applied_template_name},
+                normalized_language,
+            )
+            return (
+                "An applied business requirement template is active for this session.\n"
+                f"- Template name: {session.applied_template_name}\n"
+                "- Drive discovery using the template structure instead of the generic project interview mode.\n"
+                "- Prioritize collecting concrete answers for the next missing section in the template.\n"
+                "- Keep questions aligned to the template's intended business domain and scope.\n"
+                "- Do not fall back to the personal-project or expert generic prompting patterns.\n\n"
+                + chain_addendum
+            )
+
+        chain_addendum = self._template_conversation_chain_addendum(template, normalized_language)
+        return (
+            "An applied business requirement template is active for this session.\n"
+            "- Treat this template as the primary requirement-discovery backbone.\n"
+            "- Do not use the generic personal-project or expert discovery pattern as the main strategy.\n"
+            "- Move section by section through the template and prioritize the highest-value missing information.\n"
+            "- Ask questions that help complete the template fields, business rules, and acceptance criteria.\n"
+            "- Keep answers grounded in the template's domain and avoid drifting into unrelated discovery tracks.\n"
+            "\n"
+            + chain_addendum
+            + "\n"
+            f"- Template context: {json.dumps(template, ensure_ascii=False)}"
+        )
+
+    def _template_conversation_chain_addendum(
+        self,
+        template: dict[str, Any],
+        language: str | None = None,
+    ) -> str:
+        normalized_language = self._normalize_language(language)
+        generic_chain = self._generic_template_conversation_chain_addendum(normalized_language)
+        if not self._template_matches_ic_substrate_focus(template):
+            return generic_chain
+        return "\n\n".join(
+            (
+                generic_chain,
+                self._ic_substrate_conversation_chain_addendum(normalized_language),
+            )
+        )
+
+    def _generic_template_conversation_chain_addendum(self, language: str | None = None) -> str:
+        normalized_language = self._normalize_language(language)
+        if normalized_language == "zh":
+            return (
+                "模板对话链路：\n"
+                "- 模板启动后，把模板字段转成渐进式访谈链路，而不是一次性填表或罗列章节问题。\n"
+                "- 每轮先判断当前已覆盖到哪个链路节点，再只问一个最能推进下一节点的问题。\n"
+                "- 默认沿：背景/目标 -> 范围/角色 -> 核心场景 -> 规则/数据 -> 页面/交互 -> 验收/发布 推进；如果模板的 prompt_questions 更具体，优先把它们当作链路队列。\n"
+                "- 用户一次给出多个答案时，吸收所有信息，但回复仍只落到一个下一问。\n"
+                "- 可以用一句短标签标出当前链路，例如：当前链路：范围 -> 用户角色。"
+            )
+        if normalized_language == "de":
+            return (
+                "Vorlagen-Dialogkette:\n"
+                "- Nach dem Start einer Vorlage werden die Vorlagenfelder als schrittweise Interviewkette genutzt, nicht als einmaliges Formular oder Kapitel-Checkliste.\n"
+                "- In jeder Runde wird zuerst der aktuelle Knoten bestimmt; danach wird genau eine Frage gestellt, die den naechsten Knoten voranbringt.\n"
+                "- Standardpfad: Hintergrund/Ziel -> Umfang/Rollen -> Kernszenarien -> Regeln/Daten -> Seiten/Interaktionen -> Abnahme/Release; wenn prompt_questions spezifischer sind, gelten sie als Fragenwarteschlange.\n"
+                "- Wenn der Nutzer mehrere Punkte auf einmal beantwortet, werden alle Informationen aufgenommen, die Antwort bleibt aber auf eine naechste Frage fokussiert.\n"
+                "- Der aktuelle Knoten darf kurz markiert werden, z. B.: Aktuelle Kette: Umfang -> Nutzerrollen."
+            )
+        if normalized_language == "ms":
+            return (
+                "Rantaian dialog templat:\n"
+                "- Selepas templat dimulakan, medan templat dijadikan rantaian temu bual berperingkat, bukan borang sekali isi atau senarai bab.\n"
+                "- Pada setiap pusingan, kenal pasti nod semasa dahulu, kemudian tanya tepat satu soalan yang paling menggerakkan nod seterusnya.\n"
+                "- Laluan lalai: latar belakang/objektif -> skop/peranan -> senario utama -> peraturan/data -> halaman/interaksi -> penerimaan/release; jika prompt_questions lebih khusus, jadikannya barisan soalan.\n"
+                "- Jika pengguna menjawab beberapa nod sekali gus, serap semua maklumat, tetapi balasan masih fokus pada satu soalan seterusnya.\n"
+                "- Boleh tandakan nod semasa secara ringkas, contohnya: Rantaian semasa: skop -> peranan pengguna."
+            )
+        return (
+            "Template conversation chain:\n"
+            "- After a template starts, turn template fields into a progressive interview chain instead of a one-shot form or section checklist.\n"
+            "- On every turn, infer the current chain node from the conversation, then ask exactly one question that moves the next node forward.\n"
+            "- Default path: background/objective -> scope/roles -> core scenarios -> rules/data -> pages/interactions -> acceptance/release; when template prompt_questions are more specific, treat them as the chain queue.\n"
+            "- If the user answers multiple nodes at once, absorb all of it, but keep the reply focused on one next question.\n"
+            "- You may label the current node briefly, for example: Current chain: scope -> user roles."
+        )
+
+    def _ic_substrate_conversation_chain_addendum(self, language: str | None = None) -> str:
+        normalized_language = self._normalize_language(language)
+        if normalized_language == "zh":
+            return (
+                "IC Substrate 专业对话链路：\n"
+                "- 系统角色始终是 AI 产品经理，不是制造/质量/工程顾问；目标是帮助讲不清需求的业务部门，把想开发的软件、Web dashboard、流程工具、报表或数据产品讲清楚，沉淀成可交付给开发团队的需求。\n"
+                "- 当前 IT scope 只开放 Production、Quality、TDI 和 General 四个同级入口；其他部门链路先隐藏，统一归入 General，不要在首问选项或推荐链路里展开成独立部门。\n"
+                "- 入口先做部门/业务 owner 路由：用户当前明显在说 Quality、TDI 或 Production，就直接进入对应链路；如果用户说其他部门、部门未开放或业务 owner 不明确，就进入 General 并继续把软件需求问清楚。\n"
+                "- 如果用户只给了“做一个 IC Substrate 系统/平台/工具”这类宽泛表达，没有明确部门和需求形态，第一问只在当前开放范围内确认首版部门或业务 owner：Production、Quality、TDI、General。\n"
+                "- 部门首问选项必须只覆盖当前开放入口：Production、Quality、TDI、General；不要列 Customer、EHS、Engineering、Equipment、Finance、IT/Data、Management、Material、Planning 或 Warehouse。\n"
+                "- 反问必须先落到软件需求：谁使用、看什么、做什么决策或动作、当前痛点、首版边界、输入输出、数据来源、验收标准；领域知识用于把问题问专业，不要变成全面业务流程审计。\n"
+                "- 当用户说“做系统/看板/工具”但没说清形态时，优先确认首版软件形态：dashboard、workflow/case tracking、data query、report/export、alerting、admin console 或跨部门 cockpit；不要直接追完整制造流程。\n"
+                "- 软件形态是后端隐形路由，不要要求用户在前端选择；如果用户已经暗示 dashboard、workflow/case tracking、report/export、data query、alerting 或 admin console，就按该形态问一个更专业的问题。\n"
+                "- 每轮只问一个专业问题，但问题里可以给 2-5 个业务选项帮助用户快速确认，例如部门/owner 分组、lot / panel / unit 粒度、现行指标口径、现行状态流转或责任边界。\n"
+                "- 硬性约束：每轮只能有一个问句，不要用“另外/同时/以及/还需要”追加第二个问题；如果两个口径都缺，先问更影响链路边界的那个。\n"
+                "- 硬性约束：在用户确认前，TDI 只能写作 TDI，不要写成 TDI（技术/异常/导入/接口）或任何括号解释。\n"
+                "- 硬性约束：部门首问的选项说明里也不能展开 TDI；只能写 Production/Quality/TDI 这些部门名，不要把 TDI 解释成技术导入、异常处理、接口集成或其他含义。\n"
+                "- 硬性约束：不要自造 TDI case 状态名、SLA 数字、owner 角色或审批层级；不要给 Created/In Progress/Closed、24 小时、QA 签核这类默认选项，除非用户先提供。应询问用户现行状态、每个状态责任方、SLA 口径和关闭条件。\n"
+                "- 硬性约束：这个“不自造”规则适用于所有部门；不要替 Production 编 route/站点/yield 公式，不要替 Quality 编 inspection point/defect taxonomy/spec limit/MRB/CAPA 流程，不要替 Finance 编标准成本/实际成本/毛利公式选项，不要替 Equipment 编 OEE/MTBF/MTTR 公式或 alarm code，不要替 EHS 编法规等级/整改 SLA，不要替 Planning 编排程规则，除非用户先提供。\n"
+                "- 不要擅自引入未确认的站点缩写、工艺站点名、设备名、供应商名、系统品牌或内部术语；如果需要举例，用“最后生产站出站 / 入库 / QA release / ERP 或财务系统”这类通用表述，或先问用户的组织术语。\n"
+                "- 硬性约束：不要自造具体站点缩写、工艺站点、系统品牌或内部系统术语选项，例如 FVI、AOI、E-test、AVI、SAP、EAP、SPC 等；除非用户先提供这些术语。\n"
+                "- Production：确认产品族/厂区/线别/工艺路线/lot-panel-unit 粒度、Finished Lot 定义、工序站点 move-in/move-out、WIP/报废/返工、良率/吞吐/周期、异常 hold/release 与 owner；所有 route、站点和公式以用户现场口径为准。\n"
+                "- TDI：不要擅自展开缩写，按用户组织内定义执行；若未确认，先确认本项目 TDI 的业务含义，再问触发条件、输入输出、状态流转、责任方/SLA、审批点，以及与上游/下游生产、质量或数据系统的交接。\n"
+                "- Quality：确认用户现行检测点、defect code/taxonomy、规格上下限、抽检/全检、retest/rework/scrap/MRB 判定、缺陷 Pareto、root cause 维度、CAPA/改善闭环和验收对账；不要自造缺陷分类、规格规则或 MRB/CAPA 状态。\n"
+                "- 当前开放入口平级：如果用户提到 Production、Quality 或 TDI，要切到该部门的软件使用场景；如果用户提到其他部门或不确定归属，就走 General 的通用 PM 软件需求链路，继续确认业务决策/动作、KPI、主数据、流程状态、责任边界、系统来源和验收方式。\n"
+                "- 初期不要优先追问权限、部署、菜单、颜色、通用 CRUD，除非它直接影响该部门的首版业务链路边界。"
+            )
+        if normalized_language == "de":
+            return (
+                "IC Substrate Experten-Dialogkette:\n"
+                "- Die Rolle ist immer AI Product Manager, nicht Manufacturing-, Quality- oder Engineering-Berater. Ziel ist, unklare Anforderungen aus Fachbereichen in Software, Web Dashboards, Workflow Tools, Reports oder Datenprodukte fuer Engineering-Handover zu uebersetzen.\n"
+                "- Im aktuellen IT Scope sind Production, Quality, TDI und General als gleichrangige Einstiege aktiv; andere Fachbereiche bleiben verborgen und werden in General zusammengefasst, nicht als eigene Erstfrage-Optionen.\n"
+                "- Zuerst nach Fachbereich/Business Owner routen: Wenn Quality, TDI oder Production klar genannt ist, direkt in diesen Track wechseln. Wenn ein anderer oder nicht freigegebener Bereich genannt wird oder der Owner unklar ist, in General wechseln und die Softwareanforderung klaeren.\n"
+                "- Bei breiten Wuenschen wie IC Substrate System/Plattform/Tool ohne klaren Bereich zuerst nur im aktiven Scope fragen, welcher First-Version Owner verantwortlich ist: Production, Quality, TDI oder General.\n"
+                "- Die Erstfrage zu Bereichen darf nur Production, Quality, TDI und General nennen; Customer, EHS, Engineering, Equipment, Finance, IT/Data, Management, Material, Planning oder Warehouse nicht anbieten.\n"
+                "- Jede Rueckfrage muss zuerst die Softwareanforderung klaeren: Nutzer, Sicht/Aktion, Entscheidung, aktueller Schmerz, First-Version Boundary, Inputs/Outputs, Datenquelle und Abnahme. Domainwissen dient schaerferen PM-Fragen, nicht einer kompletten Prozessauditierung.\n"
+                "- Wenn der Nutzer System/Dashboard/Tool sagt, aber die Produktform unklar ist, zuerst die First-Version Softwareform klaeren: dashboard, workflow/case tracking, data query, report/export, alerting, admin console oder cross-department cockpit.\n"
+                "- Softwareform ist ein verborgenes Backend-Routing, keine Frontend-Auswahl. Wenn der Nutzer dashboard, workflow/case tracking, report/export, data query, alerting oder admin console andeutet, eine fachlich passende PM-Frage stellen.\n"
+                "- Pro Runde genau eine professionelle Frage stellen; 2-5 fachliche Optionen sind erlaubt, wenn sie dem Nutzer beim schnellen Einordnen helfen.\n"
+                "- Harte Regel: TDI bis zur Nutzerbestaetigung nur als TDI schreiben, ohne Klammererklaerung oder implizite Bedeutung in Department-Optionen.\n"
+                "- Harte Regel: Keine TDI case states, SLA-Zahlen, Owner-Rollen, Approval Levels, Production route/station/yield formulas, Quality inspection points/defect taxonomy/spec limits/MRB/CAPA states, Finance cost formulas, Equipment OEE/MTBF/MTTR formulas, EHS SLA oder Planning-Regeln erfinden.\n"
+                "- Keine unbestaetigten Station-Abkuerzungen, Prozessschritte, Equipmentnamen, Lieferanten, Systemmarken oder internen Begriffe einfuehren; Begriffe wie FVI, AOI, E-test, AVI, SAP, EAP, SPC, MES, QMS oder ERP nur verwenden, wenn Nutzer oder Quelle sie bestaetigt.\n"
+                "- Production: product family, plant, line, route, lot-panel-unit grain, Finished Lot Definition, move-in/move-out, WIP/scrap/rework, yield/throughput/cycle time, hold/release und Owner klaeren.\n"
+                "- TDI: Akronym nicht selbst aufloesen; zuerst projektbezogene Bedeutung, Trigger, Inputs/Outputs, Statusfluss, Owner/SLA, Approval Points und Upstream/Downstream Handoffs klaeren.\n"
+                "- Quality: aktuelle inspection points, defect code/taxonomy, spec limits, sampling/full inspection, retest/rework/scrap/MRB disposition, Pareto, root cause, CAPA/Improvement Closure und Abnahmeabgleich klaeren.\n"
+                "- Die aktiven Einstiege sind gleichrangig: Bei Production, Quality oder TDI ueber deren Software Use Case fragen; andere oder unklare Bereiche laufen ueber General mit Entscheidung/Aktion, KPI, Master Data, Workflow State, Owner Boundary, Source System und Acceptance."
+            )
+        if normalized_language == "ms":
+            return (
+                "Rantaian dialog pakar IC Substrate:\n"
+                "- Peranan sistem sentiasa AI Product Manager, bukan penasihat manufacturing, quality atau engineering. Matlamatnya ialah membantu jabatan bisnes yang belum jelas menerangkan software, Web dashboard, workflow tool, report atau data product untuk handover kepada engineering.\n"
+                "- Untuk scope IT semasa, Production, Quality, TDI dan General dibuka sebagai entry setara; jabatan lain disembunyikan dan disatukan di bawah General, bukan pilihan jabatan berasingan.\n"
+                "- Mula dengan routing jabatan/business owner: jika Quality, TDI atau Production jelas disebut, terus masuk ke track tersebut. Jika jabatan lain disebut, jabatan belum dibuka atau owner belum jelas, masuk ke General dan terus jelaskan keperluan software.\n"
+                "- Jika pengguna hanya minta IC Substrate system/platform/tool tanpa jabatan atau bentuk keperluan yang jelas, tanya dahulu first-version owner dalam scope aktif sahaja: Production, Quality, TDI atau General.\n"
+                "- Pilihan soalan jabatan pertama mesti hanya meliputi Production, Quality, TDI dan General; jangan tawarkan Customer, EHS, Engineering, Equipment, Finance, IT/Data, Management, Material, Planning atau Warehouse.\n"
+                "- Setiap soalan mesti mula-mula menjelaskan keperluan software: pengguna, view/action, keputusan, pain point semasa, first-version boundary, input/output, sumber data dan acceptance. Pengetahuan domain digunakan untuk soalan PM yang tajam, bukan audit proses penuh.\n"
+                "- Apabila pengguna menyebut system/dashboard/tool tetapi bentuk produk belum jelas, sahkan dahulu first-version software shape: dashboard, workflow/case tracking, data query, report/export, alerting, admin console atau cross-department cockpit.\n"
+                "- Software shape ialah routing backend tersembunyi, bukan pilihan frontend. Jika pengguna sudah membayangkan dashboard, workflow/case tracking, report/export, data query, alerting atau admin console, tanya satu soalan PM yang lebih khusus untuk shape itu.\n"
+                "- Tanya tepat satu soalan profesional setiap pusingan; 2-5 pilihan bisnes boleh diberi jika membantu pengguna mengesahkan dengan cepat.\n"
+                "- Peraturan keras: tulis TDI hanya sebagai TDI sehingga pengguna mengesahkan maksudnya; jangan tambah penerangan dalam kurungan atau membayangkan makna dalam pilihan jabatan.\n"
+                "- Peraturan keras: jangan reka TDI case states, nombor SLA, owner roles, approval levels, Production route/station/yield formulas, Quality inspection points/defect taxonomy/spec limits/MRB/CAPA states, Finance cost formulas, Equipment OEE/MTBF/MTTR formulas, EHS SLA atau Planning rules.\n"
+                "- Jangan masukkan station abbreviation, process step, equipment name, supplier, system brand atau istilah dalaman yang belum disahkan; istilah seperti FVI, AOI, E-test, AVI, SAP, EAP, SPC, MES, QMS atau ERP hanya boleh digunakan jika pengguna atau sumber jelas mengesahkan.\n"
+                "- Production: sahkan product family, plant, line, route, lot-panel-unit grain, Finished Lot definition, move-in/move-out, WIP/scrap/rework, yield/throughput/cycle time, hold/release dan owner.\n"
+                "- TDI: jangan kembangkan akronim sendiri; sahkan maksud TDI untuk projek ini, trigger, input/output, state flow, owner/SLA, approval points dan upstream/downstream handoff.\n"
+                "- Quality: sahkan inspection points semasa, defect code/taxonomy, spec limits, sampling/full inspection, retest/rework/scrap/MRB disposition, Pareto, root cause, CAPA/improvement closure dan acceptance reconciliation.\n"
+                "- Entry aktif adalah setara: untuk Production, Quality atau TDI, tanya melalui software use case jabatan itu; untuk jabatan lain atau owner tidak jelas, gunakan General dengan business decision/action, KPI, master data, workflow state, ownership boundary, source system dan acceptance."
+            )
+        return (
+            "IC Substrate professional conversation chain:\n"
+            "- The role is always an AI product manager, not a manufacturing/quality/engineering consultant. The goal is to help business departments who cannot clearly express needs define software, web dashboards, workflow tools, reports, or data products for engineering handoff.\n"
+            "- The current IT scope exposes four equal entry points: Production, Quality, TDI, and General. Hide other department tracks and route them into General instead of listing them as first-question options or recommended chains.\n"
+            "- First route by department/business owner: if the user is clearly discussing Quality, TDI, or Production, move directly into that track. If they mention another department, an unopened department, or an unclear owner, move into General and continue clarifying the software requirement.\n"
+            "- If the user only gives a broad request like an IC Substrate system/platform/tool without a clear department or need type, first ask only within the active scope: Production, Quality, TDI, or General.\n"
+            "- Department-first options must include only Production, Quality, TDI, and General; do not offer Customer, EHS, Engineering, Equipment, Finance, IT/Data, Management, Material, Planning, or Warehouse.\n"
+            "- Every question must first clarify the software requirement: user, view or action, decision, current pain, first-version boundary, inputs/outputs, data source, and acceptance. Use domain knowledge to ask sharper PM questions; do not turn the conversation into a full process audit.\n"
+            "- When the user says system/dashboard/tool but has not clarified the product shape, first confirm whether the first version is a dashboard, workflow/case tracker, data query, report/export, alerting, admin console, or cross-department cockpit. Do not jump directly into the whole manufacturing process.\n"
+            "- Software shape is hidden backend routing, not a frontend choice. If the user already implies dashboard, workflow/case tracking, report/export, data query, alerting, or admin console, ask one more expert PM question for that shape.\n"
+            "- Ask one professional question per turn, but include 2-5 domain options when helpful, such as department/owner groups, lot / panel / unit grain, current metric definitions, current state flow, or ownership boundaries.\n"
+            "- Hard constraint: each turn may contain only one question. Do not append a second question with \"also\", \"and\", \"in addition\", or similar wording; if two definitions are missing, ask the one that affects the boundary most.\n"
+            "- Hard constraint: until the user confirms the meaning, write TDI only as TDI. Do not add any parenthetical expansion such as technology, exception, introduction, or interface.\n"
+            "- Hard constraint: do not expand TDI inside department-first option descriptions either. Write only Production/Quality/TDI department names; do not explain TDI as technology introduction, exception handling, interface integration, or any other meaning.\n"
+            "- Hard constraint: do not invent TDI case state names, SLA numbers, owner roles, or approval levels. Do not provide default options such as Created/In Progress/Closed, 24 hours, or QA sign-off unless the user provided them first. Ask for the user's current states, state owners, SLA definition, and closure criteria.\n"
+            "- Hard constraint: this no-invention rule applies to every department. Do not invent Production route/station/yield formulas, Quality inspection points/defect taxonomy/spec limits/MRB/CAPA workflow, Finance standard-cost/actual-cost/margin formula options, Equipment OEE/MTBF/MTTR formulas or alarm codes, EHS compliance levels/corrective-action SLA, or Planning scheduling rules unless the user provided them first.\n"
+            "- Do not introduce unconfirmed station abbreviations, process-step names, equipment names, supplier names, system brands, or internal terms. When examples are needed, use generic wording such as final production move-out / warehouse receipt / QA release / ERP or finance system, or first ask for the user's local terminology.\n"
+            "- Hard constraint: do not invent station abbreviation, process-step, system-brand, or internal-system options such as FVI, AOI, E-test, AVI, SAP, EAP, SPC, or similar unless the user provided them first.\n"
+            "- Production: confirm product family, plant, line, route, lot-panel-unit grain, Finished Lot definition, move-in/move-out stations, WIP/scrap/rework, yield/throughput/cycle-time metrics, abnormal hold/release, and owners. Route, station, and formula definitions must come from the user.\n"
+            "- TDI: do not expand the acronym on your own; follow the user's organizational definition. If not confirmed, ask what TDI means in this project, then collect triggers, inputs/outputs, state flow, owner/SLA, approval points, and upstream/downstream production, quality, or data-system handoffs.\n"
+            "- Quality: confirm the user's current inspection points, defect code/taxonomy, spec limits, sampling vs. full inspection, retest/rework/scrap/MRB disposition, defect Pareto, root-cause dimensions, CAPA/improvement closure, and validation reconciliation. Do not invent defect categories, spec rules, or MRB/CAPA states.\n"
+            "- Active-entry routing: if the user mentions Production, Quality, or TDI, ask through that department's software use case. If they mention another department or unclear ownership, use General's PM software-requirement chain and clarify business decision/action, KPIs, master data, workflow states, ownership boundaries, source systems, and acceptance.\n"
+            "- Early turns should not prioritize permissions, deployment, menus, colors, or generic CRUD unless they directly affect that department's first-version business boundary."
+        )
+
+    def _template_matches_ic_substrate_focus(self, template: dict[str, Any]) -> bool:
+        template_text = json.dumps(
+            {
+                "template_id": template.get("template_id", ""),
+                "template_key": template.get("template_key", ""),
+                "template_name": template.get("template_name", ""),
+                "business_domain": template.get("business_domain", ""),
+                "description": template.get("description", ""),
+                "tags": template.get("tags", []),
+                "applicable_scenarios": template.get("applicable_scenarios", []),
+                "section_titles": template.get("section_titles", []),
+            },
+            ensure_ascii=False,
+        ).lower()
+        return any(keyword in template_text for keyword in IC_SUBSTRATE_CHAIN_KEYWORDS)
+
+    def build_conversation_chain_state(
+        self,
+        session: Session,
+        structured_requirement_model: dict[str, Any] | None = None,
+        language: str | None = None,
+    ) -> dict[str, Any]:
+        normalized_language = self._normalize_language(language)
+        template = self._resolve_business_template(session, normalized_language)
+        if template is None and not session.applied_template_name:
+            return {"enabled": False}
+
+        template_context = template or {
+            "template_id": session.applied_template_id,
+            "template_name": session.applied_template_name,
+        }
+        mode = "ic_substrate" if self._template_matches_ic_substrate_focus(template_context) else "template"
+        nodes = (
+            self._ic_substrate_chain_nodes(normalized_language)
+            if mode == "ic_substrate"
+            else self._generic_template_chain_nodes(normalized_language)
+        )
+        model = normalize_structured_requirement_model(structured_requirement_model)
+        collection_status = model.get("collection_status", {})
+
+        current_index = 0
+        current_node_override: dict[str, Any] | None = None
+        for index, node in enumerate(nodes):
+            if not self._chain_node_confirmed(collection_status, node):
+                current_index = index
+                break
+        else:
+            current_index = max(len(nodes) - 1, 0)
+
+        intent_track = ""
+        intent_focus = ""
+        intent_product_shape = ""
+        if mode == "ic_substrate":
+            intent_track = self._ic_substrate_intent_track_from_latest_user_message(session)
+            intent_focus = self._ic_substrate_intent_focus_from_latest_user_message(session)
+            intent_product_shape = self._ic_substrate_product_shape_from_latest_user_message(session)
+            has_user_messages = self._session_has_user_messages(session)
+            if not has_user_messages:
+                current_index = -1
+                current_node_override = self._ic_substrate_scope_triage_node(normalized_language)
+            elif not intent_track and not intent_focus:
+                if intent_product_shape:
+                    current_index = -1
+                    current_node_override = self._ic_substrate_track_disambiguation_node(normalized_language)
+                else:
+                    current_index = -1
+                    current_node_override = self._ic_substrate_scope_triage_node(normalized_language)
+            elif (intent_focus or intent_product_shape) and not intent_track:
+                current_index = -1
+                current_node_override = self._ic_substrate_track_disambiguation_node(normalized_language)
+            elif intent_track:
+                preferred_node = self._ic_substrate_preferred_node_for_intent(intent_track, intent_focus)
+                if preferred_node:
+                    for index, node in enumerate(nodes):
+                        if node.get("node") == preferred_node and not self._chain_node_confirmed(collection_status, node):
+                            current_index = index
+                            break
+                    else:
+                        preferred_node = ""
+                if preferred_node:
+                    pass
+                else:
+                    for index, node in enumerate(nodes):
+                        if not self._ic_substrate_node_matches_intent_track(node, intent_track):
+                            continue
+                        if not self._chain_node_confirmed(collection_status, node):
+                            current_index = index
+                            break
+                    else:
+                        if self._ic_substrate_is_department(intent_track):
+                            current_index = -1
+                            current_node_override = self._ic_substrate_department_fallback_node(
+                                intent_track,
+                                normalized_language,
+                                intent_focus,
+                            )
+
+        complete = bool(nodes) and all(self._chain_node_confirmed(collection_status, node) for node in nodes)
+        if complete:
+            status = "complete"
+        elif self._session_has_user_messages(session):
+            status = "in_progress"
+        else:
+            status = "not_started"
+
+        current_node = current_node_override or (nodes[current_index] if nodes else self._fallback_chain_node(normalized_language))
+        node_states = []
+        if current_node_override is not None:
+            node_states.append(
+                {
+                    "track": current_node["track"],
+                    "node": current_node["node"],
+                    "label": current_node["label"],
+                    "status": "current",
+                }
+            )
+        for index, node in enumerate(nodes):
+            if complete or self._chain_node_confirmed(collection_status, node):
+                node_status = "complete"
+            elif index == current_index:
+                node_status = "current"
+            else:
+                node_status = "pending"
+            node_states.append(
+                {
+                    "track": node["track"],
+                    "node": node["node"],
+                    "label": node["label"],
+                    "status": node_status,
+                }
+            )
+
+        return {
+            "enabled": True,
+            "mode": mode,
+            "template_id": session.applied_template_id,
+            "template_name": session.applied_template_name or str(template_context.get("template_name", "")),
+            "current_track": current_node["track"],
+            "current_node": current_node["node"],
+            "current_node_label": current_node["label"],
+            "current_step_index": current_index + 1 if current_index >= 0 and nodes else 0,
+            "total_steps": len(nodes),
+            "status": status,
+            "next_question_source": self._conversation_chain_question_source(template_context, mode),
+            "intent_track": intent_track,
+            "intent_focus": intent_focus,
+            "intent_product_shape": intent_product_shape,
+            "tracks": self._conversation_chain_track_labels(nodes, mode, normalized_language),
+            "nodes": node_states,
+        }
+
+    def _generic_template_chain_nodes(self, language: str | None = None) -> list[dict[str, Any]]:
+        if self._normalize_language(language) == "zh":
+            labels = {
+                "objective": ("背景目标", "确认业务目标"),
+                "scope": ("范围角色", "确认范围边界"),
+                "users": ("范围角色", "确认用户角色"),
+                "scenarios": ("核心场景", "确认核心场景"),
+                "features": ("功能流程", "确认功能需求"),
+                "rules": ("规则数据", "确认业务规则"),
+                "pages": ("页面交互", "确认页面交互"),
+                "integrations": ("规则数据", "确认数据与依赖"),
+                "acceptance": ("验收发布", "确认验收标准"),
+            }
+        else:
+            labels = {
+                "objective": ("Background", "Confirm objective"),
+                "scope": ("Scope", "Confirm scope"),
+                "users": ("Roles", "Confirm users"),
+                "scenarios": ("Scenarios", "Confirm scenarios"),
+                "features": ("Features", "Confirm requirements"),
+                "rules": ("Rules/Data", "Confirm business rules"),
+                "pages": ("Pages", "Confirm pages and interactions"),
+                "integrations": ("Rules/Data", "Confirm data and dependencies"),
+                "acceptance": ("Acceptance", "Confirm acceptance criteria"),
+            }
+
+        return [
+            {
+                "track": track,
+                "node": key,
+                "label": label,
+                "status_keys": (key,),
+            }
+            for key, (track, label) in labels.items()
+        ]
+
+    def _ic_substrate_chain_nodes(self, language: str | None = None) -> list[dict[str, Any]]:
+        return self._ic_substrate_department_chain_nodes(language)
+
+    def _ic_substrate_department_chain_nodes(self, language: str | None = None) -> list[dict[str, Any]]:
+        normalized_language = self._normalize_language(language)
+        status_by_suffix = {
+            "scope": ("objective", "scope"),
+            "metrics": ("features",),
+            "workflow": ("rules",),
+            "data_acceptance": ("integrations", "acceptance"),
+        }
+        if normalized_language == "zh":
+            specs = {
+                "production": [
+                    ("scope", "确认产品、厂区、线别、route、lot/panel/unit 和 Finished Lot 边界"),
+                    ("metrics", "确认 output、WIP、scrap、rework、cycle time、throughput 和 yield 口径"),
+                    ("workflow", "确认 move-in/out、hold/release、rework/scrap 和 Finished Lot 判定流程"),
+                    ("data_acceptance", "确认生产记录、站点流转、质量 release、对账和 sign-off"),
+                ],
+                "tdi": [
+                    ("scope", "确认 TDI 在本项目里的业务定义、对象范围和上下游边界"),
+                    ("metrics", "确认 case aging、SLA hit rate、open/close count 和 handoff delay 口径"),
+                    ("workflow", "确认 TDI trigger、triage、action/approval、handoff、verification、closure 流程"),
+                    ("data_acceptance", "确认 TDI 记录、交接数据源、SLA 起止点、回写和关闭验收"),
+                ],
+                "quality": [
+                    ("scope", "确认 inspection point、defect taxonomy、spec limit 和质量 release 边界"),
+                    ("metrics", "确认 defect rate、loss ratio、retest/rework/scrap、CAPA aging 和 repeat defect 口径"),
+                    ("workflow", "确认 defect capture、disposition、MRB/CAPA、root cause、verification/release 流程"),
+                    ("data_acceptance", "确认检测/缺陷/判定数据源、lot genealogy、关闭证据和质量 sign-off"),
+                ],
+                "general": [
+                    ("scope", "确认 General 需求的发起部门、业务 owner、首版软件形态和场景边界"),
+                    ("metrics", "确认 General 需求要支撑的决策/动作、成功指标、现行口径和数据粒度"),
+                    ("workflow", "确认 General 需求的用户流程、状态、owner、异常处理和闭环方式"),
+                    ("data_acceptance", "确认 General 需求的数据源、输出物、验收 owner、sign-off 和待开放部门边界"),
+                ],
+                "planning": [
+                    ("scope", "确认 demand/forecast、产能边界和首版排产业务目标"),
+                    ("metrics", "确认计划达成、产能负载、WIP aging 和交期承诺口径"),
+                    ("workflow", "确认 forecast lock、排程 release、dispatch 变更和 expedite 流程"),
+                    ("data_acceptance", "确认计划数据源、产能模型、commit 版本和验收对账"),
+                ],
+                "engineering": [
+                    ("scope", "确认 route/recipe/spec/parameter、NPI 或工程变更边界"),
+                    ("metrics", "确认 qualification pass rate、ECN aging 和变更周期口径"),
+                    ("workflow", "确认 change request、DOE/试作、review、release/rollback 流程"),
+                    ("data_acceptance", "确认工程数据源、release gate、版本控制和验收责任"),
+                ],
+                "equipment": [
+                    ("scope", "确认设备范围、area/line、关键机台和生产/质量影响边界"),
+                    ("metrics", "确认 uptime/OEE、downtime、PM compliance、MTBF/MTTR 口径"),
+                    ("workflow", "确认 alarm/down、维修动作、PM、release 和 recurrence review 流程"),
+                    ("data_acceptance", "确认设备数据源、维修记录、lot 关联和停机归因验收"),
+                ],
+                "material": [
+                    ("scope", "确认 BOM/料号、供应商、来料批次和供应风险边界"),
+                    ("metrics", "确认 incoming pass rate、缺料风险、库存覆盖和供应商批次口径"),
+                    ("workflow", "确认 procurement、IQC、发料、hold、替代料审批流程"),
+                    ("data_acceptance", "确认物料主数据、库存/IQC 来源、lot 追溯和可用性验收"),
+                ],
+                "warehouse": [
+                    ("scope", "确认 Finished Lot 入库、FG/WIP 库存、包装和出货边界"),
+                    ("metrics", "确认 inventory aging、on-time shipment、hold stock 和周转口径"),
+                    ("workflow", "确认 receive、store、pick/pack、hold check、ship 流程"),
+                    ("data_acceptance", "确认库存/出货数据源、QA/customer hold 和追溯验收"),
+                ],
+                "customer": [
+                    ("scope", "确认 customer/program、forecast/commit、客诉/RMA/8D 边界"),
+                    ("metrics", "确认 commit hit rate、complaint aging、8D closure 和 RMA recurrence 口径"),
+                    ("workflow", "确认客户需求/问题、内部映射、owner assignment、response、closure 流程"),
+                    ("data_acceptance", "确认客户数据源、customer lot 到内部 lot 追溯和回复验收"),
+                ],
+                "finance": [
+                    ("scope", "确认 cost object、cost center、损失类型和财务责任边界"),
+                    ("metrics", "确认 scrap/rework/loss cost、variance 和 margin impact 口径"),
+                    ("workflow", "确认 loss event、成本计算、责任归因、finance review、month-end lock 流程"),
+                    ("data_acceptance", "确认财务/生产损失数据源、月结对账和金额 sign-off"),
+                ],
+                "ehs": [
+                    ("scope", "确认 incident、chemical/hazard、permit 和合规场景边界"),
+                    ("metrics", "确认 incident aging、corrective action closure、permit compliance 口径"),
+                    ("workflow", "确认 report、risk assessment、containment、corrective action、verification 流程"),
+                    ("data_acceptance", "确认 EHS 数据源、整改证据、法规口径和关闭验收"),
+                ],
+                "it_data": [
+                    ("scope", "确认 source of truth、master data、接口和治理边界"),
+                    ("metrics", "确认 interface success、latency、data quality 和 master-data completeness 口径"),
+                    ("workflow", "确认 data change、validation、interface sync、reconciliation、remediation 流程"),
+                    ("data_acceptance", "确认系统/表名、business key、权限审计、SLA 和 sign-off"),
+                ],
+                "management": [
+                    ("scope", "确认经营 KPI、例会节奏、owner action 和跨部门升级边界"),
+                    ("metrics", "确认 target/actual gap、action aging、closure rate 和 escalation 口径"),
+                    ("workflow", "确认 KPI review、gap detection、owner action、escalation、closure 流程"),
+                    ("data_acceptance", "确认目标版本、行动项来源、关闭证据和管理层 sign-off"),
+                ],
+            }
+        elif normalized_language == "de":
+            specs = {
+                "production": [
+                    ("scope", "Produkt, Werk, Linie, Route, lot/panel/unit und Finished Lot Boundary klaeren"),
+                    ("metrics", "Output, WIP, scrap, rework, cycle time, throughput und yield Definitionen klaeren"),
+                    ("workflow", "move-in/out, hold/release, rework/scrap und Finished Lot Entscheidungsprozess klaeren"),
+                    ("data_acceptance", "Produktionsdaten, Stationsbewegung, Quality release, Abgleich und sign-off klaeren"),
+                ],
+                "tdi": [
+                    ("scope", "Projektbezogene TDI Bedeutung, Objektumfang und Upstream/Downstream Boundary klaeren"),
+                    ("metrics", "case aging, SLA hit rate, open/close count und handoff delay Definitionen klaeren"),
+                    ("workflow", "TDI trigger, triage, action/approval, handoff, verification und closure Workflow klaeren"),
+                    ("data_acceptance", "TDI Records, Handoff-Datenquellen, SLA Start/Ende, Writeback und Closure Acceptance klaeren"),
+                ],
+                "quality": [
+                    ("scope", "Inspection points, defect taxonomy, spec limits und Quality release Boundary klaeren"),
+                    ("metrics", "defect rate, loss ratio, retest/rework/scrap, CAPA aging und repeat defect Definitionen klaeren"),
+                    ("workflow", "defect capture, disposition, MRB/CAPA, root cause, verification/release Workflow klaeren"),
+                    ("data_acceptance", "Inspection/defect/disposition Quellen, lot genealogy, Closure Evidence und Quality sign-off klaeren"),
+                ],
+                "general": [
+                    ("scope", "General Requesting Bereich, Business Owner, First-Version Softwareform und Szenario-Grenze klaeren"),
+                    ("metrics", "General Business Decision/Action, Success Metrics, aktuelle Definitionen und Datengranularitaet klaeren"),
+                    ("workflow", "General Nutzerprozess, Status, Owner, Exception Handling und Closure klaeren"),
+                    ("data_acceptance", "General Datenquellen, Outputs, Acceptance Owner, Sign-off und Grenzen zu noch nicht freigegebenen Bereichen klaeren"),
+                ],
+                "planning": [
+                    ("scope", "Demand/forecast, Capacity Boundary und First-Version Scheduling-Ziel klaeren"),
+                    ("metrics", "Plan attainment, capacity loading, WIP aging und commit Definitionen klaeren"),
+                    ("workflow", "Forecast lock, schedule release, dispatch change und expedite Workflow klaeren"),
+                    ("data_acceptance", "Planning Quellen, Capacity Model, Commit Version und Abgleich klaeren"),
+                ],
+                "engineering": [
+                    ("scope", "Route/recipe/spec/parameter, NPI oder Engineering Change Boundary klaeren"),
+                    ("metrics", "Qualification pass rate, ECN aging und change cycle Definitionen klaeren"),
+                    ("workflow", "Change request, DOE/trial, review, release und rollback Workflow klaeren"),
+                    ("data_acceptance", "Engineering Quellen, release gates, Versionierung und Acceptance Owner klaeren"),
+                ],
+                "equipment": [
+                    ("scope", "Equipment Scope, area/line, kritische Tools und Production/Quality Impact Boundary klaeren"),
+                    ("metrics", "uptime/OEE, downtime, PM compliance und MTBF/MTTR Definitionen klaeren"),
+                    ("workflow", "alarm/down, maintenance action, PM, release und recurrence review Workflow klaeren"),
+                    ("data_acceptance", "Equipment Quellen, Maintenance Records, Lot-Bezug und Downtime Attribution klaeren"),
+                ],
+                "material": [
+                    ("scope", "BOM/material number, supplier, incoming lot und supply risk Boundary klaeren"),
+                    ("metrics", "incoming pass rate, shortage risk, inventory coverage und supplier lot Definitionen klaeren"),
+                    ("workflow", "Procurement, IQC, Issue to Production, Hold und Substitution Approval Workflow klaeren"),
+                    ("data_acceptance", "Material master, inventory/IQC Quellen, Lot Traceability und Usability Acceptance klaeren"),
+                ],
+                "warehouse": [
+                    ("scope", "Finished Lot receipt, FG/WIP inventory, packing und shipment Boundary klaeren"),
+                    ("metrics", "inventory aging, on-time shipment, hold stock und turnover Definitionen klaeren"),
+                    ("workflow", "receive, store, pick/pack, hold check und ship Workflow klaeren"),
+                    ("data_acceptance", "Inventory/shipping Quellen, QA/customer hold und Traceability Acceptance klaeren"),
+                ],
+                "customer": [
+                    ("scope", "Customer/program, forecast/commit, complaint/RMA/8D Boundary klaeren"),
+                    ("metrics", "commit hit rate, complaint aging, 8D closure und RMA recurrence Definitionen klaeren"),
+                    ("workflow", "Customer demand/issue, internal mapping, owner assignment, response und closure Workflow klaeren"),
+                    ("data_acceptance", "Customer Quellen, customer-lot zu internal-lot Traceability und Response Acceptance klaeren"),
+                ],
+                "finance": [
+                    ("scope", "Cost object, cost center, loss type und Finance Responsibility Boundary klaeren"),
+                    ("metrics", "scrap/rework/loss cost, variance und margin impact Definitionen klaeren"),
+                    ("workflow", "Loss event, cost calculation, responsibility attribution, finance review und month-end lock Workflow klaeren"),
+                    ("data_acceptance", "Finance/production-loss Quellen, month-end reconciliation und amount sign-off klaeren"),
+                ],
+                "ehs": [
+                    ("scope", "Incident, chemical/hazard, permit und Compliance Scenario Boundary klaeren"),
+                    ("metrics", "incident aging, corrective-action closure und permit-compliance Definitionen klaeren"),
+                    ("workflow", "Report, risk assessment, containment, corrective action und verification Workflow klaeren"),
+                    ("data_acceptance", "EHS Quellen, corrective evidence, compliance taxonomy und closure acceptance klaeren"),
+                ],
+                "it_data": [
+                    ("scope", "Source of truth, master data, interfaces und Governance Boundary klaeren"),
+                    ("metrics", "interface success, latency, data quality und master-data completeness Definitionen klaeren"),
+                    ("workflow", "Data change, validation, interface sync, reconciliation und remediation Workflow klaeren"),
+                    ("data_acceptance", "Systeme/Tabellen, business keys, access audit, SLA und sign-off klaeren"),
+                ],
+                "management": [
+                    ("scope", "Operating KPIs, meeting cadence, owner actions und cross-department escalation Boundary klaeren"),
+                    ("metrics", "target/actual gap, action aging, closure rate und escalation Definitionen klaeren"),
+                    ("workflow", "KPI review, gap detection, owner action, escalation und closure Workflow klaeren"),
+                    ("data_acceptance", "Target versions, action-item Quellen, closure evidence und Management sign-off klaeren"),
+                ],
+            }
+        elif normalized_language == "ms":
+            specs = {
+                "production": [
+                    ("scope", "Sahkan product, plant, line, route, lot/panel/unit dan Finished Lot boundary"),
+                    ("metrics", "Sahkan definisi output, WIP, scrap, rework, cycle time, throughput dan yield"),
+                    ("workflow", "Sahkan workflow move-in/out, hold/release, rework/scrap dan Finished Lot decision"),
+                    ("data_acceptance", "Sahkan production records, station movement, quality release, reconciliation dan sign-off"),
+                ],
+                "tdi": [
+                    ("scope", "Sahkan maksud TDI untuk projek, object scope dan upstream/downstream boundary"),
+                    ("metrics", "Sahkan definisi case aging, SLA hit rate, open/close count dan handoff delay"),
+                    ("workflow", "Sahkan workflow TDI trigger, triage, action/approval, handoff, verification dan closure"),
+                    ("data_acceptance", "Sahkan TDI records, sumber data handoff, SLA start/end, writeback dan closure acceptance"),
+                ],
+                "quality": [
+                    ("scope", "Sahkan inspection points, defect taxonomy, spec limits dan quality release boundary"),
+                    ("metrics", "Sahkan definisi defect rate, loss ratio, retest/rework/scrap, CAPA aging dan repeat defect"),
+                    ("workflow", "Sahkan workflow defect capture, disposition, MRB/CAPA, root cause, verification/release"),
+                    ("data_acceptance", "Sahkan sumber inspection/defect/disposition, lot genealogy, closure evidence dan quality sign-off"),
+                ],
+                "general": [
+                    ("scope", "Sahkan requesting department, business owner, first-version software shape dan scenario boundary untuk General"),
+                    ("metrics", "Sahkan business decision/action, success metric, definisi semasa dan data grain untuk General"),
+                    ("workflow", "Sahkan user workflow, status, owner, exception handling dan closure untuk General"),
+                    ("data_acceptance", "Sahkan data sources, outputs, acceptance owner, sign-off dan boundary jabatan belum dibuka untuk General"),
+                ],
+                "planning": [
+                    ("scope", "Sahkan demand/forecast, capacity boundary dan objektif scheduling versi pertama"),
+                    ("metrics", "Sahkan definisi plan attainment, capacity loading, WIP aging dan commit"),
+                    ("workflow", "Sahkan workflow forecast lock, schedule release, dispatch change dan expedite"),
+                    ("data_acceptance", "Sahkan sumber planning, capacity model, commit version dan reconciliation"),
+                ],
+                "engineering": [
+                    ("scope", "Sahkan route/recipe/spec/parameter, NPI atau engineering-change boundary"),
+                    ("metrics", "Sahkan qualification pass rate, ECN aging dan change-cycle definitions"),
+                    ("workflow", "Sahkan workflow change request, DOE/trial, review, release dan rollback"),
+                    ("data_acceptance", "Sahkan sumber engineering, release gates, version control dan acceptance owners"),
+                ],
+                "equipment": [
+                    ("scope", "Sahkan equipment scope, area/line, critical tools dan production/quality impact boundary"),
+                    ("metrics", "Sahkan definisi uptime/OEE, downtime, PM compliance dan MTBF/MTTR"),
+                    ("workflow", "Sahkan workflow alarm/down, maintenance action, PM, release dan recurrence review"),
+                    ("data_acceptance", "Sahkan equipment sources, maintenance records, lot linkage dan downtime attribution acceptance"),
+                ],
+                "material": [
+                    ("scope", "Sahkan BOM/material number, supplier, incoming lot dan supply-risk boundary"),
+                    ("metrics", "Sahkan incoming pass rate, shortage risk, inventory coverage dan supplier-lot definitions"),
+                    ("workflow", "Sahkan workflow procurement, IQC, issue-to-production, hold dan substitution approval"),
+                    ("data_acceptance", "Sahkan material master, inventory/IQC sources, lot traceability dan usability acceptance"),
+                ],
+                "warehouse": [
+                    ("scope", "Sahkan Finished Lot receipt, FG/WIP inventory, packing dan shipment boundary"),
+                    ("metrics", "Sahkan inventory aging, on-time shipment, hold stock dan turnover definitions"),
+                    ("workflow", "Sahkan workflow receive, store, pick/pack, hold check dan ship"),
+                    ("data_acceptance", "Sahkan inventory/shipping sources, QA/customer hold dan traceability acceptance"),
+                ],
+                "customer": [
+                    ("scope", "Sahkan customer/program, forecast/commit dan complaint/RMA/8D boundary"),
+                    ("metrics", "Sahkan commit hit rate, complaint aging, 8D closure dan RMA recurrence definitions"),
+                    ("workflow", "Sahkan workflow customer demand/issue, internal mapping, owner assignment, response dan closure"),
+                    ("data_acceptance", "Sahkan customer sources, customer-lot to internal-lot traceability dan response acceptance"),
+                ],
+                "finance": [
+                    ("scope", "Sahkan cost object, cost center, loss type dan finance responsibility boundary"),
+                    ("metrics", "Sahkan scrap/rework/loss cost, variance dan margin-impact definitions"),
+                    ("workflow", "Sahkan workflow loss event, cost calculation, responsibility attribution, finance review dan month-end lock"),
+                    ("data_acceptance", "Sahkan finance/production-loss sources, month-end reconciliation dan amount sign-off"),
+                ],
+                "ehs": [
+                    ("scope", "Sahkan incident, chemical/hazard, permit dan compliance scenario boundary"),
+                    ("metrics", "Sahkan incident aging, corrective-action closure dan permit-compliance definitions"),
+                    ("workflow", "Sahkan workflow report, risk assessment, containment, corrective action dan verification"),
+                    ("data_acceptance", "Sahkan EHS sources, corrective evidence, compliance taxonomy dan closure acceptance"),
+                ],
+                "it_data": [
+                    ("scope", "Sahkan source of truth, master data, interfaces dan governance boundary"),
+                    ("metrics", "Sahkan interface success, latency, data quality dan master-data completeness definitions"),
+                    ("workflow", "Sahkan workflow data change, validation, interface sync, reconciliation dan remediation"),
+                    ("data_acceptance", "Sahkan systems/tables, business keys, access audit, SLA dan sign-off"),
+                ],
+                "management": [
+                    ("scope", "Sahkan operating KPIs, meeting cadence, owner actions dan cross-department escalation boundary"),
+                    ("metrics", "Sahkan target/actual gap, action aging, closure rate dan escalation definitions"),
+                    ("workflow", "Sahkan workflow KPI review, gap detection, owner action, escalation dan closure"),
+                    ("data_acceptance", "Sahkan target versions, action-item sources, closure evidence dan management sign-off"),
+                ],
+            }
+        else:
+            specs = {
+                "production": [
+                    ("scope", "Confirm product, plant, line, route, lot/panel/unit, and Finished Lot boundary"),
+                    ("metrics", "Confirm output, WIP, scrap, rework, cycle time, throughput, and yield definitions"),
+                    ("workflow", "Confirm move-in/out, hold/release, rework/scrap, and Finished Lot decision workflow"),
+                    ("data_acceptance", "Confirm production records, station movement, quality release, reconciliation, and sign-off"),
+                ],
+                "tdi": [
+                    ("scope", "Confirm project-specific TDI definition, object scope, and upstream/downstream boundary"),
+                    ("metrics", "Confirm case aging, SLA hit rate, open/close count, and handoff-delay definitions"),
+                    ("workflow", "Confirm TDI trigger, triage, action/approval, handoff, verification, and closure workflow"),
+                    ("data_acceptance", "Confirm TDI records, handoff data sources, SLA start/end, writeback, and closure acceptance"),
+                ],
+                "quality": [
+                    ("scope", "Confirm inspection points, defect taxonomy, spec limits, and quality-release boundary"),
+                    ("metrics", "Confirm defect rate, loss ratio, retest/rework/scrap, CAPA aging, and repeat-defect definitions"),
+                    ("workflow", "Confirm defect capture, disposition, MRB/CAPA, root cause, verification, and release workflow"),
+                    ("data_acceptance", "Confirm inspection/defect/disposition sources, lot genealogy, closure evidence, and quality sign-off"),
+                ],
+                "general": [
+                    ("scope", "Confirm General requesting department, business owner, first-version software shape, and scenario boundary"),
+                    ("metrics", "Confirm General business decision/action, success metric, current definitions, and data grain"),
+                    ("workflow", "Confirm General user workflow, status, owner, exception handling, and closure method"),
+                    ("data_acceptance", "Confirm General data sources, outputs, acceptance owner, sign-off, and unopened-department boundary"),
+                ],
+                "planning": [
+                    ("scope", "Confirm demand/forecast, capacity boundary, and first-version scheduling objective"),
+                    ("metrics", "Confirm plan attainment, capacity loading, WIP aging, and commit definitions"),
+                    ("workflow", "Confirm forecast lock, schedule release, dispatch change, and expedite workflow"),
+                    ("data_acceptance", "Confirm planning sources, capacity model, commit version, and reconciliation"),
+                ],
+                "engineering": [
+                    ("scope", "Confirm route/recipe/spec/parameter, NPI, or engineering-change boundary"),
+                    ("metrics", "Confirm qualification pass rate, ECN aging, and change-cycle definitions"),
+                    ("workflow", "Confirm change request, DOE/trial, review, release, and rollback workflow"),
+                    ("data_acceptance", "Confirm engineering sources, release gates, version control, and acceptance owners"),
+                ],
+                "equipment": [
+                    ("scope", "Confirm equipment scope, area/line, critical tools, and production/quality impact boundary"),
+                    ("metrics", "Confirm uptime/OEE, downtime, PM compliance, and MTBF/MTTR definitions"),
+                    ("workflow", "Confirm alarm/down, maintenance action, PM, release, and recurrence review workflow"),
+                    ("data_acceptance", "Confirm equipment sources, maintenance records, lot linkage, and downtime attribution acceptance"),
+                ],
+                "material": [
+                    ("scope", "Confirm BOM/material number, supplier, incoming lot, and supply-risk boundary"),
+                    ("metrics", "Confirm incoming pass rate, shortage risk, inventory coverage, and supplier-lot definitions"),
+                    ("workflow", "Confirm procurement, IQC, issue-to-production, hold, and substitution approval workflow"),
+                    ("data_acceptance", "Confirm material master, inventory/IQC sources, lot traceability, and usability acceptance"),
+                ],
+                "warehouse": [
+                    ("scope", "Confirm Finished Lot receipt, FG/WIP inventory, packing, and shipment boundary"),
+                    ("metrics", "Confirm inventory aging, on-time shipment, hold stock, and turnover definitions"),
+                    ("workflow", "Confirm receive, store, pick/pack, hold check, and ship workflow"),
+                    ("data_acceptance", "Confirm inventory/shipping sources, QA/customer hold, and traceability acceptance"),
+                ],
+                "customer": [
+                    ("scope", "Confirm customer/program, forecast/commit, complaint/RMA/8D boundary"),
+                    ("metrics", "Confirm commit hit rate, complaint aging, 8D closure, and RMA recurrence definitions"),
+                    ("workflow", "Confirm customer demand/issue, internal mapping, owner assignment, response, and closure workflow"),
+                    ("data_acceptance", "Confirm customer sources, customer-lot to internal-lot traceability, and response acceptance"),
+                ],
+                "finance": [
+                    ("scope", "Confirm cost object, cost center, loss type, and finance responsibility boundary"),
+                    ("metrics", "Confirm scrap/rework/loss cost, variance, and margin-impact definitions"),
+                    ("workflow", "Confirm loss event, cost calculation, responsibility attribution, finance review, and month-end lock workflow"),
+                    ("data_acceptance", "Confirm finance/production-loss sources, month-end reconciliation, and amount sign-off"),
+                ],
+                "ehs": [
+                    ("scope", "Confirm incident, chemical/hazard, permit, and compliance scenario boundary"),
+                    ("metrics", "Confirm incident aging, corrective-action closure, and permit-compliance definitions"),
+                    ("workflow", "Confirm report, risk assessment, containment, corrective action, and verification workflow"),
+                    ("data_acceptance", "Confirm EHS sources, corrective evidence, compliance taxonomy, and closure acceptance"),
+                ],
+                "it_data": [
+                    ("scope", "Confirm source of truth, master data, interfaces, and governance boundary"),
+                    ("metrics", "Confirm interface success, latency, data quality, and master-data completeness definitions"),
+                    ("workflow", "Confirm data change, validation, interface sync, reconciliation, and remediation workflow"),
+                    ("data_acceptance", "Confirm systems/tables, business keys, access audit, SLA, and sign-off"),
+                ],
+                "management": [
+                    ("scope", "Confirm operating KPIs, meeting cadence, owner actions, and cross-department escalation boundary"),
+                    ("metrics", "Confirm target/actual gap, action aging, closure rate, and escalation definitions"),
+                    ("workflow", "Confirm KPI review, gap detection, owner action, escalation, and closure workflow"),
+                    ("data_acceptance", "Confirm target versions, action-item sources, closure evidence, and management sign-off"),
+                ],
+            }
+
+        department_order = ACTIVE_IC_SUBSTRATE_DEPARTMENTS
+        nodes: list[dict[str, Any]] = []
+        for department in department_order:
+            department_specs = specs[department]
+            track = self._ic_substrate_department_label(department, language)
+            for suffix, label in department_specs:
+                nodes.append(
+                    {
+                        "track": track,
+                        "department": department,
+                        "node": f"{department}_{suffix}",
+                        "label": label,
+                        "status_keys": status_by_suffix[suffix],
+                    }
+                )
+        return nodes
+
+    def _conversation_chain_track_labels(
+        self,
+        nodes: list[dict[str, Any]],
+        mode: str,
+        language: str | None = None,
+    ) -> list[str]:
+        node_tracks = [str(node["track"]) for node in nodes]
+        return self._unique_strings(node_tracks)
+
+    def _ic_substrate_node_matches_intent_track(self, node: dict[str, Any], intent_track: str) -> bool:
+        track = intent_track.strip().lower()
+        if not track:
+            return False
+        department = str(node.get("department", "")).strip().lower()
+        if department:
+            return department == track
+        return str(node.get("track", "")).strip().lower() == track
+
+    def _chain_node_confirmed(self, collection_status: dict[str, Any], node: dict[str, Any]) -> bool:
+        status_keys = node.get("status_keys")
+        if not isinstance(status_keys, tuple):
+            return False
+        for key in status_keys:
+            item = collection_status.get(key)
+            if not isinstance(item, dict):
+                return False
+            status_value = str(item.get("status", "")).strip().lower()
+            if status_value != CONVERSATION_CHAIN_STATUS_CONFIRMED:
+                return False
+        return True
+
+    def _conversation_chain_question_source(self, template: dict[str, Any], mode: str) -> str:
+        if mode == "ic_substrate":
+            return "ic_substrate_department_first_chain"
+        prompt_questions = template.get("prompt_questions")
+        if isinstance(prompt_questions, list) and prompt_questions:
+            return "template_prompt_questions"
+        return "generic_template_chain"
+
+    def _ic_substrate_production_tdi_quality_playbook_guidance(
+        self,
+        track: str,
+        language: str | None = None,
+    ) -> str:
+        key = track.strip().lower()
+        if key not in {"production", "tdi", "quality"}:
+            return ""
+
+        if self._normalize_language(language) == "zh":
+            playbooks = {
+                "production": {
+                    "decision": "Finished Lot 完工判定、WIP/hold/release 处置、返工/报废责任、瓶颈站点、产出与周期改善优先级",
+                    "kpi": "yield、output、WIP aging、scrap、rework、hold aging、cycle time、throughput、move queue；名称和公式以现场现行口径为准",
+                    "master": "product family、plant、line、route、operation/station、lot/panel/unit、hold reason、rework loop、owner；不要自造 route 或站点名",
+                    "workflow": "lot release -> move-in/out -> hold/release -> rework/scrap -> Finished Lot 判定 -> 产量/质量/仓储对账确认；状态名由用户提供",
+                    "source": "生产记录、站点流转、WIP/hold/报废/返工记录、质量 release、入库或交接记录；系统名和表名由用户确认",
+                    "acceptance": "Production owner、Quality owner、必要时 Warehouse/Planning owner 对 Finished Lot 判定点、数量、状态、时间窗和对账差异 sign-off",
+                },
+                "tdi": {
+                    "decision": "TDI 业务定义、触发边界、case 分类、状态机、owner/SLA、审批/验证、跨部门 handoff 和关闭条件",
+                    "kpi": "case aging、SLA hit rate、open/close count、handoff delay、approval aging、reopen/repeat issue；名称和公式以用户 TDI 口径为准",
+                    "master": "TDI case、trigger type、input/output、state、priority、owner、approval point、linked lot/project、closure evidence；不要展开 TDI",
+                    "workflow": "trigger -> triage -> owner assignment -> action/approval -> handoff -> verification -> writeback -> closure；状态名由用户提供",
+                    "source": "用户确认的 TDI 记录、生产/质量/工程/数据交接记录、审批/验证证据；不要预设 MES/QMS/ERP 等系统名",
+                    "acceptance": "TDI owner、上下游业务 owner、最终验收 owner 对关闭条件、SLA 起止点、回写边界、重开规则和证据留存确认",
+                },
+                "quality": {
+                    "decision": "检测覆盖、缺陷判定、MRB/CAPA 是否适用、retest/rework/scrap disposition、root cause 分析和质量 release 条件",
+                    "kpi": "defect rate、loss ratio、retest/rework/scrap count、MRB aging、CAPA aging、repeat defect、release cycle time；公式以质量现行报表为准",
+                    "master": "inspection point、defect code/taxonomy、spec limit、sampling rule、disposition reason、lot genealogy、responsible owner、release evidence；不要自造分类或规格",
+                    "workflow": "inspection -> defect capture -> disposition/MRB -> root cause -> action/CAPA if used -> verification -> release/sign-off",
+                    "source": "检测记录、缺陷记录、判定/处置记录、MRB/CAPA 记录、root cause 和验证证据；系统名和表名由用户确认",
+                    "acceptance": "Quality owner、Production/Engineering owner、必要时 Customer owner 对缺陷口径、处置规则、release gate 和关闭证据 sign-off",
+                },
+            }
+            playbook = playbooks[key]
+            product_shapes = self._ic_substrate_department_product_shapes(key, language)
+            return (
+                "部门专家 PM 访谈框架：\n"
+                f"- 常见首版软件形态：{product_shapes}\n"
+                f"- 软件要支撑的业务决策/动作：{playbook['decision']}\n"
+                f"- 看板/报表要展示的 KPI/口径：{playbook['kpi']}\n"
+                f"- 软件需要识别的主数据/对象：{playbook['master']}\n"
+                f"- 软件要承载或反映的流程状态：{playbook['workflow']}\n"
+                f"- 软件数据来源与接口边界：{playbook['source']}\n"
+                f"- 软件验收与责任边界：{playbook['acceptance']}"
+            )
+
+        playbooks = {
+            "production": {
+                "decision": "Finished Lot completion, WIP/hold/release disposition, bottleneck station, rework/scrap responsibility, output and cycle-time improvement priority",
+                "kpi": "yield, output, WIP aging, scrap, rework, hold aging, cycle time, throughput, move queue using the site's current names and formulas",
+                "master": "product family, plant, line, route, operation/station, lot/panel/unit, hold reason, rework loop, owner; do not invent route or station names",
+                "workflow": "lot release -> move-in/out -> hold/release -> rework/scrap -> Finished Lot decision -> production/quality/warehouse reconciliation, with user-provided state names",
+                "source": "production records, station movement, WIP/hold/scrap/rework records, quality release, warehouse or handoff records; user confirms system/table names",
+                "acceptance": "Production, Quality, and when needed Warehouse/Planning owners sign off Finished Lot decision point, quantities, states, time window, and reconciliation gaps",
+            },
+            "tdi": {
+                "decision": "TDI business definition, trigger boundary, case category, state machine, owner/SLA, approval/verification, cross-functional handoff, and closure condition",
+                "kpi": "case aging, SLA hit rate, open/close count, handoff delay, approval aging, reopen/repeat issue using the user's TDI definitions",
+                "master": "TDI case, trigger type, input/output, state, priority, owner, approval point, linked lot/project, closure evidence; do not expand TDI",
+                "workflow": "trigger -> triage -> owner assignment -> action/approval -> handoff -> verification -> writeback -> closure, with user-provided state names",
+                "source": "user-confirmed TDI records, production/quality/engineering/data handoff records, and approval/verification evidence; do not assume MES/QMS/ERP names",
+                "acceptance": "TDI owner, upstream/downstream business owners, and final acceptance owner confirm closure condition, SLA start/end, writeback boundary, reopen rule, and evidence retention",
+            },
+            "quality": {
+                "decision": "inspection coverage, defect disposition, whether MRB/CAPA applies, retest/rework/scrap disposition, root-cause analysis, and quality release gates",
+                "kpi": "defect rate, loss ratio, retest/rework/scrap count, MRB aging, CAPA aging, repeat defect, release cycle time using current Quality formulas",
+                "master": "inspection point, defect code/taxonomy, spec limit, sampling rule, disposition reason, lot genealogy, responsible owner, release evidence; do not invent categories or specs",
+                "workflow": "inspection -> defect capture -> disposition/MRB -> root cause -> action/CAPA if used -> verification -> release/sign-off",
+                "source": "inspection, defect, disposition, MRB/CAPA, root-cause, and verification records; user confirms system/table names",
+                "acceptance": "Quality, Production/Engineering, and when needed Customer owners sign off defect definition, disposition rule, release gate, and closure evidence",
+            },
+        }
+        playbook = playbooks[key]
+        product_shapes = self._ic_substrate_department_product_shapes(key, language)
+        return (
+            "Department-expert PM interview playbook:\n"
+            f"- Common first-version software shapes: {product_shapes}\n"
+            f"- Business decision/action the software must support: {playbook['decision']}\n"
+            f"- Dashboard/report KPI and definition: {playbook['kpi']}\n"
+            f"- Master data/object the software must identify: {playbook['master']}\n"
+            f"- Workflow states the software must carry or reflect: {playbook['workflow']}\n"
+            f"- Software data sources and integration boundary: {playbook['source']}\n"
+            f"- Software acceptance and ownership boundary: {playbook['acceptance']}"
+        )
+
+    def _ic_substrate_department_product_shapes(self, department: str, language: str | None = None) -> str:
+        key = department.strip().lower()
+        normalized_language = self._normalize_language(language)
+        if normalized_language == "zh":
+            product_shapes = {
+                "production": "生产看板、WIP/hold/release tracking、Finished Lot 判定、良率/吞吐/周期分析、异常告警、交接对账",
+                "tdi": "case tracking、handoff dashboard、SLA aging、审批/验证流、异常告警、数据回写对账",
+                "quality": "质量看板、缺陷下钻、MRB/CAPA case tracking、release sign-off、报表导出、异常告警",
+                "general": "通用业务看板、workflow/case tracking、data query、report/export、alerting、admin console、跨部门 cockpit",
+                "planning": "排产看板、capacity loading、dispatch priority、commit 风险预警、forecast-to-schedule gap、expedite tracking",
+                "engineering": "recipe/spec change tracking、NPI/qualification dashboard、DOE/trial lot 记录、root cause action tracking、release gate sign-off",
+                "equipment": "downtime dashboard、PM execution tracking、alarm/event triage、spare-part risk、equipment release、lot-impact analysis",
+                "material": "来料质量看板、shortage risk、supplier lot traceability、替代料审批、IQC issue tracking、库存可用性预警",
+                "warehouse": "Finished Lot 入库看板、pick/pack/ship tracking、inventory aging、shipping hold、QA/customer release gate、traceability report",
+                "customer": "customer commit dashboard、forecast/order tracking、complaint/RMA/8D case tracking、program milestone、customer spec compliance、response SLA",
+                "finance": "scrap/rework cost dashboard、loss attribution、cost center variance、margin impact、month-end reconciliation、management report export",
+                "ehs": "incident tracking、corrective action workflow、chemical usage dashboard、permit/compliance calendar、environmental report、audit evidence repository",
+                "it_data": "data quality dashboard、interface SLA monitor、master data workflow、lineage/query catalog、access audit、reconciliation console",
+                "management": "war room cockpit、KPI scorecard、target/actual gap review、owner action tracking、escalation board、meeting pack export",
+            }
+            return product_shapes.get(key, "dashboard、workflow/case tracking、report/export、alerting、admin console")
+        if normalized_language == "de":
+            product_shapes = {
+                "production": "Production Dashboard, WIP/hold/release Tracking, Finished Lot Entscheidung, Yield/Throughput/Cycle-Time Analyse, Exception Alerting, Handoff-Reconciliation",
+                "tdi": "case tracking, handoff dashboard, SLA aging, approval/verification flow, exception alerting, data writeback reconciliation",
+                "quality": "Quality Dashboard, Defect Drill-down, MRB/CAPA case tracking, Release Sign-off, Report Export, Exception Alerting",
+                "general": "General business dashboard, workflow/case tracking, data query, report/export, alerting, admin console, cross-department cockpit",
+                "planning": "Scheduling Dashboard, Capacity Loading, Dispatch Priority, Commit-Risk Alerting, Forecast-to-Schedule Gap, Expedite Tracking",
+                "engineering": "recipe/spec change tracking, NPI/qualification dashboard, DOE/trial-lot records, root-cause action tracking, release-gate sign-off",
+                "equipment": "Downtime Dashboard, PM execution tracking, alarm/event triage, spare-part risk, equipment release, lot-impact analysis",
+                "material": "Incoming-Quality Dashboard, shortage risk, supplier-lot traceability, substitute-material approval, IQC issue tracking, inventory availability alerting",
+                "warehouse": "Finished Lot Receipt Dashboard, pick/pack/ship tracking, inventory aging, shipping hold, QA/customer release gate, traceability report",
+                "customer": "Customer Commit Dashboard, forecast/order tracking, complaint/RMA/8D case tracking, program milestone, customer-spec compliance, response SLA",
+                "finance": "scrap/rework cost dashboard, loss attribution, cost-center variance, margin impact, month-end reconciliation, management report export",
+                "ehs": "incident tracking, corrective-action workflow, chemical usage dashboard, permit/compliance calendar, environmental report, audit evidence repository",
+                "it_data": "data-quality dashboard, interface SLA monitor, master-data workflow, lineage/query catalog, access audit, reconciliation console",
+                "management": "war-room cockpit, KPI scorecard, target/actual gap review, owner action tracking, escalation board, meeting-pack export",
+            }
+            return product_shapes.get(key, "dashboard, workflow/case tracking, report/export, alerting, admin console")
+        if normalized_language == "ms":
+            product_shapes = {
+                "production": "production dashboard, WIP/hold/release tracking, Finished Lot decision, yield/throughput/cycle-time analysis, abnormal alerting, handoff reconciliation",
+                "tdi": "case tracking, handoff dashboard, SLA aging, approval/verification flow, abnormal alerting, data writeback reconciliation",
+                "quality": "quality dashboard, defect drill-down, MRB/CAPA case tracking, release sign-off, report export, abnormal alerting",
+                "general": "general business dashboard, workflow/case tracking, data query, report/export, alerting, admin console, cross-department cockpit",
+                "planning": "schedule dashboard, capacity loading, dispatch priority, commit-risk alerting, forecast-to-schedule gap, expedite tracking",
+                "engineering": "recipe/spec change tracking, NPI/qualification dashboard, DOE/trial-lot records, root-cause action tracking, release-gate sign-off",
+                "equipment": "downtime dashboard, PM execution tracking, alarm/event triage, spare-part risk, equipment release, lot-impact analysis",
+                "material": "incoming-quality dashboard, shortage risk, supplier-lot traceability, substitute-material approval, IQC issue tracking, inventory availability alerting",
+                "warehouse": "Finished Lot receipt dashboard, pick/pack/ship tracking, inventory aging, shipping hold, QA/customer release gate, traceability report",
+                "customer": "customer commit dashboard, forecast/order tracking, complaint/RMA/8D case tracking, program milestone, customer-spec compliance, response SLA",
+                "finance": "scrap/rework cost dashboard, loss attribution, cost-center variance, margin impact, month-end reconciliation, management report export",
+                "ehs": "incident tracking, corrective-action workflow, chemical usage dashboard, permit/compliance calendar, environmental report, audit evidence repository",
+                "it_data": "data-quality dashboard, interface SLA monitor, master-data workflow, lineage/query catalog, access audit, reconciliation console",
+                "management": "war-room cockpit, KPI scorecard, target/actual gap review, owner action tracking, escalation board, meeting-pack export",
+            }
+            return product_shapes.get(key, "dashboard, workflow/case tracking, report/export, alerting, admin console")
+
+        product_shapes = {
+            "production": "production dashboard, WIP/hold/release tracking, Finished Lot decision, yield/throughput/cycle-time analysis, abnormal alerting, handoff reconciliation",
+            "tdi": "case tracking, handoff dashboard, SLA aging, approval/verification flow, abnormal alerting, data writeback reconciliation",
+            "quality": "quality dashboard, defect drill-down, MRB/CAPA case tracking, release sign-off, report export, abnormal alerting",
+            "general": "general business dashboard, workflow/case tracking, data query, report/export, alerting, admin console, cross-department cockpit",
+            "planning": "schedule dashboard, capacity loading, dispatch priority, commit-risk alerting, forecast-to-schedule gap, expedite tracking",
+            "engineering": "recipe/spec change tracking, NPI/qualification dashboard, DOE/trial-lot records, root-cause action tracking, release-gate sign-off",
+            "equipment": "downtime dashboard, PM execution tracking, alarm/event triage, spare-part risk, equipment release, lot-impact analysis",
+            "material": "incoming-quality dashboard, shortage risk, supplier-lot traceability, substitute-material approval, IQC issue tracking, inventory availability alerting",
+            "warehouse": "Finished Lot receipt dashboard, pick/pack/ship tracking, inventory aging, shipping hold, QA/customer release gate, traceability report",
+            "customer": "customer commit dashboard, forecast/order tracking, complaint/RMA/8D case tracking, program milestone, customer-spec compliance, response SLA",
+            "finance": "scrap/rework cost dashboard, loss attribution, cost-center variance, margin impact, month-end reconciliation, management report export",
+            "ehs": "incident tracking, corrective-action workflow, chemical usage dashboard, permit/compliance calendar, environmental report, audit evidence repository",
+            "it_data": "data-quality dashboard, interface SLA monitor, master-data workflow, lineage/query catalog, access audit, reconciliation console",
+            "management": "war-room cockpit, KPI scorecard, target/actual gap review, owner action tracking, escalation board, meeting-pack export",
+        }
+        return product_shapes.get(key, "dashboard, workflow/case tracking, report/export, alerting, admin console")
+
+    def _fallback_chain_node(self, language: str | None = None) -> dict[str, Any]:
+        normalized_language = self._normalize_language(language)
+        if normalized_language == "zh":
+            return {"track": "模板链路", "node": "not_available", "label": "待开始", "status_keys": ()}
+        if normalized_language == "de":
+            return {"track": "Vorlagenkette", "node": "not_available", "label": "Noch nicht gestartet", "status_keys": ()}
+        if normalized_language == "ms":
+            return {"track": "Rantaian templat", "node": "not_available", "label": "Belum bermula", "status_keys": ()}
+        return {"track": "Template chain", "node": "not_available", "label": "Not started", "status_keys": ()}
+
+    def _ic_substrate_track_disambiguation_node(self, language: str | None = None) -> dict[str, Any]:
+        normalized_language = self._normalize_language(language)
+        if normalized_language == "zh":
+            return {
+                "track": "Routing",
+                "node": "track_disambiguation",
+                "label": "确认需求发起部门或业务 owner",
+                "status_keys": (),
+            }
+        if normalized_language == "de":
+            return {
+                "track": "Routing",
+                "node": "track_disambiguation",
+                "label": "Anfordernden Bereich oder Business Owner klaeren",
+                "status_keys": (),
+            }
+        if normalized_language == "ms":
+            return {
+                "track": "Routing",
+                "node": "track_disambiguation",
+                "label": "Sahkan jabatan pemohon atau business owner",
+                "status_keys": (),
+            }
+        return {
+            "track": "Routing",
+            "node": "track_disambiguation",
+            "label": "Confirm the requesting department or business owner",
+            "status_keys": (),
+        }
+
+    def _ic_substrate_scope_triage_node(self, language: str | None = None) -> dict[str, Any]:
+        normalized_language = self._normalize_language(language)
+        if normalized_language == "zh":
+            return {
+                "track": "Routing",
+                "node": "scope_triage",
+                "label": "确认需求发起部门、业务 owner 和首版场景",
+                "status_keys": (),
+            }
+        if normalized_language == "de":
+            return {
+                "track": "Routing",
+                "node": "scope_triage",
+                "label": "Anfordernden Bereich, Business Owner und First-Version Szenario klaeren",
+                "status_keys": (),
+            }
+        if normalized_language == "ms":
+            return {
+                "track": "Routing",
+                "node": "scope_triage",
+                "label": "Sahkan jabatan pemohon, business owner dan senario versi pertama",
+                "status_keys": (),
+            }
+        return {
+            "track": "Routing",
+            "node": "scope_triage",
+            "label": "Confirm requesting department, business owner, and first-version scenario",
+            "status_keys": (),
+        }
+
+    def _ic_substrate_department_fallback_node(
+        self,
+        department: str,
+        language: str | None = None,
+        intent_focus: str | None = None,
+    ) -> dict[str, Any]:
+        label = self._ic_substrate_department_label(department, language)
+        focus = str(intent_focus or "").strip().lower()
+        normalized_language = self._normalize_language(language)
+        if normalized_language == "zh":
+            labels_by_focus = {
+                "metric_definition": f"确认 {label} 的 KPI、成本/数量口径和数据粒度",
+                "workflow_state": f"确认 {label} 的流程状态、owner、SLA 和关闭条件",
+                "data_integration": f"确认 {label} 的数据源、主数据、接口和对账方式",
+                "alert_exception": f"确认 {label} 的异常阈值、升级规则和闭环证据",
+                "drilldown_analysis": f"确认 {label} 的分析维度、追溯路径和根因闭环",
+                "dashboard_view": f"确认 {label} 的看板决策场景、核心 KPI 和默认维度",
+                "export_reporting": f"确认 {label} 的报表接收人、冻结口径和推送频率",
+                "permission_role": f"确认 {label} 的角色权限、审批边界和最终责任人",
+            }
+            node_suffix = focus if focus in labels_by_focus else "department_discovery"
+            return {
+                "track": label,
+                "node": f"{department}_{node_suffix}",
+                "label": labels_by_focus.get(focus, f"确认 {label} 的业务目标、流程边界和数据口径"),
+                "status_keys": (),
+            }
+        if normalized_language == "de":
+            labels_by_focus = {
+                "metric_definition": f"{label} KPIs, Kosten-/Mengenlogik und Datengranularitaet klaeren",
+                "workflow_state": f"{label} Workflow States, Owner, SLA und Closure Criteria klaeren",
+                "data_integration": f"{label} Datenquellen, Master Data, Interfaces und Reconciliation klaeren",
+                "alert_exception": f"{label} Exception Thresholds, Escalation Rules und Closure Evidence klaeren",
+                "drilldown_analysis": f"{label} Analyse-Dimensionen, Traceability Path und Root-Cause Closure klaeren",
+                "dashboard_view": f"{label} Dashboard Decision Scenario, Core KPIs und Default Dimensions klaeren",
+                "export_reporting": f"{label} Report Empfaenger, Frozen Definitions und Delivery Cadence klaeren",
+                "permission_role": f"{label} Rollenrechte, Approval Boundaries und accountable Owner klaeren",
+            }
+            node_suffix = focus if focus in labels_by_focus else "department_discovery"
+            return {
+                "track": label,
+                "node": f"{department}_{node_suffix}",
+                "label": labels_by_focus.get(focus, f"{label} Ziele, Prozessgrenze und Datenlogik klaeren"),
+                "status_keys": (),
+            }
+        if normalized_language == "ms":
+            labels_by_focus = {
+                "metric_definition": f"Sahkan KPI {label}, definisi kos/kuantiti dan data grain",
+                "workflow_state": f"Sahkan workflow states, owner, SLA dan closure criteria untuk {label}",
+                "data_integration": f"Sahkan sumber data, master data, interface dan reconciliation untuk {label}",
+                "alert_exception": f"Sahkan exception thresholds, escalation rules dan closure evidence untuk {label}",
+                "drilldown_analysis": f"Sahkan analysis dimensions, traceability path dan root-cause closure untuk {label}",
+                "dashboard_view": f"Sahkan dashboard decision scenario, core KPIs dan default dimensions untuk {label}",
+                "export_reporting": f"Sahkan report recipients, frozen definitions dan delivery cadence untuk {label}",
+                "permission_role": f"Sahkan role permissions, approval boundaries dan accountable owners untuk {label}",
+            }
+            node_suffix = focus if focus in labels_by_focus else "department_discovery"
+            return {
+                "track": label,
+                "node": f"{department}_{node_suffix}",
+                "label": labels_by_focus.get(focus, f"Sahkan matlamat, process boundary dan data definitions untuk {label}"),
+                "status_keys": (),
+            }
+        labels_by_focus = {
+            "metric_definition": f"Confirm {label} KPIs, cost/quantity definitions, and data grain",
+            "workflow_state": f"Confirm {label} workflow states, owners, SLA, and closure criteria",
+            "data_integration": f"Confirm {label} data sources, master data, interfaces, and reconciliation",
+            "alert_exception": f"Confirm {label} exception thresholds, escalation rules, and closure evidence",
+            "drilldown_analysis": f"Confirm {label} analysis dimensions, traceability path, and root-cause closure",
+            "dashboard_view": f"Confirm {label} dashboard decision scenario, core KPIs, and default dimensions",
+            "export_reporting": f"Confirm {label} report recipients, frozen definitions, and delivery cadence",
+            "permission_role": f"Confirm {label} role permissions, approval boundaries, and accountable owners",
+        }
+        node_suffix = focus if focus in labels_by_focus else "department_discovery"
+        return {
+            "track": label,
+            "node": f"{department}_{node_suffix}",
+            "label": labels_by_focus.get(focus, f"Confirm {label} goals, process boundary, and data definitions"),
+            "status_keys": (),
+        }
+
+    def _ic_substrate_is_department(self, department: str) -> bool:
+        return department.strip().lower() in ACTIVE_IC_SUBSTRATE_DEPARTMENTS
+
+    def _ic_substrate_department_label(self, department: str, language: str | None = None) -> str:
+        labels = {
+            "production": ("Production", "Production"),
+            "tdi": ("TDI", "TDI"),
+            "quality": ("Quality", "Quality"),
+            "general": ("General", "General"),
+            "planning": ("Planning/PMC", "Planning/PMC"),
+            "engineering": ("Engineering/Process", "Engineering/Process"),
+            "equipment": ("Equipment/Maintenance", "Equipment/Maintenance"),
+            "material": ("Material/Procurement", "Material/Procurement"),
+            "warehouse": ("Warehouse/Logistics", "Warehouse/Logistics"),
+            "customer": ("Customer/Program", "Customer/Program"),
+            "finance": ("Finance/Cost", "Finance/Cost"),
+            "ehs": ("EHS", "EHS"),
+            "it_data": ("IT/Data Governance", "IT/Data Governance"),
+            "management": ("Management/Ops Excellence", "Management/Ops Excellence"),
+        }
+        zh_label, en_label = labels.get(department.strip().lower(), (department, department))
+        return zh_label if self._normalize_language(language) == "zh" else en_label
+
+    def _ic_substrate_department_playbook_guidance(
+        self,
+        department: str,
+        language: str | None = None,
+    ) -> str:
+        key = department.strip().lower()
+        if not self._ic_substrate_is_department(key):
+            return ""
+        if key in {"production", "tdi", "quality"}:
+            return self._ic_substrate_production_tdi_quality_playbook_guidance(key, language)
+
+        if self._normalize_language(language) == "zh":
+            playbooks = {
+                "general": {
+                    "decision": "其他部门或不明确需求的首版软件目标、业务决策/动作、MVP 边界和待开放部门边界",
+                    "kpi": "业务成功指标、当前报表口径、处理时效、异常数量、使用频率；公式以用户现行口径为准",
+                    "master": "requesting department、business owner、primary user、business object、status、output artifact、acceptance owner",
+                    "workflow": "request -> review/operate -> output/report/action -> exception handling -> sign-off/closure",
+                    "source": "用户确认的数据源、人工台账、现有报表、上下游系统；不要预设系统名",
+                    "acceptance": "业务 owner、使用者、IT/Data owner 对首版范围、输出物、数据口径和验收标准确认",
+                },
+                "planning": {
+                    "decision": "排产承诺、产能缺口、dispatch 优先级、交期风险升级",
+                    "kpi": "plan attainment、capacity loading、WIP aging、commit hit rate",
+                    "master": "customer demand、forecast version、route capacity、priority class",
+                    "workflow": "forecast lock -> capacity check -> schedule release -> dispatch change -> expedite/commit update",
+                    "source": "计划表、产能模型、生产 WIP、客户交期承诺；系统名未确认前用通用描述",
+                    "acceptance": "计划 owner、生产 owner、客户/项目 owner 对同一 commit 版本 sign-off",
+                },
+                "engineering": {
+                    "decision": "recipe/spec/route 变更、NPI/qualification release、异常 root cause 关闭",
+                    "kpi": "change cycle time、qualification pass rate、ECN aging、repeat issue rate",
+                    "master": "route、recipe、spec、parameter、ECN/ECR、trial lot、release gate",
+                    "workflow": "change request -> impact assessment -> trial/DOE -> review -> release/rollback",
+                    "source": "工程变更记录、试作数据、规格文件、生产/质量反馈；不要自造系统名",
+                    "acceptance": "工程 owner、生产 owner、质量 owner 对 release 条件和回滚条件确认",
+                },
+                "equipment": {
+                    "decision": "downtime 归因、PM 执行闭环、备件风险、设备状态是否影响生产/质量",
+                    "kpi": "uptime/OEE、downtime minutes、PM compliance、MTBF/MTTR；公式以用户现行口径为准",
+                    "master": "equipment id、area/line、PM plan、alarm category、spare part、maintenance owner",
+                    "workflow": "alarm/down -> triage -> maintenance action -> production release -> recurrence review",
+                    "source": "设备状态记录、维修记录、PM 计划、生产批次/质量结果；不要自造 EAP/SPC 等术语",
+                    "acceptance": "设备 owner、生产 owner、质量 owner 确认停机归因和 release 证据",
+                },
+                "material": {
+                    "decision": "来料质量、缺料风险、替代料使用、供应商/批次对良率和交期影响",
+                    "kpi": "incoming pass rate、shortage risk、inventory coverage、supplier lot issue rate",
+                    "master": "material number、BOM、supplier、incoming lot、IQC result、substitute rule",
+                    "workflow": "demand -> procurement/incoming -> IQC -> issue to production -> hold/substitution",
+                    "source": "物料主数据、BOM、来料批次、库存、IQC 结果；系统名未确认前不指定品牌",
+                    "acceptance": "物料 owner、质量 owner、生产/计划 owner 对可用性和风险归因确认",
+                },
+                "warehouse": {
+                    "decision": "Finished Lot 入库、出货冻结、库存周转、包装/客户限制是否满足",
+                    "kpi": "inventory aging、shipment on-time、hold stock、turnover、traceability completeness",
+                    "master": "FG/WIP inventory、lot、packing spec、carrier、ship-to/customer restriction",
+                    "workflow": "receive -> store -> pick/pack -> QA/customer hold check -> ship -> proof of delivery",
+                    "source": "库存记录、包装/出货记录、质量 release、客户限制；不要自造承运商或系统名",
+                    "acceptance": "仓储 owner、质量 owner、客户/项目 owner 对发货条件和追溯证据确认",
+                },
+                "customer": {
+                    "decision": "forecast/commit 管理、客诉/RMA/8D 优先级、客户规格影响和沟通 SLA",
+                    "kpi": "commit hit rate、complaint aging、8D closure time、RMA recurrence、customer spec compliance",
+                    "master": "customer、program、customer lot、order/forecast、spec、complaint/RMA/8D case",
+                    "workflow": "customer demand/issue -> internal mapping -> owner assignment -> response -> closure confirmation",
+                    "source": "客户需求、订单/forecast、客诉/RMA/8D 记录、内部 lot 追溯；客户术语以用户提供为准",
+                    "acceptance": "客户/项目 owner、质量 owner、生产/工程 owner 对回复口径和关闭证据确认",
+                },
+                "finance": {
+                    "decision": "scrap/rework/loss cost 归因、cost center 责任、报价/毛利影响、月结对账",
+                    "kpi": "scrap cost、rework cost、loss amount、cost center variance、margin impact；公式以财务现行口径为准",
+                    "master": "cost center、product/customer、process step、loss reason、standard/actual cost definition",
+                    "workflow": "loss event -> cost calculation -> responsibility attribution -> finance review -> month-end lock",
+                    "source": "生产损失记录、返工/报废记录、成本中心、财务月结数据；不要自造标准成本或实际成本公式",
+                    "acceptance": "财务 owner、生产/质量 owner、责任部门 owner 对金额和归因 sign-off",
+                },
+                "ehs": {
+                    "decision": "incident 等级、化学品/危化风险、废液废气合规、整改优先级和关闭证据",
+                    "kpi": "incident aging、corrective action closure、permit compliance、chemical usage variance、repeat incident",
+                    "master": "chemical、hazard class、permit、incident type、corrective action、responsible owner",
+                    "workflow": "incident/report -> risk assessment -> containment -> corrective action -> verification -> closure",
+                    "source": "事件记录、化学品台账、permit/合规记录、整改证据；法规等级以用户现场口径为准",
+                    "acceptance": "EHS owner、现场责任 owner、管理层/合规 owner 对整改证据和关闭条件确认",
+                },
+                "it_data": {
+                    "decision": "source of truth、master data owner、接口 SLA、数据质量、权限审计和 lineage",
+                    "kpi": "interface success rate、data latency、data quality issue aging、master-data completeness、access audit findings",
+                    "master": "system/source、business key、master data、data owner、interface contract、access role",
+                    "workflow": "data change -> validation -> interface sync -> reconciliation -> issue remediation",
+                    "source": "源系统、接口日志、主数据表、权限审计、对账记录；系统品牌和表名由用户确认",
+                    "acceptance": "IT/Data owner、业务 data owner、下游使用方对数据口径和 SLA sign-off",
+                },
+                "management": {
+                    "decision": "经营 KPI 优先级、目标/actual gap、owner action、跨部门升级和例会节奏",
+                    "kpi": "daily/weekly/monthly KPI、target gap、action aging、closure rate、escalation count",
+                    "master": "KPI definition、target、owner、meeting cadence、action item、escalation rule",
+                    "workflow": "KPI review -> gap detection -> owner action -> escalation -> closure/sign-off",
+                    "source": "各部门指标、行动项、例会纪要、目标版本；不要混用未确认的统计口径",
+                    "acceptance": "管理层 owner、部门 owner 对 KPI 口径、行动闭环和升级规则确认",
+                },
+            }
+            playbook = playbooks.get(key, {})
+            if not playbook:
+                return ""
+            product_shapes = self._ic_substrate_department_product_shapes(key, language)
+            return (
+                "PM 访谈框架：\n"
+                f"- 常见首版软件形态：{product_shapes}\n"
+                f"- 软件要支撑的业务决策/动作：{playbook['decision']}\n"
+                f"- 看板/报表要展示的 KPI/口径：{playbook['kpi']}\n"
+                f"- 软件需要识别的主数据/对象：{playbook['master']}\n"
+                f"- 软件要承载或反映的流程状态：{playbook['workflow']}\n"
+                f"- 软件数据来源与接口边界：{playbook['source']}\n"
+                f"- 软件验收与责任边界：{playbook['acceptance']}"
+            )
+
+        playbooks = {
+            "general": {
+                "decision": "first-version software goal for another or unclear department, business decision/action, MVP boundary, and unopened-department boundary",
+                "kpi": "business success metric, current report definition, processing time, exception volume, usage frequency, using the user's current formulas",
+                "master": "requesting department, business owner, primary user, business object, status, output artifact, acceptance owner",
+                "workflow": "request -> review/operate -> output/report/action -> exception handling -> sign-off/closure",
+                "source": "user-confirmed data sources, manual trackers, existing reports, upstream/downstream systems; do not presume system names",
+                "acceptance": "business owner, users, and IT/Data owner confirm first-version scope, outputs, data definitions, and acceptance criteria",
+            },
+            "planning": {
+                "decision": "schedule commitment, capacity gap, dispatch priority, delivery-risk escalation",
+                "kpi": "plan attainment, capacity loading, WIP aging, commit hit rate",
+                "master": "customer demand, forecast version, route capacity, priority class",
+                "workflow": "forecast lock -> capacity check -> schedule release -> dispatch change -> expedite/commit update",
+                "source": "planning tables, capacity model, production WIP, customer commit; keep system names generic until confirmed",
+                "acceptance": "planning, production, and customer/program owners sign off the same commit version",
+            },
+            "engineering": {
+                "decision": "recipe/spec/route changes, NPI/qualification release, abnormal root-cause closure",
+                "kpi": "change cycle time, qualification pass rate, ECN aging, repeat issue rate",
+                "master": "route, recipe, spec, parameter, ECN/ECR, trial lot, release gate",
+                "workflow": "change request -> impact assessment -> trial/DOE -> review -> release/rollback",
+                "source": "engineering change records, trial data, specs, production/quality feedback; do not invent system names",
+                "acceptance": "engineering, production, and quality owners confirm release and rollback criteria",
+            },
+            "equipment": {
+                "decision": "downtime attribution, PM closure, spare-part risk, equipment impact on production/quality",
+                "kpi": "uptime/OEE, downtime minutes, PM compliance, MTBF/MTTR using the user's current formulas",
+                "master": "equipment id, area/line, PM plan, alarm category, spare part, maintenance owner",
+                "workflow": "alarm/down -> triage -> maintenance action -> production release -> recurrence review",
+                "source": "equipment status, maintenance records, PM plans, lot/quality outcomes; do not invent EAP/SPC terms",
+                "acceptance": "equipment, production, and quality owners confirm downtime attribution and release evidence",
+            },
+            "material": {
+                "decision": "incoming quality, shortage risk, substitute-material use, supplier/lot impact on yield and delivery",
+                "kpi": "incoming pass rate, shortage risk, inventory coverage, supplier-lot issue rate",
+                "master": "material number, BOM, supplier, incoming lot, IQC result, substitution rule",
+                "workflow": "demand -> procurement/incoming -> IQC -> issue to production -> hold/substitution",
+                "source": "material master, BOM, incoming lot, inventory, IQC results; do not name system brands until confirmed",
+                "acceptance": "material, quality, production/planning owners confirm usability and risk attribution",
+            },
+            "warehouse": {
+                "decision": "Finished Lot receipt, shipping hold, inventory turnover, packing/customer restrictions",
+                "kpi": "inventory aging, shipment on-time, hold stock, turnover, traceability completeness",
+                "master": "FG/WIP inventory, lot, packing spec, carrier, ship-to/customer restriction",
+                "workflow": "receive -> store -> pick/pack -> QA/customer hold check -> ship -> proof of delivery",
+                "source": "inventory, packing/shipping, quality release, customer restrictions; do not invent carriers or systems",
+                "acceptance": "warehouse, quality, and customer/program owners confirm shipping gates and traceability evidence",
+            },
+            "customer": {
+                "decision": "forecast/commit management, complaint/RMA/8D priority, customer-spec impact, communication SLA",
+                "kpi": "commit hit rate, complaint aging, 8D closure time, RMA recurrence, customer-spec compliance",
+                "master": "customer, program, customer lot, order/forecast, spec, complaint/RMA/8D case",
+                "workflow": "customer demand/issue -> internal mapping -> owner assignment -> response -> closure confirmation",
+                "source": "customer demand, order/forecast, complaint/RMA/8D records, internal lot traceability; use user-provided terminology",
+                "acceptance": "customer/program, quality, production/engineering owners confirm response definition and closure evidence",
+            },
+            "finance": {
+                "decision": "scrap/rework/loss-cost attribution, cost-center responsibility, quote/margin impact, month-end reconciliation",
+                "kpi": "scrap cost, rework cost, loss amount, cost-center variance, margin impact using Finance's current formulas",
+                "master": "cost center, product/customer, process step, loss reason, standard/actual cost definition",
+                "workflow": "loss event -> cost calculation -> responsibility attribution -> finance review -> month-end lock",
+                "source": "production loss, rework/scrap records, cost center, finance close data; do not invent costing formulas",
+                "acceptance": "finance, production/quality, and responsible department owners sign off amount and attribution",
+            },
+            "ehs": {
+                "decision": "incident level, chemical/hazard risk, wastewater/exhaust compliance, corrective-action priority and evidence",
+                "kpi": "incident aging, corrective-action closure, permit compliance, chemical usage variance, repeat incident",
+                "master": "chemical, hazard class, permit, incident type, corrective action, responsible owner",
+                "workflow": "incident/report -> risk assessment -> containment -> corrective action -> verification -> closure",
+                "source": "incident records, chemical register, permit/compliance records, corrective evidence; use user's compliance taxonomy",
+                "acceptance": "EHS, site owner, and management/compliance owners confirm evidence and closure criteria",
+            },
+            "it_data": {
+                "decision": "source of truth, master-data owner, interface SLA, data quality, access audit, lineage",
+                "kpi": "interface success rate, data latency, data-quality issue aging, master-data completeness, access audit findings",
+                "master": "system/source, business key, master data, data owner, interface contract, access role",
+                "workflow": "data change -> validation -> interface sync -> reconciliation -> issue remediation",
+                "source": "source systems, interface logs, master data, access audit, reconciliation records; user confirms system/table names",
+                "acceptance": "IT/Data owner, business data owner, and downstream users sign off data definitions and SLA",
+            },
+            "management": {
+                "decision": "operating KPI priority, target/actual gap, owner action, cross-department escalation, meeting cadence",
+                "kpi": "daily/weekly/monthly KPI, target gap, action aging, closure rate, escalation count",
+                "master": "KPI definition, target, owner, meeting cadence, action item, escalation rule",
+                "workflow": "KPI review -> gap detection -> owner action -> escalation -> closure/sign-off",
+                "source": "department metrics, action items, meeting notes, target versions; do not mix unconfirmed definitions",
+                "acceptance": "management and department owners confirm KPI definitions, action closure, and escalation rules",
+            },
+        }
+        playbook = playbooks.get(key, {})
+        if not playbook:
+            return ""
+        product_shapes = self._ic_substrate_department_product_shapes(key, language)
+        return (
+            "PM interview playbook:\n"
+            f"- Common first-version software shapes: {product_shapes}\n"
+            f"- Business decision/action the software must support: {playbook['decision']}\n"
+            f"- Dashboard/report KPI and definition: {playbook['kpi']}\n"
+            f"- Master data/object the software must identify: {playbook['master']}\n"
+            f"- Workflow states the software must carry or reflect: {playbook['workflow']}\n"
+            f"- Software data sources and integration boundary: {playbook['source']}\n"
+            f"- Software acceptance and ownership boundary: {playbook['acceptance']}"
+        )
+
+    def _latest_user_message_text(self, session: Session) -> str:
+        for message in reversed(session.messages):
+            if message.get("role") == "user":
+                return str(message.get("content", ""))
+        return ""
+
+    def _ic_substrate_intent_track_from_latest_user_message(self, session: Session) -> str:
+        user_texts = self._user_message_texts(session)
+        if not user_texts:
+            return ""
+
+        latest_text = user_texts[-1]
+        latest_track = self._ic_substrate_intent_track_from_text(latest_text)
+        prior_track = ""
+        for previous_text in reversed(user_texts[:-1]):
+            prior_track = self._ic_substrate_intent_track_from_text(previous_text)
+            if prior_track:
+                break
+
+        if prior_track and self._ic_substrate_should_preserve_prior_track(
+            latest_text,
+            latest_track,
+            prior_track,
+        ):
+            return prior_track
+        return latest_track
+
+    def _user_message_texts(self, session: Session) -> list[str]:
+        return [
+            str(message.get("content", ""))
+            for message in session.messages
+            if message.get("role") == "user" and str(message.get("content", "")).strip()
+        ]
+
+    def _ic_substrate_should_preserve_prior_track(
+        self,
+        latest_text: str,
+        latest_track: str,
+        prior_track: str,
+    ) -> bool:
+        if not prior_track:
+            return False
+        if not latest_track:
+            return True
+        if latest_track == prior_track:
+            return False
+        if self._ic_substrate_has_explicit_track_name(latest_text, latest_track):
+            return False
+        if latest_track in {"production", "quality"}:
+            return not self._ic_substrate_has_strong_track_signal(latest_text, latest_track)
+        return False
+
+    def _ic_substrate_has_explicit_track_name(self, text: str, track: str) -> bool:
+        normalized = text.lower()
+        explicit_keywords = {
+            "production": ("production", "生产", "产线"),
+            "tdi": ("tdi",),
+            "quality": ("quality", "品质", "质量"),
+            "general": ("general", "通用", "其他", "其它", "其他部门", "别的部门", "不确定", "跨部门"),
+            "planning": ("planning", "pmc", "计划"),
+            "engineering": ("engineering", "工艺", "工程"),
+            "equipment": ("equipment", "设备"),
+            "material": ("material", "procurement", "材料", "物料", "采购"),
+            "warehouse": ("warehouse", "logistics", "仓库", "物流"),
+            "customer": ("customer", "program", "sales", "客户", "销售"),
+            "finance": ("finance", "cost", "财务", "成本"),
+            "ehs": ("ehs", "环保", "安全"),
+            "it_data": ("it/data", "it data", "it 数据", "it 部门", "data governance", "数据治理"),
+            "management": ("management", "管理层", "经营"),
+        }
+        return any(keyword in normalized for keyword in explicit_keywords.get(track.strip().lower(), ()))
+
+    def _ic_substrate_has_strong_track_signal(self, text: str, track: str) -> bool:
+        normalized = text.lower()
+        strong_keywords = {
+            "production": (
+                "production",
+                "生产",
+                "产线",
+                "线别",
+                "finished lot",
+                "wip",
+                "throughput",
+                "cycle time",
+            ),
+            "quality": (
+                "quality",
+                "品质",
+                "质量",
+                "检测",
+                "检验",
+                "defect",
+                "缺陷",
+                "mrb",
+                "capa",
+                "pareto",
+                "root cause",
+            ),
+        }
+        return any(keyword in normalized for keyword in strong_keywords.get(track.strip().lower(), ()))
+
+    def _ic_substrate_intent_track_from_text(self, text: str) -> str:
+        text = text.lower()
+        if not text:
+            return ""
+
+        keyword_groups = {
+            "production": (
+                "production",
+                "生产",
+                "产线",
+                "线别",
+                "工序",
+                "站点",
+                "finished lot",
+                "lot",
+                "panel",
+                "wip",
+                "move-in",
+                "move out",
+                "move-out",
+                "出站",
+                "入库",
+                "throughput",
+                "cycle time",
+            ),
+            "tdi": ("tdi",),
+            "quality": (
+                "quality",
+                "品质",
+                "质量",
+                "检测",
+                "检验",
+                "defect",
+                "缺陷",
+                "mrb",
+                "capa",
+                "pareto",
+                "root cause",
+                "retest",
+                "rework",
+                "scrap",
+                "判定",
+                "报废",
+                "返工",
+            ),
+            "general": (
+                "general",
+                "通用",
+                "其他",
+                "其它",
+                "其他部门",
+                "别的部门",
+                "other department",
+                "others",
+                "unclear owner",
+                "不确定",
+                "暂不确定",
+                "还不确定",
+                "跨部门",
+            ),
+            "planning": (
+                "planning",
+                "pmc",
+                "计划",
+                "排产",
+                "产能",
+                "capacity",
+                "schedule",
+                "scheduling",
+                "dispatch",
+                "交期",
+                "commit",
+                "demand",
+                "forecast",
+                "wip aging",
+                "优先级",
+            ),
+            "engineering": (
+                "engineering",
+                "process",
+                "工艺",
+                "工程",
+                "recipe",
+                "parameter",
+                "spec",
+                "ecn",
+                "eco",
+                "ecr",
+                "change control",
+                "doe",
+                "qualification",
+                "npi",
+                "新产品",
+                "新工艺",
+            ),
+            "equipment": (
+                "equipment",
+                "maintenance",
+                "设备",
+                "机台",
+                "保养",
+                "维修",
+                "down",
+                "downtime",
+                "oee",
+                "mtbf",
+                "mttr",
+                "稼动",
+                "spare",
+                "备件",
+            ),
+            "material": (
+                "material",
+                "procurement",
+                "purchasing",
+                "材料",
+                "物料",
+                "采购",
+                "供应商",
+                "supplier",
+                "来料",
+                "iqc",
+                "inventory",
+                "库存",
+                "bom",
+                "料号",
+                "替代料",
+            ),
+            "warehouse": (
+                "warehouse",
+                "logistics",
+                "shipping",
+                "shipment",
+                "仓库",
+                "物流",
+                "出货",
+                "发货",
+                "包装",
+                "carrier",
+                "库存周转",
+                "成品仓",
+            ),
+            "customer": (
+                "customer",
+                "program",
+                "sales",
+                "fae",
+                "客户",
+                "项目",
+                "销售",
+                "客诉",
+                "complaint",
+                "rma",
+                "8d",
+                "订单",
+                "forecast",
+                "交付",
+                "commit",
+            ),
+            "finance": (
+                "finance",
+                "cost",
+                "财务",
+                "成本",
+                "报价",
+                "margin",
+                "scrap cost",
+                "rework cost",
+                "loss amount",
+                "损失金额",
+                "报废成本",
+                "返工成本",
+                "cost center",
+            ),
+            "ehs": (
+                "ehs",
+                "safety",
+                "环保",
+                "安全",
+                "环境",
+                "chemical",
+                "hazard",
+                "incident",
+                "waste",
+                "permit",
+                "合规",
+                "危化",
+            ),
+            "it_data": (
+                "it/data",
+                "it data",
+                "it 数据",
+                "it 部门",
+                "data governance",
+                "数据治理",
+                "master data",
+                "主数据",
+                "权限",
+                "sso",
+                "audit",
+                "接口",
+                "报表平台",
+                "数据平台",
+                "系统集成",
+            ),
+            "management": (
+                "management",
+                "ops excellence",
+                "经营",
+                "管理层",
+                "老板",
+                "war room",
+                "daily meeting",
+                "kpi governance",
+                "月会",
+                "周会",
+                "例会",
+                "行动项",
+                "action item",
+            ),
+        }
+        scores = {
+            track: sum(1 for keyword in keywords if keyword in text)
+            for track, keywords in keyword_groups.items()
+        }
+        best_track, best_score = max(scores.items(), key=lambda item: item[1])
+        if best_score <= 0:
+            return ""
+        if sum(1 for score in scores.values() if score == best_score) > 1:
+            return ""
+        if self._ic_substrate_is_department(best_track):
+            return best_track
+        return "general"
+
+    def _ic_substrate_intent_focus_from_latest_user_message(self, session: Session) -> str:
+        user_texts = self._user_message_texts(session)
+        if not user_texts:
+            return ""
+
+        latest_text = user_texts[-1]
+        latest_focus = self._ic_substrate_intent_focus_from_text(latest_text)
+        if latest_focus:
+            return latest_focus
+
+        latest_track = self._ic_substrate_intent_track_from_text(latest_text)
+        if latest_track:
+            return ""
+        prior_track = ""
+        for previous_text in reversed(user_texts[:-1]):
+            prior_track = self._ic_substrate_intent_track_from_text(previous_text)
+            if prior_track:
+                break
+        if latest_track and prior_track and latest_track != prior_track:
+            return ""
+
+        for previous_text in reversed(user_texts[:-1]):
+            prior_focus = self._ic_substrate_intent_focus_from_text(previous_text)
+            if prior_focus:
+                return prior_focus
+        return ""
+
+    def _ic_substrate_product_shape_from_latest_user_message(self, session: Session) -> str:
+        user_texts = self._user_message_texts(session)
+        if not user_texts:
+            return ""
+
+        latest_shape = self._ic_substrate_product_shape_from_text(user_texts[-1])
+        if latest_shape:
+            return latest_shape
+
+        for previous_text in reversed(user_texts[:-1]):
+            prior_shape = self._ic_substrate_product_shape_from_text(previous_text)
+            if prior_shape:
+                return prior_shape
+        return ""
+
+    def _ic_substrate_product_shape_from_text(self, text: str) -> str:
+        normalized = text.lower()
+        if not normalized:
+            return ""
+
+        shape_keywords = (
+            (
+                "workflow_tracker",
+                (
+                    "workflow",
+                    "case tracking",
+                    "tracking",
+                    "流程",
+                    "状态流转",
+                    "状态",
+                    "审批",
+                    "闭环",
+                    "待办",
+                    "task",
+                    "action item",
+                    "mrb",
+                    "capa",
+                ),
+            ),
+            (
+                "report_export",
+                (
+                    "report",
+                    "报表",
+                    "export",
+                    "download",
+                    "导出",
+                    "下载",
+                    "日报",
+                    "周报",
+                    "月报",
+                    "推送",
+                    "email",
+                    "meeting pack",
+                ),
+            ),
+            (
+                "data_query",
+                (
+                    "query",
+                    "查询",
+                    "search",
+                    "检索",
+                    "data query",
+                    "明细",
+                    "detail",
+                    "drill",
+                    "下钻",
+                    "追溯",
+                    "genealogy",
+                    "lineage",
+                ),
+            ),
+            (
+                "alerting",
+                (
+                    "alert",
+                    "alarm",
+                    "notification",
+                    "notify",
+                    "告警",
+                    "报警",
+                    "通知",
+                    "预警",
+                    "异常",
+                    "threshold",
+                    "阈值",
+                    "escalation",
+                    "升级",
+                ),
+            ),
+            (
+                "admin_tool",
+                (
+                    "admin",
+                    "console",
+                    "配置",
+                    "维护",
+                    "权限",
+                    "role",
+                    "permission",
+                    "master data",
+                    "主数据",
+                    "setting",
+                    "settings",
+                ),
+            ),
+            (
+                "dashboard",
+                (
+                    "dashboard",
+                    "cockpit",
+                    "看板",
+                    "大屏",
+                    "图表",
+                    "chart",
+                    "trend",
+                    "趋势",
+                    "monitor",
+                    "监控",
+                    "scorecard",
+                    "kpi",
+                ),
+            ),
+        )
+        scores = {
+            shape: sum(1 for keyword in keywords if keyword in normalized)
+            for shape, keywords in shape_keywords
+        }
+        best_shape, best_score = max(scores.items(), key=lambda item: item[1])
+        if best_score <= 0:
+            return ""
+        if sum(1 for score in scores.values() if score == best_score) > 1:
+            return ""
+        return best_shape
+
+    def _ic_substrate_intent_focus_from_text(self, text: str) -> str:
+        text = text.lower()
+        if not text:
+            return ""
+
+        data_integration_keywords = (
+            "interface",
+            "integration",
+            "api",
+            "接口",
+            "集成",
+            "数据源",
+            "source",
+            "mes",
+            "qms",
+            "etl",
+            "table",
+            "字段",
+            "mapping",
+            "回写",
+            "master data",
+            "主数据",
+            "lineage",
+            "对账",
+        )
+        if any(keyword in text for keyword in data_integration_keywords):
+            return "data_integration"
+
+        report_export_keywords = (
+            "report",
+            "报表",
+            "export",
+            "download",
+            "导出",
+            "下载",
+            "推送",
+            "email",
+            "邮件",
+            "meeting pack",
+        )
+        if any(keyword in text for keyword in report_export_keywords):
+            return "export_reporting"
+
+        focus_keywords = (
+            (
+                "drilldown_analysis",
+                (
+                    "drill",
+                    "下钻",
+                    "pareto",
+                    "root cause",
+                    "根因",
+                    "genealogy",
+                    "追溯",
+                    "维度",
+                    "分析",
+                ),
+            ),
+            (
+                "alert_exception",
+                (
+                    "alert",
+                    "alarm",
+                    "告警",
+                    "报警",
+                    "异常",
+                    "exception",
+                    "ooc",
+                    "out of control",
+                    "阈值",
+                    "threshold",
+                    "hold",
+                    "release",
+                ),
+            ),
+            (
+                "workflow_state",
+                (
+                    "workflow",
+                    "flow",
+                    "流程",
+                    "状态",
+                    "state",
+                    "approval",
+                    "approve",
+                    "审批",
+                    "owner",
+                    "责任人",
+                    "sla",
+                    "mrb",
+                    "capa",
+                    "case",
+                    "闭环",
+                ),
+            ),
+            (
+                "data_integration",
+                (
+                    "interface",
+                    "integration",
+                    "api",
+                    "接口",
+                    "集成",
+                    "数据源",
+                    "source",
+                    "mes",
+                    "qms",
+                    "etl",
+                    "table",
+                    "字段",
+                    "mapping",
+                    "回写",
+                    "master data",
+                    "主数据",
+                    "lineage",
+                    "对账",
+                ),
+            ),
+            (
+                "metric_definition",
+                (
+                    "metric",
+                    "kpi",
+                    "yield",
+                    "良率",
+                    "公式",
+                    "计算",
+                    "分母",
+                    "分子",
+                    "fpy",
+                    "throughput",
+                    "cycle time",
+                    "wip",
+                    "scrap",
+                    "rework",
+                    "cost",
+                    "成本",
+                    "loss",
+                    "损失",
+                    "金额",
+                    "cost center",
+                    "downtime",
+                    "oee",
+                    "mtbf",
+                    "mttr",
+                    "inventory",
+                    "库存",
+                ),
+            ),
+            (
+                "dashboard_view",
+                (
+                    "dashboard",
+                    "看板",
+                    "报表",
+                    "chart",
+                    "图表",
+                    "trend",
+                    "趋势",
+                    "页面",
+                    "view",
+                    "visual",
+                    "monitor",
+                    "监控",
+                ),
+            ),
+            (
+                "export_reporting",
+                (
+                    "export",
+                    "download",
+                    "导出",
+                    "下载",
+                    "email",
+                    "邮件",
+                    "daily",
+                    "weekly",
+                    "日报",
+                    "周报",
+                    "推送",
+                ),
+            ),
+            (
+                "permission_role",
+                (
+                    "permission",
+                    "access",
+                    "权限",
+                    "角色",
+                    "role",
+                    "viewer",
+                    "editor",
+                    "审批人",
+                ),
+            ),
+        )
+        for focus, keywords in focus_keywords:
+            if any(keyword in text for keyword in keywords):
+                return focus
+        return ""
+
+    def _ic_substrate_preferred_node_for_intent(self, intent_track: str, intent_focus: str) -> str:
+        track = intent_track.strip().lower()
+        focus = intent_focus.strip().lower()
+        if not track or not focus:
+            return ""
+
+        if self._ic_substrate_is_department(track):
+            focus_suffix = {
+                "metric_definition": "metrics",
+                "dashboard_view": "metrics",
+                "export_reporting": "data_acceptance",
+                "data_integration": "data_acceptance",
+                "permission_role": "data_acceptance",
+                "workflow_state": "workflow",
+                "alert_exception": "workflow",
+                "drilldown_analysis": "workflow",
+            }.get(focus)
+            if focus_suffix:
+                return f"{track}_{focus_suffix}"
+            return f"{track}_scope"
+        return ""
+
+    def _ic_substrate_current_node_question_guidance(
+        self,
+        chain_state: dict[str, Any],
+        language: str | None = None,
+    ) -> str:
+        if chain_state.get("mode") != "ic_substrate":
+            return ""
+
+        node = str(chain_state.get("current_node", "")).strip()
+        department_guidance = self._ic_substrate_department_question_guidance(chain_state, language)
+        if department_guidance:
+            return department_guidance
+        current_track = str(chain_state.get("current_track", "")).strip()
+        track_playbook = self._ic_substrate_production_tdi_quality_playbook_guidance(current_track, language)
+
+        if self._normalize_language(language) == "zh":
+            guidance_by_node = {
+                "scope_triage": (
+                    "当前节点专业追问方向：\n"
+                    "- 用户只给了宽泛目标，没有明确部门/业务 owner 或需求形态；第一问先确认需求来自哪个部门、谁是首版 owner，不要直接问字段、页面或技术栈。\n"
+                    "- 当前 IT scope 只开放 Production、Quality、TDI、General；首问选项只能列这四个入口，不要展开其他部门。\n"
+                    "- 首问选项里不要展开 TDI，也不要自造 EAP/SPC/MES/QMS/ERP 等未确认系统或内部术语。\n"
+                    "- 好问题示例：这个 IC Substrate 需求首版主要由哪个入口发起并负责验收：Production、Quality、TDI，还是 General？"
+                ),
+                "track_disambiguation": (
+                    "当前节点专业追问方向：\n"
+                    "- 用户已经表达了需求形态，但没有说明发起部门或业务 owner；先问部门归属，不要默认套到 Production/TDI/Quality。\n"
+                    "- 当前 IT scope 只开放 Production、Quality、TDI、General；如果用户想做其他部门，归入 General，不要展开隐藏部门专家链路。\n"
+                    "- 好问题示例：这个需求当前应归到哪个已开放入口来定义首版：Production、Quality、TDI，还是 General？"
+                ),
+                "production_scope": (
+                    "当前节点专业追问方向：\n"
+                    "- 优先确认 Production 的业务对象和边界：product family、plant、line、route、lot/panel/unit 粒度、Finished Lot 的判定点、时间窗口。\n"
+                    "- 不要擅自给出未确认的具体站点缩写；如果用户还没给站点名，用最后生产站出站、入库、QA release 这类通用判定点。\n"
+                    "- 如果 Finished Lot 判定点和粒度都缺，先问 Finished Lot 判定点，下一轮再问粒度；不要用“另外”追加第二问。\n"
+                    "- 好问题示例：首版 Production 里 Finished Lot 的完工判定以哪个时点为准：最后生产站出站、入库，还是 QA release？"
+                ),
+                "production_flow": (
+                    "当前节点专业追问方向：\n"
+                    "- 优先确认工序和站点流转：route/operation/station、move-in/move-out、hold/release、rework loop、equipment/recipe 是否要纳入。\n"
+                    "- 好问题示例：Production flow 里哪些站点是首版必须串起来的关键节点？每个 lot 在这些站点需要记录 move-in、move-out、hold、release、rework 哪些状态？"
+                ),
+                "production_metrics": (
+                    "当前节点专业追问方向：\n"
+                    "- 优先确认用户现行指标公式和数据口径：input、output、good、scrap、rework、WIP、cycle time、throughput、良率类指标的计算边界。\n"
+                    "- 不要替用户预设 FPY/final yield/lot yield 等名称或公式；先问现场现在怎么命名和计算。\n"
+                    "- 好问题示例：你们现在老板看的核心 Production 指标叫什么，分母/分子、统计粒度和时间窗口分别是什么，报废和返工是否单独拆出口径？"
+                ),
+                "tdi_definition": (
+                    "当前节点专业追问方向：\n"
+                    "- 优先确认 TDI 在你们组织里的定义；在用户确认前，只写 TDI，不要加括号解释或替用户展开。\n"
+                    "- 好问题示例：这个项目里 TDI 具体指哪条业务链路？是新产品/新工艺导入试作，还是 Production/Quality 数据接口集成，或者你们内部另有定义？"
+                ),
+                "tdi_handoff": (
+                    "当前节点专业追问方向：\n"
+                    "- 优先确认 TDI 的触发、输入输出、状态机、owner、SLA、审批点，以及它和上游/下游生产、质量或数据系统的交接边界。\n"
+                    "- 不要自造状态名、SLA 数字、owner 角色或审批层级；先问用户现在实际使用的状态和口径。\n"
+                    "- 好问题示例：你们现在一个 TDI case 从触发到关闭实际有哪些状态，每个状态由哪个角色负责，SLA 是按哪个起止点计算，什么条件才算关闭？"
+                ),
+                "quality_rules": (
+                    "当前节点专业追问方向：\n"
+                    "- 优先确认用户现行检测和判定规则：inspection point、defect code/taxonomy、spec limit、sampling/full inspection、retest/rework/scrap/MRB disposition。\n"
+                    "- 不要自造检测点、缺陷分类、规格上下限或 MRB/CAPA 状态；先问用户现行质量口径。\n"
+                    "- 好问题示例：Quality 首版要覆盖你们现行哪些检测点和缺陷分类，缺陷发生后的判定规则、责任 owner 和关闭证据现在分别是什么？"
+                ),
+                "quality_drilldown": (
+                    "当前节点专业追问方向：\n"
+                    "- 优先确认质量分析和闭环：defect Pareto、root cause 维度、lot genealogy、station/equipment/recipe 关联、CAPA/改善措施和验证结果。\n"
+                    "- 不要替用户预设 root cause 维度或 CAPA 关闭标准；先问当前报表和会议怎么追因。\n"
+                    "- 好问题示例：质量下钻时你们现在最常用的 root cause 维度是什么，CAPA 如果适用，需要哪些验证数据才算关闭？"
+                ),
+                "acceptance": (
+                    "当前节点专业追问方向：\n"
+                    "- 优先确认验收和对账：Production/TDI/Quality 三条链路各自的验收口径、数据延迟、历史回补、系统对账、owner sign-off。\n"
+                    "- 好问题示例：首版上线验收时，Production、TDI、Quality 分别要和哪些系统或报表对账，允许的数据延迟是多少，谁最终 sign-off？"
+                ),
+            }
+            base_guidance = guidance_by_node.get(node, "")
+            if base_guidance and track_playbook:
+                return base_guidance + "\n" + track_playbook
+            return base_guidance
+
+        guidance_by_node = {
+                "scope_triage": (
+                    "Current-node professional question guidance:\n"
+                    "- The user only gave a broad goal without a clear department/business owner or need type. First confirm the requesting department and first-version owner; do not jump into fields, pages, or tech stack.\n"
+                    "- The current IT scope exposes only Production, Quality, TDI, and General. The first question may list only these four entry points.\n"
+                    "- Do not expand TDI in first-question options, and do not invent unconfirmed system/internal terms such as EAP/SPC/MES/QMS/ERP.\n"
+                    "- Strong question example: Which open entry point is requesting and accepting the first IC Substrate version: Production, Quality, TDI, or General?"
+                ),
+            "track_disambiguation": (
+                "Current-node professional question guidance:\n"
+                "- The user expressed a need focus but did not identify the requesting department or business owner. Ask for department ownership first instead of defaulting to Production/TDI/Quality.\n"
+                "- The current IT scope exposes only Production, Quality, TDI, and General. If the need belongs to another department, route it to General instead of continuing a hidden expert chain.\n"
+                "- Strong question example: Which opened entry point should own this first version: Production, Quality, TDI, or General?"
+            ),
+            "production_scope": (
+                "Current-node professional question guidance:\n"
+                "- First confirm the Production business object and boundary: product family, plant, line, route, lot/panel/unit grain, Finished Lot decision point, and time window.\n"
+                "- Do not invent specific station abbreviations; if the user has not named the station, use generic decision points such as final production move-out, warehouse receipt, or QA release.\n"
+                "- If both Finished Lot decision point and grain are missing, ask the Finished Lot decision point first and leave grain for the next turn; do not append a second question.\n"
+                "- Strong question example: In the first Production scope, which decision point defines Finished Lot completion: final production move-out, warehouse receipt, or QA release?"
+            ),
+            "production_flow": (
+                "Current-node professional question guidance:\n"
+                "- First confirm process and station movement: route/operation/station, move-in/move-out, hold/release, rework loop, and whether equipment/recipe matter.\n"
+                "- Strong question example: Which key stations must the first Production flow connect, and should each lot track move-in, move-out, hold, release, and rework states at those stations?"
+            ),
+            "production_metrics": (
+                "Current-node professional question guidance:\n"
+                "- First confirm the user's current metric formulas and grain: input, output, good, scrap, rework, WIP, cycle time, throughput, and yield-related boundaries.\n"
+                "- Do not prescribe FPY/final yield/lot yield names or formulas. Ask how the site names and calculates the metric today.\n"
+                "- Strong question example: What is the current Production metric leadership reads, what are its numerator/denominator, grain, and time window, and are scrap/rework split out?"
+            ),
+            "tdi_definition": (
+                "Current-node professional question guidance:\n"
+                "- First confirm what TDI means in the user's organization. Until confirmed, write only TDI and do not add parenthetical expansions.\n"
+                "- Strong question example: In this project, which business chain does TDI refer to: new product/process trial introduction, Production/Quality data integration, or another internal definition?"
+            ),
+            "tdi_handoff": (
+                "Current-node professional question guidance:\n"
+                "- First confirm TDI trigger, inputs/outputs, state machine, owner, SLA, approval points, and handoff boundaries with upstream/downstream production, quality, or data systems.\n"
+                "- Do not invent state names, SLA numbers, owner roles, or approval levels. First ask for the user's actual states and definitions.\n"
+                "- Strong question example: What states does a TDI case actually move through from trigger to closure in your organization, who owns each state, how is SLA measured, and what makes the case closed?"
+            ),
+            "quality_rules": (
+                "Current-node professional question guidance:\n"
+                "- First confirm the user's current inspection and disposition rules: inspection point, defect code/taxonomy, spec limits, sampling/full inspection, retest/rework/scrap/MRB disposition.\n"
+                "- Do not invent inspection points, defect categories, spec limits, or MRB/CAPA states. Ask for the user's current Quality definitions.\n"
+                "- Strong question example: Which current inspection points and defect categories are in scope, and what are the existing disposition owner and closure evidence?"
+            ),
+            "quality_drilldown": (
+                "Current-node professional question guidance:\n"
+                "- First confirm quality analysis closure: defect Pareto, root-cause dimensions, lot genealogy, station/equipment/recipe linkage, CAPA/improvement action, and validation result.\n"
+                "- Do not prescribe root-cause dimensions or CAPA closure criteria. Ask how the current report or review meeting investigates root cause.\n"
+                "- Strong question example: In today's Quality review, which dimensions are used for root-cause drill-down, and if CAPA applies, what validation evidence closes it?"
+            ),
+            "acceptance": (
+                "Current-node professional question guidance:\n"
+                "- First confirm acceptance and reconciliation: sign-off criteria for Production/TDI/Quality, data latency, historical backfill, system reconciliation, and owner approval.\n"
+                "- Strong question example: At launch acceptance, which systems or reports must Production, TDI, and Quality reconcile against, what latency is allowed, and who signs off?"
+            ),
+        }
+        base_guidance = guidance_by_node.get(node, "")
+        if base_guidance and track_playbook:
+            return base_guidance + "\n" + track_playbook
+        return base_guidance
+
+    def _ic_substrate_department_question_guidance(
+        self,
+        chain_state: dict[str, Any],
+        language: str | None = None,
+    ) -> str:
+        department = str(chain_state.get("intent_track", "")).strip().lower()
+        if not self._ic_substrate_is_department(department):
+            return ""
+        playbook_guidance = self._ic_substrate_department_playbook_guidance(department, language)
+        current_node = str(chain_state.get("current_node", "")).strip()
+        current_node_label = str(chain_state.get("current_node_label", "")).strip()
+
+        if self._normalize_language(language) == "zh":
+            node_suffix = current_node.removeprefix(f"{department}_")
+            node_guidance_by_suffix = {
+                "scope": "- 当前专家链路节点先确认首版软件形态、目标用户、使用场景、业务对象、决策/动作、首版边界和验收 owner；不要先跳到页面细节或技术实现。",
+                "metrics": "- 当前专家链路节点先确认软件要展示/计算的 KPI 名称、公式、分子分母、时间窗、粒度、排除项，以及用户在例会/报表/看板里如何使用。",
+                "workflow": "- 当前专家链路节点先确认软件要承载的触发条件、状态流转、owner、SLA 起止点、异常升级、关闭证据和待办/通知边界。",
+                "data_acceptance": "- 当前专家链路节点先确认软件数据的 source of truth、主数据、接口/对账、权限审计、数据延迟、刷新频率和最终 sign-off。",
+            }
+            node_guidance = ""
+            if current_node_label:
+                node_guidance = f"当前专家链路节点：{current_node_label}\n{node_guidance_by_suffix.get(node_suffix, '')}".strip()
+            guidance_by_department = {
+                "production": (
+                    "当前部门专业追问方向：Production\n"
+                    "- 先确认 Production 想开发的软件形态和使用场景：生产看板、WIP/hold/release tracking、Finished Lot 判定、良率/吞吐/周期分析、异常告警或交接对账；再追 product family、plant、line、route、lot/panel/unit 粒度、WIP/scrap/rework 和 owner。\n"
+                    "- 好问题示例：Production 首版这个系统主要给谁用来做什么：看良率/产出 dashboard、追 WIP/hold/release 状态，还是做 Finished Lot 完工判定和对账？"
+                ),
+                "tdi": (
+                    "当前部门专业追问方向：TDI\n"
+                    "- 先确认 TDI 想开发的软件形态和使用场景：case tracking、handoff dashboard、SLA aging、审批/验证流、异常告警或数据回写对账；不要擅自展开 TDI，再追本项目 TDI 定义、触发条件、输入输出、状态流转、owner/SLA、审批点和交接边界。\n"
+                    "- 好问题示例：TDI 首版这个系统主要是用来追 case 状态/SLA、管理跨部门 handoff，还是做审批验证和关闭对账？"
+                ),
+                "quality": (
+                    "当前部门专业追问方向：Quality\n"
+                    "- 先确认 Quality 想开发的软件形态和使用场景：质量看板、缺陷下钻、MRB/CAPA case tracking、release sign-off、报表导出或异常告警；再追 inspection point、defect code/taxonomy、spec limit、MRB 判定、root cause、CAPA/改善闭环和 release 证据。\n"
+                    "- 好问题示例：Quality 首版这个系统主要是给谁用来做什么：看缺陷/良率 dashboard、追 MRB/CAPA 流程，还是做 release/sign-off 对账？"
+                ),
+                "general": (
+                    "当前部门专业追问方向：General\n"
+                    "- 先确认 General 需求的真实发起部门、业务 owner、首版软件形态和使用场景：通用业务看板、workflow/case tracking、data query、report/export、alerting、admin console 或跨部门 cockpit；其他隐藏部门不要展开成独立专家链路。\n"
+                    "- 好问题示例：General 首版这个系统主要给谁用来完成什么业务动作：看一个业务 dashboard、追一个流程/case 状态，还是查询/导出一份固定口径的数据？"
+                ),
+                "planning": (
+                    "当前部门专业追问方向：Planning/PMC\n"
+                    "- 先确认 Planning/PMC 想开发的软件形态和使用场景：排产看板、capacity loading、dispatch priority、commit 风险预警、forecast-to-schedule gap 或 expedite tracking；再追 demand/forecast、产能约束、排产规则、WIP aging、交期承诺和异常升级。\n"
+                    "- 好问题示例：Planning/PMC 首版这个系统主要给谁用来做什么：看产能缺口 dashboard、排 lot dispatch 优先级，还是追客户 commit 风险和 expedite 闭环？"
+                ),
+                "engineering": (
+                    "当前部门专业追问方向：Engineering/Process\n"
+                    "- 先确认 Engineering/Process 想开发的软件形态和使用场景：recipe/spec change tracking、NPI/qualification dashboard、DOE/trial lot 记录、root cause action tracking 或 release gate sign-off；再追 route/recipe/spec/parameter、工程变更、试作数据和回滚条件。\n"
+                    "- 好问题示例：Engineering 首版这个系统主要是管理 recipe/spec 变更、NPI qualification 进度，还是追异常 root cause 和 release gate sign-off？"
+                ),
+                "equipment": (
+                    "当前部门专业追问方向：Equipment/Maintenance\n"
+                    "- 先确认 Equipment/Maintenance 想开发的软件形态和使用场景：downtime dashboard、PM execution tracking、alarm/event triage、spare-part risk、equipment release 或 lot-impact analysis；再追 uptime/OEE、downtime 原因、PM 计划、MTBF/MTTR 和对 Production/Quality 的影响。\n"
+                    "- 好问题示例：Equipment 首版这个系统主要给谁用来做什么：看 downtime/OEE dashboard、追 PM 执行闭环，还是把停机事件关联到 lot、station、recipe 或 defect 结果？"
+                ),
+                "material": (
+                    "当前部门专业追问方向：Material/Procurement\n"
+                    "- 先确认 Material/Procurement 想开发的软件形态和使用场景：来料质量看板、shortage risk、supplier lot traceability、替代料审批、IQC issue tracking 或库存可用性预警；再追 BOM/料号、供应商、来料批次、IQC、库存、替代料和对良率/交期的影响。\n"
+                    "- 好问题示例：Material 首版这个系统主要是追供应商来料质量、库存缺料风险，还是替代料审批和 supplier lot 到生产 lot 的追溯？"
+                ),
+                "warehouse": (
+                    "当前部门专业追问方向：Warehouse/Logistics\n"
+                    "- 先确认 Warehouse/Logistics 想开发的软件形态和使用场景：Finished Lot 入库看板、pick/pack/ship tracking、inventory aging、shipping hold、QA/customer release gate 或 traceability report；再追 FG/WIP 库存、批次追溯、包装/发货和客户交付窗口。\n"
+                    "- 好问题示例：Warehouse 首版这个系统主要给谁用来做什么：看 Finished Lot 入库/库存 aging、追出货状态，还是做 QA/customer hold release 和批次追溯？"
+                ),
+                "customer": (
+                    "当前部门专业追问方向：Customer/Program/Sales/FAE\n"
+                    "- 先确认 Customer/Program 想开发的软件形态和使用场景：customer commit dashboard、forecast/order tracking、complaint/RMA/8D case tracking、program milestone、customer spec compliance 或 response SLA；再追 customer lot 到内部 lot/panel、defect code 和责任部门的追溯。\n"
+                    "- 好问题示例：Customer/Program 首版这个系统主要给谁用来做什么：看 forecast/commit 风险、追客户 complaint/RMA/8D 闭环，还是管理客户规格和回复 SLA？"
+                ),
+                "finance": (
+                    "当前部门专业追问方向：Finance/Cost\n"
+                    "- 先确认 Finance/Cost 想开发的软件形态和使用场景：scrap/rework cost dashboard、loss attribution、cost center variance、margin impact、month-end reconciliation 或 management report export；再追金额口径、责任归因、产品/客户/工序维度和月结锁定规则。\n"
+                    "- 好问题示例：Finance 首版这个系统主要给谁用来做什么：看报废/返工损失 dashboard、做 cost center 归因，还是支持月结对账和管理报表导出？"
+                ),
+                "ehs": (
+                    "当前部门专业追问方向：EHS\n"
+                    "- 先确认 EHS 想开发的软件形态和使用场景：incident tracking、corrective action workflow、chemical usage dashboard、permit/compliance calendar、environmental report 或 audit evidence repository；再追事件等级、整改证据、法规口径、owner 和关闭条件。\n"
+                    "- 好问题示例：EHS 首版这个系统主要给谁用来做什么：追 incident/整改闭环、看化学品/排放合规 dashboard，还是生成法规/稽核报表？"
+                ),
+                "it_data": (
+                    "当前部门专业追问方向：IT/Data Governance\n"
+                    "- 先确认 IT/Data Governance 想开发的软件形态和使用场景：data quality dashboard、interface SLA monitor、master data workflow、lineage/query catalog、access audit 或 reconciliation console；再追 source of truth、business key、数据 owner、接口合约、回写责任和系统 owner。\n"
+                    "- 好问题示例：IT/Data 首版这个系统主要给谁用来做什么：监控接口 SLA、治理 master data，还是做 source of truth/lineage 和权限审计？"
+                ),
+                "management": (
+                    "当前部门专业追问方向：Management/Ops Excellence\n"
+                    "- 先确认 Management/Ops Excellence 想开发的软件形态和使用场景：war room cockpit、KPI scorecard、target/actual gap review、owner action tracking、escalation board 或 meeting pack export；再追 KPI 口径、例会节奏、owner action、升级规则、闭环证据和 sign-off。\n"
+                    "- 好问题示例：Management 首版这个系统主要给谁用来做什么：看经营 KPI scorecard、追 owner action 闭环，还是支持 war room 跨部门升级和例会输出？"
+                ),
+            }
+            base_guidance = guidance_by_department.get(department, "")
+            if node_guidance:
+                base_guidance = (node_guidance + ("\n" + base_guidance if base_guidance else "")).strip()
+            if base_guidance and playbook_guidance:
+                return base_guidance + "\n" + playbook_guidance
+            return base_guidance or playbook_guidance
+
+        node_suffix = current_node.removeprefix(f"{department}_")
+        node_guidance_by_suffix = {
+            "scope": "- This expert-chain node first confirms first-version software shape, target user, use case, business object, decision/action, boundary, and acceptance owner. Do not jump to page details or implementation.",
+            "metrics": "- This expert-chain node first confirms the KPI the software must show/calculate, formula, numerator/denominator, time window, grain, exclusions, and how users consume it in meetings, reports, or dashboards.",
+            "workflow": "- This expert-chain node first confirms the workflow the software must carry: trigger, state flow, owner, SLA start/end, escalation, closure evidence, and task/notification boundary.",
+            "data_acceptance": "- This expert-chain node first confirms software data source of truth, master data, interfaces/reconciliation, access audit, data latency, refresh cadence, and final sign-off.",
+        }
+        node_guidance = ""
+        if current_node_label:
+            node_guidance = f"Current expert-chain node: {current_node_label}\n{node_guidance_by_suffix.get(node_suffix, '')}".strip()
+        guidance_by_department = {
+            "production": (
+                "Current department guidance: Production\n"
+                "- First confirm the Production software shape and use case: production dashboard, WIP/hold/release tracking, Finished Lot decision, yield/throughput/cycle-time analysis, abnormal alerting, or handoff reconciliation. Then clarify product family, plant, line, route, lot/panel/unit grain, WIP/scrap/rework, and owners.\n"
+                "- Strong question example: For the first Production version, who uses this system and for what main job: yield/output dashboard, WIP/hold/release tracking, or Finished Lot completion and reconciliation?"
+            ),
+            "tdi": (
+                "Current department guidance: TDI\n"
+                "- First confirm the TDI software shape and use case: case tracking, handoff dashboard, SLA aging, approval/verification flow, abnormal alerting, or writeback reconciliation. Do not expand TDI; then clarify this project's TDI definition, trigger, inputs/outputs, state flow, owner/SLA, approval points, and handoff boundary.\n"
+                "- Strong question example: For the first TDI version, is the main job case/SLA tracking, cross-department handoff management, or approval, verification, and closure reconciliation?"
+            ),
+            "quality": (
+                "Current department guidance: Quality\n"
+                "- First confirm the Quality software shape and use case: quality dashboard, defect drill-down, MRB/CAPA case tracking, release sign-off, report export, or abnormal alerting. Then clarify inspection point, defect code/taxonomy, spec limit, MRB disposition, root cause, CAPA/improvement closure, and release evidence.\n"
+                "- Strong question example: For the first Quality version, who uses this system and for what main job: defect/yield dashboard, MRB/CAPA tracking, or release/sign-off reconciliation?"
+            ),
+            "general": (
+                "Current department guidance: General\n"
+                "- First confirm the real requesting department, business owner, first-version software shape, and use case: general business dashboard, workflow/case tracking, data query, report/export, alerting, admin console, or cross-department cockpit. Do not expand hidden departments into separate expert chains.\n"
+                "- Strong question example: For the first General version, who uses this system and for what main business action: reading a business dashboard, tracking workflow/case status, or querying/exporting data with a fixed definition?"
+            ),
+            "planning": (
+                "Current department guidance: Planning/PMC\n"
+                "- First confirm the Planning/PMC software shape and use case: schedule dashboard, capacity loading, dispatch priority, commit-risk alerting, forecast-to-schedule gap, or expedite tracking. Then clarify demand/forecast, capacity constraints, scheduling rules, WIP aging, delivery commitment, and escalation.\n"
+                "- Strong question example: For the first Planning/PMC version, who uses this system and for what main job: capacity-gap dashboard, lot dispatch priority, or customer commit risk and expedite closure?"
+            ),
+            "engineering": (
+                "Current department guidance: Engineering/Process\n"
+                "- First confirm the Engineering/Process software shape and use case: recipe/spec change tracking, NPI/qualification dashboard, DOE/trial-lot records, root-cause action tracking, or release-gate sign-off. Then clarify route/recipe/spec/parameter, engineering change, trial data, and rollback criteria.\n"
+                "- Strong question example: For the first Engineering version, is the main job recipe/spec change management, NPI qualification progress, or abnormal root-cause and release-gate sign-off?"
+            ),
+            "equipment": (
+                "Current department guidance: Equipment/Maintenance\n"
+                "- First confirm the Equipment/Maintenance software shape and use case: downtime dashboard, PM execution tracking, alarm/event triage, spare-part risk, equipment release, or lot-impact analysis. Then clarify uptime/OEE, downtime reason, PM plan, MTBF/MTTR, and Production/Quality impact.\n"
+                "- Strong question example: For the first Equipment version, who uses this system and for what main job: downtime/OEE dashboard, PM closure tracking, or linking downtime events to lots, stations, recipes, or defect outcomes?"
+            ),
+            "material": (
+                "Current department guidance: Material/Procurement\n"
+                "- First confirm the Material/Procurement software shape and use case: incoming-quality dashboard, shortage risk, supplier-lot traceability, substitute-material approval, IQC issue tracking, or inventory availability alerting. Then clarify BOM/material number, supplier, incoming lot, IQC, inventory, substitute rules, and yield/delivery impact.\n"
+                "- Strong question example: For the first Material version, is the main job supplier incoming quality, shortage-risk monitoring, substitute-material approval, or supplier lot to production lot traceability?"
+            ),
+            "warehouse": (
+                "Current department guidance: Warehouse/Logistics\n"
+                "- First confirm the Warehouse/Logistics software shape and use case: Finished Lot receipt dashboard, pick/pack/ship tracking, inventory aging, shipping hold, QA/customer release gate, or traceability report. Then clarify FG/WIP inventory, lot traceability, packing/shipping, and customer delivery window.\n"
+                "- Strong question example: For the first Warehouse version, who uses this system and for what main job: Finished Lot receipt/inventory aging, shipment tracking, or QA/customer hold release and lot traceability?"
+            ),
+            "customer": (
+                "Current department guidance: Customer/Program/Sales/FAE\n"
+                "- First confirm the Customer/Program software shape and use case: customer commit dashboard, forecast/order tracking, complaint/RMA/8D case tracking, program milestone, customer-spec compliance, or response SLA. Then clarify customer lot to internal lot/panel, defect code, and responsible department traceability.\n"
+                "- Strong question example: For the first Customer/Program version, is the main job forecast/commit risk, complaint/RMA/8D closure, or customer-spec and response-SLA management?"
+            ),
+            "finance": (
+                "Current department guidance: Finance/Cost\n"
+                "- First confirm the Finance/Cost software shape and use case: scrap/rework cost dashboard, loss attribution, cost-center variance, margin impact, month-end reconciliation, or management report export. Then clarify amount definitions, responsibility attribution, product/customer/process dimensions, and month-end lock rules.\n"
+                "- Strong question example: For the first Finance version, who uses this system and for what main job: scrap/rework loss dashboard, cost-center attribution, or month-end reconciliation and management report export?"
+            ),
+            "ehs": (
+                "Current department guidance: EHS\n"
+                "- First confirm the EHS software shape and use case: incident tracking, corrective-action workflow, chemical usage dashboard, permit/compliance calendar, environmental report, or audit evidence repository. Then clarify incident level, corrective evidence, compliance taxonomy, owners, and closure criteria.\n"
+                "- Strong question example: For the first EHS version, is the main job incident/corrective-action closure, chemical/emission compliance dashboard, or compliance/audit report generation?"
+            ),
+            "it_data": (
+                "Current department guidance: IT/Data Governance\n"
+                "- First confirm the IT/Data Governance software shape and use case: data-quality dashboard, interface SLA monitor, master-data workflow, lineage/query catalog, access audit, or reconciliation console. Then clarify source of truth, business key, data owner, interface contract, writeback responsibility, and system owner.\n"
+                "- Strong question example: For the first IT/Data version, who uses this system and for what main job: interface SLA monitoring, master-data governance, source-of-truth/lineage, or access audit?"
+            ),
+            "management": (
+                "Current department guidance: Management/Ops Excellence\n"
+                "- First confirm the Management/Ops Excellence software shape and use case: war-room cockpit, KPI scorecard, target/actual gap review, owner action tracking, escalation board, or meeting-pack export. Then clarify KPI definitions, meeting cadence, owner actions, escalation rules, closure evidence, and sign-off.\n"
+                "- Strong question example: For the first Management version, who uses this system and for what main job: operating KPI scorecard, owner-action closure, or war-room escalation and meeting output?"
+            ),
+        }
+        base_guidance = guidance_by_department.get(department, "")
+        if node_guidance:
+            base_guidance = (node_guidance + ("\n" + base_guidance if base_guidance else "")).strip()
+        if base_guidance and playbook_guidance:
+            return base_guidance + "\n" + playbook_guidance
+        return base_guidance or playbook_guidance
+
+    def _ic_substrate_product_shape_question_guidance(
+        self,
+        chain_state: dict[str, Any],
+        language: str | None = None,
+    ) -> str:
+        if chain_state.get("mode") != "ic_substrate":
+            return ""
+
+        shape = str(chain_state.get("intent_product_shape", "")).strip()
+        if not shape:
+            return ""
+
+        track = str(chain_state.get("intent_track", "")).strip().lower() or "general"
+        track_label = self._ic_substrate_department_label(track, language) if self._ic_substrate_is_department(track) else "General"
+
+        if self._normalize_language(language) == "zh":
+            guidance_by_shape = {
+                "dashboard": (
+                    f"软件形态追问方向：{track_label} dashboard / cockpit\n"
+                    "- 优先确认首屏服务的业务决策、核心 KPI、默认维度、刷新频率、下钻路径和谁负责验收；不要先问颜色、卡片数量或图表库。\n"
+                    "- 专家问题模板：这个 dashboard 首屏是给谁在什么会议或班次里做什么决策，默认必须看到哪 3 个 KPI，以及点击后要下钻到 lot、panel、station、defect code 还是 owner action？"
+                ),
+                "workflow_tracker": (
+                    f"软件形态追问方向：{track_label} workflow / case tracking\n"
+                    "- 优先确认触发条件、对象、状态流转、owner、SLA 起止点、异常升级、关闭证据和重开规则；不要自造状态名或审批层级。\n"
+                    "- 专家问题模板：这个 case 从触发到关闭现在实际有哪些状态，每个状态谁负责处理，什么证据可以让系统判定为已关闭或需要升级？"
+                ),
+                "report_export": (
+                    f"软件形态追问方向：{track_label} report / export\n"
+                    "- 优先确认报表接收人、使用场景、冻结时间点、指标口径、字段粒度、权限、推送频率和与线上看板的对账关系。\n"
+                    "- 专家问题模板：这份报表是给每日/每周例会冻结使用，还是给管理层/客户分享，导出时必须锁定哪个时间窗和哪套 KPI 口径？"
+                ),
+                "data_query": (
+                    f"软件形态追问方向：{track_label} data query / drilldown\n"
+                    "- 优先确认查询对象、业务主键、筛选维度、返回粒度、权限边界、保留周期和 source of truth；不要自造表名、字段名或 join key。\n"
+                    "- 专家问题模板：用户查询时最常用的业务对象是什么，必须用哪个 key 定位，返回结果要停在汇总层、lot/panel 明细层，还是要继续追到事件/状态历史？"
+                ),
+                "alerting": (
+                    f"软件形态追问方向：{track_label} alerting\n"
+                    "- 优先确认触发阈值、判定窗口、去重/抑制规则、通知对象、处置动作、升级路径和关闭证据；不要自造阈值数字或 SLA。\n"
+                    "- 专家问题模板：这个告警现在按单个对象触发还是按某个维度累计触发，触发后谁必须在什么业务动作里处理，什么证据才能关闭告警？"
+                ),
+                "admin_tool": (
+                    f"软件形态追问方向：{track_label} admin console / configuration\n"
+                    "- 优先确认谁维护配置、配置对象、审批/生效规则、版本审计、回滚方式和误配置影响；不要把它降级成普通 CRUD。\n"
+                    "- 专家问题模板：这个配置由谁维护，变更后什么时候生效，是否需要审批和版本留痕，如果配置错误会影响哪个业务流程或指标？"
+                ),
+            }
+            return guidance_by_shape.get(shape, "")
+
+        guidance_by_shape = {
+            "dashboard": (
+                f"Software-shape guidance: {track_label} dashboard / cockpit\n"
+                "- First confirm the decision served by the first screen, core KPIs, default dimensions, refresh cadence, drill path, and acceptance owner before colors, card count, or chart libraries.\n"
+                "- Expert question template: Who uses the dashboard in which meeting or shift to make what decision, which 3 KPIs must be visible by default, and should drill-down go to lot, panel, station, defect code, or owner action?"
+            ),
+            "workflow_tracker": (
+                f"Software-shape guidance: {track_label} workflow / case tracking\n"
+                "- First confirm trigger, object, state flow, owner, SLA start/end, escalation, closure evidence, and reopen rules. Do not invent state names or approval levels.\n"
+                "- Expert question template: What states does the case actually move through today, who owns each state, and what evidence lets the system mark it closed or escalated?"
+            ),
+            "report_export": (
+                f"Software-shape guidance: {track_label} report / export\n"
+                "- First confirm recipients, use occasion, freeze time, metric definitions, field grain, permissions, delivery cadence, and reconciliation to the live dashboard.\n"
+                "- Expert question template: Is this report frozen for daily/weekly review or shared with leadership/customers, and which time window and KPI definition must be locked at export?"
+            ),
+            "data_query": (
+                f"Software-shape guidance: {track_label} data query / drill-down\n"
+                "- First confirm query object, business key, filter dimensions, return grain, access boundary, retention, and source of truth. Do not invent table names, field names, or join keys.\n"
+                "- Expert question template: What business object do users search most often, which key identifies it, and should results stop at summary, lot/panel detail, or event/status history?"
+            ),
+            "alerting": (
+                f"Software-shape guidance: {track_label} alerting\n"
+                "- First confirm trigger threshold, judgment window, dedupe/suppression rules, notification target, action, escalation path, and closure evidence. Do not invent threshold numbers or SLA.\n"
+                "- Expert question template: Does the alert trigger per object or by accumulated threshold over a dimension, who must act, and what evidence closes it?"
+            ),
+            "admin_tool": (
+                f"Software-shape guidance: {track_label} admin console / configuration\n"
+                "- First confirm who maintains configuration, configurable object, approval/effective rule, version audit, rollback, and business impact of misconfiguration. Do not reduce it to generic CRUD.\n"
+                "- Expert question template: Who maintains this configuration, when does a change become effective, does it need approval/version history, and which workflow or metric is affected if it is wrong?"
+            ),
+        }
+        return guidance_by_shape.get(shape, "")
+
+    def _ic_substrate_intent_focus_question_guidance(
+        self,
+        chain_state: dict[str, Any],
+        language: str | None = None,
+    ) -> str:
+        if chain_state.get("mode") != "ic_substrate":
+            return ""
+
+        focus = str(chain_state.get("intent_focus", "")).strip()
+        if not focus:
+            return ""
+
+        if self._normalize_language(language) == "zh":
+            guidance_by_focus = {
+                "metric_definition": (
+                    "用户需求形态追问方向：指标口径\n"
+                    "- 优先问用户现行指标公式、分子分母、时间窗、数据粒度和排除项；不要先问页面布局，也不要替用户编标准成本/实际成本/OEE/良率等公式选项。\n"
+                    "- 好问题示例：这个指标在你们现在的报表里分母和分子分别是什么，统计粒度按 lot、panel、unit 还是 cost center，rework/scrap 是否从口径里单独拆出？"
+                ),
+                "workflow_state": (
+                    "用户需求形态追问方向：流程/状态流转\n"
+                    "- 优先问用户现行触发条件、状态机、owner、SLA、审批点和关闭条件；不要先问通用功能清单，也不要自造状态名、角色名或 SLA 数字。\n"
+                    "- 好问题示例：这个 case 在你们现行流程里从触发到关闭有哪些状态，每个状态由谁处理，SLA 从哪个节点开始算，什么条件算完成或超时？"
+                ),
+                "data_integration": (
+                    "用户需求形态追问方向：数据源/接口\n"
+                    "- 优先问 source of truth、关键字段、join key、刷新频率、数据延迟、回写目标和对账方式；不要自造系统品牌、表名、接口名或主键规则。\n"
+                    "- 好问题示例：这条数据链路在你们现有系统里的 source of truth 是哪个，业务主键如何对齐，允许的数据延迟和对账方式是什么？"
+                ),
+                "alert_exception": (
+                    "用户需求形态追问方向：异常/告警\n"
+                    "- 优先问用户现行触发阈值、判定窗口、通知对象、处置动作、升级规则和关闭证据；不要自造阈值数值、通知角色或升级层级。\n"
+                    "- 好问题示例：这个异常在你们现在是按单笔对象触发，还是按某个业务维度在一段时间内累计触发，触发后必须留下什么关闭证据？"
+                ),
+                "drilldown_analysis": (
+                    "用户需求形态追问方向：下钻/根因分析\n"
+                    "- 优先问 drill path、分析维度、保留粒度、关联对象和 root cause 闭环证据。\n"
+                    "- 好问题示例：下钻时最关键的路径是 product -> line -> station -> defect code，还是 lot genealogy -> equipment/recipe -> root cause？"
+                ),
+                "dashboard_view": (
+                    "用户需求形态追问方向：看板/图表\n"
+                    "- 优先问业务决策场景、核心 KPI、默认维度、刷新频率和首屏排序；不要先问颜色或组件样式。\n"
+                    "- 好问题示例：这个看板首屏是给老板看异常排行、良率趋势，还是给工程师看可下钻明细？默认按 product、line、station 还是 customer 排序？"
+                ),
+                "export_reporting": (
+                    "用户需求形态追问方向：导出/报表推送\n"
+                    "- 优先问接收人、频率、格式、冻结口径、权限和与线上看板的对账关系。\n"
+                    "- 好问题示例：导出的数据是给每日例会冻结使用，还是给客户/管理层分享？导出后是否必须和看板同一时间窗、同一良率口径对账？"
+                ),
+                "permission_role": (
+                    "用户需求形态追问方向：角色/权限\n"
+                    "- 只有当权限直接影响当前部门的业务操作边界时才深挖；优先问角色能看什么、改什么、审批什么和谁最终负责。\n"
+                    "- 好问题示例：这个部门里哪些角色只能看汇总，哪些角色可以处理异常、审批状态变更或关闭 action item？"
+                ),
+            }
+            return guidance_by_focus.get(focus, "")
+
+        guidance_by_focus = {
+            "metric_definition": (
+                "User-need focus guidance: metric definition\n"
+                "- Ask the user's current metric formula, numerator/denominator, time window, grain, and exclusions before page layout. Do not invent standard-cost, actual-cost, OEE, or yield formula options.\n"
+                "- Strong question example: In your current report, what are the numerator and denominator, is the grain lot/panel/unit/cost center, and should rework/scrap be split out?"
+            ),
+            "workflow_state": (
+                "User-need focus guidance: workflow/state flow\n"
+                "- Ask the user's current trigger, state machine, owner, SLA, approval point, and closure condition before generic feature lists. Do not invent state names, role names, or SLA numbers.\n"
+                "- Strong question example: In your current process, what states does the case move through from trigger to closure, who owns each state, where does SLA start, and what makes it complete or overdue?"
+            ),
+            "data_integration": (
+                "User-need focus guidance: data source/integration\n"
+                "- Ask source of truth, key fields, join keys, refresh cadence, latency, writeback target, and reconciliation. Do not invent system brands, table names, API names, or key rules.\n"
+                "- Strong question example: In your existing systems, what is the source of truth, how do business keys align, and what latency/reconciliation rule is acceptable?"
+            ),
+            "alert_exception": (
+                "User-need focus guidance: exception/alert\n"
+                "- Ask the user's current trigger threshold, judgment window, notification target, action, escalation, and closure evidence. Do not invent threshold numbers, notification roles, or escalation levels.\n"
+                "- Strong question example: Does the exception trigger per object or by accumulated threshold over a business dimension/time window, and what closure evidence is required?"
+            ),
+            "drilldown_analysis": (
+                "User-need focus guidance: drill-down/root-cause analysis\n"
+                "- Ask drill path, dimensions, retained grain, linked objects, and root-cause closure evidence.\n"
+                "- Strong question example: Is the critical path product -> line -> station -> defect code, or lot genealogy -> equipment/recipe -> root cause?"
+            ),
+            "dashboard_view": (
+                "User-need focus guidance: dashboard/chart\n"
+                "- Ask decision scenario, core KPI, default dimension, refresh cadence, and first-screen sorting before colors or component style.\n"
+                "- Strong question example: Is the first screen for leadership anomaly ranking/yield trend, or for engineers to drill into detail, and should it default by product, line, station, or customer?"
+            ),
+            "export_reporting": (
+                "User-need focus guidance: export/report push\n"
+                "- Ask recipients, cadence, format, frozen metric definition, permissions, and reconciliation with the live dashboard.\n"
+                "- Strong question example: Is the export for frozen daily review or customer/leadership sharing, and must it reconcile to the dashboard with the same time window and yield definition?"
+            ),
+            "permission_role": (
+                "User-need focus guidance: role/permission\n"
+                "- Only dig into permissions when they directly affect the current department's operating boundary; ask what each role can view, change, approve, and ultimately own.\n"
+                "- Strong question example: In this department, which roles can only view summaries, and which roles can handle exceptions, approve status changes, or close action items?"
+            ),
+        }
+        return guidance_by_focus.get(focus, "")
+
+    def _conversation_chain_state_for_prompt(self, session: Session, language: str) -> str:
+        if not session.applied_template_id and not session.applied_template_name:
+            return ""
+
+        normalized_language = self._normalize_language(language)
+        message_count = self._message_count(session.messages)
+        structured_requirement_model = self._get_cached_localized_structured_requirement_model(
+            session.id,
+            normalized_language,
+            message_count,
+        )
+        if structured_requirement_model is None:
+            structured_requirement_model = self._get_cached_canonical_structured_requirement_model(
+                session.id,
+                message_count,
+                normalized_language,
+            )
+        if structured_requirement_model is None:
+            structured_requirement_model = self._empty_structured_requirement_model()
+
+        chain_state = self.build_conversation_chain_state(
+            session,
+            structured_requirement_model,
+            normalized_language,
+        )
+        if not chain_state.get("enabled"):
+            return ""
+        focus_question_guidance = self._ic_substrate_intent_focus_question_guidance(
+            chain_state,
+            normalized_language,
+        )
+        product_shape_guidance = self._ic_substrate_product_shape_question_guidance(
+            chain_state,
+            normalized_language,
+        )
+        node_question_guidance = self._ic_substrate_current_node_question_guidance(
+            chain_state,
+            normalized_language,
+        )
+        runtime_guardrails = self._ic_substrate_runtime_guardrails_for_prompt(
+            chain_state,
+            normalized_language,
+        )
+        convergence_guidance = self._requirement_convergence_guidance_for_prompt(
+            structured_requirement_model,
+            normalized_language,
+        )
+
+        if normalized_language == "zh":
+            state_text = (
+                "当前对话链路状态：\n"
+                f"- 链路类型：{chain_state.get('mode', '')}\n"
+                f"- 当前轨道：{chain_state.get('current_track', '')}\n"
+                f"- 当前节点：{chain_state.get('current_node_label', '')}\n"
+                f"- 进度：{chain_state.get('current_step_index', 0)}/{chain_state.get('total_steps', 0)}\n"
+                f"- 下一问来源：{chain_state.get('next_question_source', '')}\n"
+                f"- 用户意图路由：{chain_state.get('intent_track', '') or '未明确'}\n"
+                f"- 需求形态路由：{chain_state.get('intent_focus', '') or '未明确'}\n"
+                f"- 软件形态路由：{chain_state.get('intent_product_shape', '') or '未明确'}\n"
+                "- 回答时优先尊重用户当前意图路由和需求形态路由；当前节点是建议推进点，不是必须照走的固定剧本。如果需求形态和节点指南冲突，优先按用户当前需求形态提问。\n"
+                "- 如果需求形态明确但用户没有说清发起部门或业务 owner，先问部门/owner，不要默认套到 Production/TDI/Quality。"
+            )
+            if focus_question_guidance:
+                state_text += "\n" + focus_question_guidance
+            if product_shape_guidance:
+                state_text += "\n" + product_shape_guidance
+            if node_question_guidance:
+                state_text += "\n" + node_question_guidance
+            if runtime_guardrails:
+                state_text += "\n" + runtime_guardrails
+            if convergence_guidance:
+                state_text += "\n" + convergence_guidance
+            return state_text
+
+        if normalized_language == "de":
+            state_text = (
+                "Aktueller Dialogkettenstatus:\n"
+                f"- Kettentyp: {chain_state.get('mode', '')}\n"
+                f"- Aktueller Track: {chain_state.get('current_track', '')}\n"
+                f"- Aktueller Knoten: {chain_state.get('current_node_label', '')}\n"
+                f"- Fortschritt: {chain_state.get('current_step_index', 0)}/{chain_state.get('total_steps', 0)}\n"
+                f"- Quelle der naechsten Frage: {chain_state.get('next_question_source', '')}\n"
+                f"- Nutzer-Intent-Routing: {chain_state.get('intent_track', '') or 'unklar'}\n"
+                f"- Bedarfsform-Routing: {chain_state.get('intent_focus', '') or 'unklar'}\n"
+                f"- Softwareform-Routing: {chain_state.get('intent_product_shape', '') or 'unklar'}\n"
+                "- Respektiere zuerst den aktuellen Nutzer-Intent und die Bedarfsform. Der aktuelle Knoten ist ein empfohlener naechster Schritt, kein starres Skript. Wenn Bedarfsform und Knotenguide kollidieren, nach der aktuellen Bedarfsform fragen.\n"
+                "- Wenn die Bedarfsform klar ist, aber anfordernder Bereich oder Business Owner fehlen, zuerst Bereich/Owner fragen statt default auf Production/TDI/Quality zu setzen."
+            )
+            if focus_question_guidance:
+                state_text += "\n" + focus_question_guidance
+            if product_shape_guidance:
+                state_text += "\n" + product_shape_guidance
+            if node_question_guidance:
+                state_text += "\n" + node_question_guidance
+            if runtime_guardrails:
+                state_text += "\n" + runtime_guardrails
+            if convergence_guidance:
+                state_text += "\n" + convergence_guidance
+            return state_text
+
+        if normalized_language == "ms":
+            state_text = (
+                "Status rantaian dialog semasa:\n"
+                f"- Mod rantaian: {chain_state.get('mode', '')}\n"
+                f"- Track semasa: {chain_state.get('current_track', '')}\n"
+                f"- Nod semasa: {chain_state.get('current_node_label', '')}\n"
+                f"- Kemajuan: {chain_state.get('current_step_index', 0)}/{chain_state.get('total_steps', 0)}\n"
+                f"- Sumber soalan seterusnya: {chain_state.get('next_question_source', '')}\n"
+                f"- Routing intent pengguna: {chain_state.get('intent_track', '') or 'belum jelas'}\n"
+                f"- Routing bentuk keperluan: {chain_state.get('intent_focus', '') or 'belum jelas'}\n"
+                f"- Routing bentuk software: {chain_state.get('intent_product_shape', '') or 'belum jelas'}\n"
+                "- Utamakan intent pengguna dan bentuk keperluan semasa. Nod semasa ialah cadangan langkah seterusnya, bukan skrip tetap. Jika panduan bentuk keperluan bercanggah dengan panduan nod, tanya mengikut bentuk keperluan semasa.\n"
+                "- Jika bentuk keperluan jelas tetapi jabatan pemohon atau business owner belum dikenal pasti, tanya jabatan/owner dahulu dan jangan default kepada Production/TDI/Quality."
+            )
+            if focus_question_guidance:
+                state_text += "\n" + focus_question_guidance
+            if product_shape_guidance:
+                state_text += "\n" + product_shape_guidance
+            if node_question_guidance:
+                state_text += "\n" + node_question_guidance
+            if runtime_guardrails:
+                state_text += "\n" + runtime_guardrails
+            if convergence_guidance:
+                state_text += "\n" + convergence_guidance
+            return state_text
+
+        state_text = (
+            "Current conversation chain state:\n"
+            f"- Chain mode: {chain_state.get('mode', '')}\n"
+            f"- Current track: {chain_state.get('current_track', '')}\n"
+            f"- Current node: {chain_state.get('current_node_label', '')}\n"
+            f"- Progress: {chain_state.get('current_step_index', 0)}/{chain_state.get('total_steps', 0)}\n"
+            f"- Next-question source: {chain_state.get('next_question_source', '')}\n"
+            f"- User-intent route: {chain_state.get('intent_track', '') or 'unclear'}\n"
+            f"- User-need focus route: {chain_state.get('intent_focus', '') or 'unclear'}\n"
+            f"- Software-shape route: {chain_state.get('intent_product_shape', '') or 'unclear'}\n"
+            "- Prioritize the user's current intent route and need-focus route. The current node is a suggested next step, not a fixed script. If need-focus guidance conflicts with node guidance, ask according to the user's current need focus.\n"
+            "- If the need focus is clear but the user did not identify the requesting department or business owner, ask department/owner first instead of defaulting it to Production/TDI/Quality."
+        )
+        if focus_question_guidance:
+            state_text += "\n" + focus_question_guidance
+        if product_shape_guidance:
+            state_text += "\n" + product_shape_guidance
+        if node_question_guidance:
+            state_text += "\n" + node_question_guidance
+        if runtime_guardrails:
+            state_text += "\n" + runtime_guardrails
+        if convergence_guidance:
+            state_text += "\n" + convergence_guidance
+        return state_text
+
+    def _requirement_convergence_guidance_for_prompt(
+        self,
+        structured_requirement_model: dict[str, Any],
+        language: str,
+    ) -> str:
+        progress = self._structured_requirement_progress(structured_requirement_model)
+        total_count = self._safe_int(progress.get("total_count"))
+        collected_count = self._safe_int(progress.get("collected_count"))
+        confirmed_count = self._safe_int(progress.get("confirmed_count"))
+        conflict_count = self._safe_int(progress.get("conflict_count"))
+        if total_count <= 0:
+            return ""
+        if conflict_count > 0:
+            if language == "zh":
+                return "收口规则：当前存在冲突项。下一轮优先澄清冲突，不要继续开新问题。"
+            if language == "de":
+                return "Konvergenzregel: Es gibt Konflikte. Klaere als Naechstes den Konflikt, statt neue Themen zu oeffnen."
+            if language == "ms":
+                return "Peraturan penutupan: Terdapat konflik. Utamakan penjelasan konflik sebelum membuka soalan baharu."
+            return "Convergence rule: There are conflicting items. Clarify the conflict next instead of opening a new topic."
+        if collected_count >= total_count and confirmed_count < total_count:
+            if language == "zh":
+                return (
+                    "收口规则：需求信息已经收集完整但尚未全部确认。下一轮不要继续挖新细节；"
+                    "请用简短方式总结待确认项，并只问用户是否确认或要修改其中一个点。"
+                )
+            if language == "de":
+                return (
+                    "Konvergenzregel: Die Anforderungsinformationen sind gesammelt, aber noch nicht voll bestaetigt. "
+                    "Frage nicht nach neuen Details; fasse die offenen Bestaetigungen kurz zusammen und frage nur, ob sie bestaetigt oder ein Punkt geaendert werden soll."
+                )
+            if language == "ms":
+                return (
+                    "Peraturan penutupan: Maklumat keperluan sudah lengkap dikumpulkan tetapi belum disahkan sepenuhnya. "
+                    "Jangan gali butiran baharu; ringkaskan item yang perlu disahkan dan tanya sama ada pengguna mengesahkan atau mahu mengubah satu perkara."
+                )
+            return (
+                "Convergence rule: Requirement information is fully collected but not fully confirmed. "
+                "Do not ask for new detail; briefly summarize the pending confirmations and ask only whether the user confirms or wants to change one point."
+            )
+        if confirmed_count >= total_count:
+            if language == "zh":
+                return "收口规则：需求已全部确认。下一轮应提示可以生成文档，除非用户主动补充新范围。"
+            if language == "de":
+                return "Konvergenzregel: Alle Anforderungen sind bestaetigt. Weise als Naechstes auf die Dokumenterstellung hin, ausser der Nutzer erweitert den Umfang."
+            if language == "ms":
+                return "Peraturan penutupan: Semua keperluan telah disahkan. Seterusnya cadangkan penjanaan dokumen kecuali pengguna menambah skop baharu."
+            return "Convergence rule: All requirements are confirmed. Suggest generating documents next unless the user adds new scope."
+        return ""
+
+    def _skill_style_ai_pm_method_prompt(self, language: str | None = None) -> str:
+        normalized_language = self._normalize_language(language)
+        if normalized_language == "zh":
+            return (
+                "AI PM skill-style 工作法：\n"
+                "- 这套工作法借鉴 agent skill 的小而清晰原则：先对齐 mental model，再产出文档；不要把它写给用户看成方法论说明。\n"
+                "- 像专业访谈 skill 一样推进：沿需求决策树逐支拆解，先解决会改变产品边界的依赖问题，再问局部细节。\n"
+                "- 每一轮只问一个问题；如果一个问题可由当前对话、附件、模板或结构化模型推断，就不要再问用户。\n"
+                "- 每个问题必须带一个可快速确认的推荐答案或选项示例，例如：'我建议首版先按 lot 粒度，因为它最接近现有追溯和责任边界；是否按这个口径？'\n"
+                "- 推荐答案必须明确标记为建议或假设，不得伪装成已确认事实；如果用户不同意，以用户口径为准。\n"
+                "- 建立共享领域语言：持续识别关键名词、状态、KPI、对象和 owner；发现同词异义、同义词或模糊词时，立即用一个问题澄清 canonical term。\n"
+                "- 对 IC Substrate，优先统一部门、业务对象、粒度、状态、指标口径、数据源、验收 owner；不要自造现场术语、状态名、公式、系统名或 SLA。\n"
+                "- 当用户给出业务术语时，把它沉淀为后续 PRD 的 glossary/definition；当术语未确认时，写成 open question 或 assumption。\n"
+                "- 追问必须服务 PRD 质量门：problem、business goal、requesting department、primary user、core scenario、decision/action、data source、business rule、workflow state、acceptance criteria、out-of-scope。\n"
+                "- 如果这些关键块已经足够生成文档，不要继续开新坑；请收口为确认问题，并提示可以生成文档。\n"
+                "- 如果还缺信息，只问那个最阻塞 PRD 可交付质量的缺口，并说明为什么它影响文档质量。"
+            )
+        if normalized_language == "de":
+            return (
+                "AI-PM Skill-Style Arbeitsweise:\n"
+                "- Nutze kleine, klare Skill-Prinzipien: zuerst gemeinsames Mental Model, dann Dokument. Erklaere diese Methode dem Nutzer nicht als Theorie.\n"
+                "- Arbeite entlang des Requirement-Decision-Trees; klaere zuerst Abhaengigkeiten, die Produktgrenzen veraendern, dann Details.\n"
+                "- Pro Runde genau eine Frage. Wenn die Antwort aus Konversation, Anhang, Template oder strukturiertem Modell ableitbar ist, frage den Nutzer nicht erneut.\n"
+                "- Jede Frage enthaelt eine empfohlene Antwort oder konkrete Optionen, damit der Nutzer schnell bestaetigen kann.\n"
+                "- Empfehlungen muessen als Empfehlung oder Annahme markiert sein, nie als bestaetigte Tatsache. Nutzerdefinitionen haben Vorrang.\n"
+                "- Baue eine gemeinsame Fachsprache auf: erkenne Begriffe, Status, KPIs, Objekte und Owner; bei Mehrdeutigkeit sofort mit einer Frage den canonical term klaeren.\n"
+                "- Fuer IC Substrate zuerst Bereich, Business Object, Grain, Status, KPI-Definition, Datenquelle und Acceptance Owner vereinheitlichen; keine Site-Begriffe, Status, Formeln, Systeme oder SLA erfinden.\n"
+                "- Nutzerbegriffe als spaetere PRD Glossary/Definition sichern; unbestaetigte Begriffe als Open Question oder Assumption markieren.\n"
+                "- Fragen dienen dem PRD Quality Gate: Problem, Business Goal, Requesting Department, Primary User, Core Scenario, Decision/Action, Data Source, Business Rule, Workflow State, Acceptance Criteria, Out-of-Scope.\n"
+                "- Wenn diese Bloecke dokumentreif sind, keine neuen Themen oeffnen; mit einer Bestaetigungsfrage abschliessen und Dokumentgenerierung vorschlagen."
+            )
+        if normalized_language == "ms":
+            return (
+                "Kaedah kerja AI PM gaya skill:\n"
+                "- Ikut prinsip skill yang kecil dan jelas: selaraskan mental model dahulu, kemudian hasilkan dokumen. Jangan terangkan kaedah ini sebagai teori kepada pengguna.\n"
+                "- Gerakkan temu bual mengikut requirement decision tree; selesaikan dependency yang mengubah boundary produk dahulu, kemudian butiran kecil.\n"
+                "- Tanya tepat satu soalan setiap pusingan. Jika jawapan boleh disimpulkan daripada perbualan, lampiran, templat atau structured model, jangan tanya semula.\n"
+                "- Setiap soalan mesti ada jawapan cadangan atau pilihan contoh supaya pengguna boleh sahkan dengan cepat.\n"
+                "- Cadangan mesti dilabel sebagai cadangan atau assumption, bukan fakta sah. Definisi pengguna sentiasa mengatasi cadangan.\n"
+                "- Bina shared domain language: kenal pasti term, status, KPI, objek dan owner; jika istilah kabur atau overloaded, tanya satu soalan untuk canonical term.\n"
+                "- Untuk IC Substrate, utamakan penyelarasan department, business object, grain, status, KPI definition, data source dan acceptance owner; jangan reka site term, status, formula, system name atau SLA.\n"
+                "- Simpan istilah pengguna sebagai glossary/definition untuk PRD; istilah belum sah masuk sebagai open question atau assumption.\n"
+                "- Soalan mesti menyokong PRD quality gate: problem, business goal, requesting department, primary user, core scenario, decision/action, data source, business rule, workflow state, acceptance criteria, out-of-scope.\n"
+                "- Jika blok ini sudah cukup untuk dokumen, jangan buka topik baharu; tutup dengan soalan pengesahan dan cadangkan penjanaan dokumen."
+            )
+        return (
+            "AI PM skill-style operating method:\n"
+            "- Use small, sharp skill principles: align the mental model first, then produce the document. Do not explain this method to the user as theory.\n"
+            "- Interview along the requirement decision tree; resolve dependencies that change product boundaries before local details.\n"
+            "- Ask exactly one question per turn. If the answer can be inferred from conversation, attachment, template, or structured model, do not ask the user again.\n"
+            "- Every question must include a recommended answer or concrete options so the user can confirm quickly.\n"
+            "- Mark recommendations as suggestions or assumptions, never as confirmed facts. The user's definition wins.\n"
+            "- Build shared domain language: identify terms, states, KPIs, objects, and owners; when a term is ambiguous, overloaded, or conflicting, ask one question to establish the canonical term.\n"
+            "- For IC Substrate, prioritize department, business object, grain, state, KPI definition, data source, and acceptance owner; do not invent site terms, states, formulas, system names, or SLAs.\n"
+            "- Preserve user-provided terms as later PRD glossary/definitions; keep unconfirmed terms as open questions or assumptions.\n"
+            "- Questions must serve the PRD quality gate: problem, business goal, requesting department, primary user, core scenario, decision/action, data source, business rule, workflow state, acceptance criteria, out-of-scope.\n"
+            "- If these blocks are document-ready, stop opening new topics; ask a confirmation question and suggest document generation."
+        )
+
+    def _structured_requirement_skill_extraction_guidance(self, language: str | None = None) -> str:
+        normalized_language = self._normalize_language(language)
+        if normalized_language == "zh":
+            return (
+                "Skill-style 抽取补充规则：\n"
+                "- 从对话中抽取共享领域语言：业务术语、KPI 名称、状态名、对象粒度、owner、数据源、验收口径。\n"
+                "- 不新增 schema；把术语定义放入 business_rules、data_and_dependencies、risks_and_notes 或 open_questions 的最贴近位置。\n"
+                "- 对推荐答案、假设、待确认术语要保持 pending_confirmation 或 open question，不要升级为 confirmed。\n"
+                "- 如果用户确认了 canonical term、公式、状态、owner 或验收标准，要尽量标成 confirmed，并保留用户原话口径。"
+            )
+        if normalized_language == "de":
+            return (
+                "Skill-Style Extraktionsregeln:\n"
+                "- Extrahiere gemeinsame Fachsprache: Business Terms, KPI-Namen, State Names, Object Grain, Owner, Datenquellen und Acceptance Definitions.\n"
+                "- Schema nicht erweitern; Termdefinitionen in business_rules, data_and_dependencies, risks_and_notes oder open_questions ablegen.\n"
+                "- Empfehlungen, Annahmen und unbestaetigte Begriffe bleiben pending_confirmation oder open question, nicht confirmed.\n"
+                "- Wenn der Nutzer canonical term, Formel, State, Owner oder Acceptance bestaetigt, als confirmed erfassen und Nutzerwortlaut bewahren."
+            )
+        if normalized_language == "ms":
+            return (
+                "Peraturan ekstraksi gaya skill:\n"
+                "- Ekstrak shared domain language: business terms, KPI names, state names, object grain, owner, data sources dan acceptance definitions.\n"
+                "- Jangan tambah schema; letakkan definisi term di business_rules, data_and_dependencies, risks_and_notes atau open_questions yang paling sesuai.\n"
+                "- Recommended answers, assumptions dan unconfirmed terms kekal pending_confirmation atau open question, bukan confirmed.\n"
+                "- Jika pengguna sahkan canonical term, formula, state, owner atau acceptance criteria, tandakan sebagai confirmed dan kekalkan wording pengguna."
+            )
+        return (
+            "Skill-style extraction rules:\n"
+            "- Extract shared domain language: business terms, KPI names, state names, object grain, owners, data sources, and acceptance definitions.\n"
+            "- Do not add schema; place term definitions in the closest existing areas such as business_rules, data_and_dependencies, risks_and_notes, or open_questions.\n"
+            "- Keep recommended answers, assumptions, and unconfirmed terms as pending_confirmation or open questions, not confirmed facts.\n"
+            "- When the user confirms a canonical term, formula, state, owner, or acceptance standard, mark the closest requirement area confirmed and preserve the user's wording."
+        )
+
+    def _prd_skill_style_document_guidance(self, language: str | None = None) -> str:
+        normalized_language = self._normalize_language(language)
+        if normalized_language == "zh":
+            return (
+                "Skill-style PRD 写作规则：\n"
+                "- PRD 不是聊天纪要；它要体现经过访谈收敛后的共享语言、产品边界和工程可交付决策。\n"
+                "- 在文档前半部分加入简洁的 Glossary / Definitions，列出已确认的业务术语、KPI、状态、对象粒度和 owner；未确认术语进入 Open Questions。\n"
+                "- User Stories 必须覆盖真实业务场景，而不是只列页面功能；优先使用“作为某角色，我希望完成某动作，以便达成某业务结果”。\n"
+                "- Implementation Decisions 只写产品/接口/数据/流程层面的决策，不写易过期的具体代码文件路径。\n"
+                "- Testing / Acceptance 要以外部可观察行为为准，覆盖主流程、异常流程、数据口径、权限/owner 和文档中标注的验收标准。\n"
+                "- Out of Scope 要明确写出本版不做什么，特别是未开放部门、未确认公式、未确认系统接口和未确认状态流。"
+            )
+        if normalized_language == "de":
+            return (
+                "Skill-Style PRD Regeln:\n"
+                "- Das PRD ist kein Chat-Protokoll; es zeigt gemeinsame Sprache, Produktgrenzen und umsetzbare Entscheidungen.\n"
+                "- Fuege frueh eine knappe Glossary / Definitions Sektion ein: bestaetigte Begriffe, KPIs, States, Object Grain und Owner; unbestaetigte Begriffe in Open Questions.\n"
+                "- User Stories muessen reale Business-Szenarien abdecken, nicht nur Seitenfunktionen.\n"
+                "- Implementation Decisions beschreiben Produkt-, Interface-, Daten- und Prozessentscheidungen; keine schnell veraltenden Dateipfade.\n"
+                "- Testing / Acceptance prueft extern beobachtbares Verhalten, Hauptfluss, Ausnahmen, Datenlogik, Rollen/Owner und Acceptance Standards.\n"
+                "- Out of Scope nennt explizit, was diese Version nicht macht."
+            )
+        if normalized_language == "ms":
+            return (
+                "Peraturan PRD gaya skill:\n"
+                "- PRD bukan ringkasan chat; ia mesti menunjukkan shared language, product boundary dan keputusan yang boleh dihantar kepada engineering.\n"
+                "- Tambah Glossary / Definitions ringkas di bahagian awal: confirmed terms, KPI, states, object grain dan owner; unconfirmed terms masuk Open Questions.\n"
+                "- User Stories mesti meliputi senario bisnes sebenar, bukan hanya fungsi halaman.\n"
+                "- Implementation Decisions tulis keputusan product/interface/data/process; jangan tulis file path kod yang mudah lapuk.\n"
+                "- Testing / Acceptance berdasarkan externally observable behavior, main flow, exception flow, data definitions, roles/owners dan acceptance standards.\n"
+                "- Out of Scope nyatakan dengan jelas apa yang tidak dibuat dalam versi ini."
+            )
+        return (
+            "Skill-style PRD writing rules:\n"
+            "- The PRD is not a chat transcript; it must show the converged shared language, product boundary, and engineering-ready decisions.\n"
+            "- Add a concise Glossary / Definitions section near the top for confirmed business terms, KPIs, states, object grain, and owners; unresolved terms go to Open Questions.\n"
+            "- User Stories must cover real business scenarios, not only page features. Prefer: As a role, I want to perform an action, so that a business outcome is achieved.\n"
+            "- Implementation Decisions describe product, interface, data, and workflow decisions; do not include fragile code file paths.\n"
+            "- Testing / Acceptance should verify externally observable behavior, main flow, exception flow, data definitions, roles/owners, and the documented acceptance standards.\n"
+            "- Out of Scope must explicitly state what this version will not do, especially unopened departments, unconfirmed formulas, unconfirmed system integrations, and unconfirmed state flows."
+        )
+
+    def _ic_substrate_runtime_guardrails_for_prompt(
+        self,
+        chain_state: dict[str, Any],
+        language: str | None = None,
+    ) -> str:
+        if chain_state.get("mode") != "ic_substrate":
+            return ""
+        if self._normalize_language(language) == "zh":
+            return (
+                "运行时硬约束：\n"
+                "- 这是本轮 prompt 的最终规则，优先级高于前面的模板样例和 Template context。\n"
+                "- 每轮只能问一个问题；围绕当前部门/owner、当前需求形态路由和当前节点推进，不要把多个缺口合成连续追问。\n"
+                "- 模板来源术语只能作为证据，不要自动变成选项；FVI、AOI、E-test、AVI、SAP、EAP、SPC、MES、QMS、ERP 等术语只有在用户或明确来源已确认适用时才能进入选项。\n"
+                "- TDI 只能写作 TDI；不要展开缩写，不要在括号里解释，也不要在部门选项里暗示含义。\n"
+                "- 不要自造公式、状态、站点、系统名、缺陷分类、SLA 数字或 owner 角色；这些都要问用户现场现行定义。\n"
+                "- 如果用户的问题很宽泛，第一问先确认来自哪个入口或首版业务 owner：Production、Quality、TDI、General；如果用户属于其他部门或归属不清，归入 General，不要展开隐藏部门；如果部门已明确，就先确认首版软件形态、目标用户、使用场景和要支撑的业务决策/动作，再按 KPI/口径、主数据、流程状态、数据来源、责任边界来问。"
+            )
+        if self._normalize_language(language) == "de":
+            return (
+                "Runtime-Hard-Constraints:\n"
+                "- Dies sind die finalen Regeln fuer diesen Prompt und haben Vorrang vor frueheren Template-Beispielen und Template context.\n"
+                "- Pro Runde genau eine Frage stellen; entlang aktuellem Bereich/Owner, Bedarfsform-Routing und aktuellem Knoten vorgehen, statt mehrere Luecken in eine Antwort zu stapeln.\n"
+                "- Begriffe aus der Vorlage sind Evidenz, keine Default-Optionen. Begriffe wie FVI, AOI, E-test, AVI, SAP, EAP, SPC, MES, QMS oder ERP duerfen nur in Optionen erscheinen, wenn Nutzer oder klare Quelle sie bestaetigt.\n"
+                "- TDI nur als TDI schreiben. Akronym nicht aufloesen, keine Klammererklaerung und keine implizite Bedeutung in Department-Optionen.\n"
+                "- Keine Formeln, Status, Stationen, Systemnamen, Defect Categories, SLA-Zahlen oder Owner-Rollen erfinden. Immer nach aktuellen Site-Definitionen des Nutzers fragen.\n"
+                "- Wenn die Anfrage breit ist, zuerst den Einstieg oder First-Version Business Owner fragen: Production, Quality, TDI oder General. Andere oder unklare Bereiche in General routen und nicht als verborgene Department-Ketten ausbauen. Wenn der Bereich klar ist, zuerst Softwareform, Zielnutzer, Use Case und Business Decision/Action klaeren, dann KPI-Definitionen, Master Data, Workflow States, Datenquellen und Ownership Boundary."
+            )
+        if self._normalize_language(language) == "ms":
+            return (
+                "Peraturan keras runtime:\n"
+                "- Ini ialah peraturan akhir untuk prompt ini dan lebih utama daripada contoh templat serta Template context terdahulu.\n"
+                "- Tanya tepat satu soalan setiap pusingan; gerakkan perbualan mengikut jabatan/owner semasa, need-focus route dan nod semasa, bukan menggabungkan banyak jurang dalam satu balasan.\n"
+                "- Istilah daripada templat ialah bukti, bukan pilihan default. Istilah seperti FVI, AOI, E-test, AVI, SAP, EAP, SPC, MES, QMS atau ERP hanya boleh masuk pilihan jika pengguna atau sumber jelas mengesahkan ia terpakai.\n"
+                "- Tulis TDI hanya sebagai TDI. Jangan kembangkan akronim, tambah penerangan dalam kurungan atau membayangkan makna dalam pilihan jabatan.\n"
+                "- Jangan reka formula, status, station, system name, defect category, nombor SLA atau owner role. Tanya definisi semasa di site pengguna.\n"
+                "- Jika permintaan luas, tanya dahulu entry atau first-version business owner: Production, Quality, TDI atau General. Jika jabatan lain atau ownership belum jelas, route ke General dan jangan buka hidden department chain. Jika jabatan jelas, sahkan dahulu software shape, target user, use case dan business decision/action, kemudian tanya KPI definitions, master data, workflow states, data sources dan ownership boundary."
+            )
+        return (
+            "Runtime hard constraints:\n"
+            "- These are the final rules for this prompt and take priority over earlier template examples and Template context.\n"
+            "- Ask exactly one question per turn; advance by the current department/owner, need-focus route, and current node instead of stacking multiple gaps into one reply.\n"
+            "- Source terms from the template are evidence, not default options. Terms such as FVI, AOI, E-test, AVI, SAP, EAP, SPC, MES, QMS, or ERP may enter options only when the user or an explicit source confirms they apply.\n"
+            "- Write TDI only as TDI. Do not expand the acronym, add parenthetical explanations, or imply a meaning inside department options.\n"
+            "- Do not invent formulas, states, stations, system names, defect categories, SLA numbers, or owner roles. Ask for the user's current site definitions.\n"
+            "- If the request is broad, first ask which entry point or first-version business owner it comes from: Production, Quality, TDI, or General. If it belongs to another department or ownership is unclear, route to General and do not open hidden department chains. If department is clear, first confirm the first-version software shape, target user, use case, and business decision/action the software must support, then ask through KPI definitions, master data, workflow states, data sources, and ownership boundary."
+        )
+
+    def _business_template_document_context(self, session: Session, language: str | None = None) -> str:
+        template = self._resolve_business_template(session, language)
+        if template is None:
+            if not session.applied_template_name:
+                return ""
+            return (
+                "Applied business template:\n"
+                + json.dumps(
+                    {
+                        "template_name": session.applied_template_name,
+                        "template_id": session.applied_template_id,
+                    },
+                    ensure_ascii=False,
+                )
+            )
+        return "Applied business template:\n" + json.dumps(template, ensure_ascii=False)
+
+    def _structured_requirement_model_prompt(self, session: Session, language: str) -> str:
+        prompt_parts = [build_structured_requirement_model_prompt(language)]
+        prompt_parts.append(self._structured_requirement_skill_extraction_guidance(language))
+        template_addendum = self._business_template_pm_addendum(session, language)
+        if template_addendum:
+            prompt_parts.append(
+                "Template-aware extraction rules:\n"
+                "- Use the applied business template as additional context for what information matters most.\n"
+                "- Keep the structured requirement schema unchanged.\n"
+                "- If the template contains fields not represented directly in the schema, map them into the closest schema section or preserve them as open questions.\n"
+                + "\n"
+                + template_addendum
+            )
+        return "\n\n".join(part for part in prompt_parts if part)
+
+    def _build_design_doc_messages(
+        self,
+        session: Session,
+        messages: list[dict[str, Any]],
+        structured_requirement_model: dict[str, Any],
+        progress: dict[str, Any],
+        seed_markdown: str,
+        language: str,
+    ) -> list[dict[str, str]]:
+        language = self._normalize_language(language)
+        content_label = CONVERSATION_LABELS.get(language, CONVERSATION_LABELS["en"])
+        summary_label = SUMMARY_LABELS.get(language, SUMMARY_LABELS["en"])
+        draft_mode = "draft_with_assumptions" if not progress.get("fully_confirmed") else "confirmed_design_doc"
+        business_template_context = self._business_template_document_context(session, language)
+        business_template_block = f"\n\n{business_template_context}" if business_template_context else ""
+        document_quality_gate = self._document_quality_gate(
+            structured_requirement_model,
+            progress,
+            draft_mode,
+        )
+        return [
+            {"role": "system", "content": self._design_doc_prompt(session, language)},
+            {
+                "role": "user",
+                "content": (
+                    "Design document scaffold:\n"
+                    + seed_markdown
+                    + "\n\nCollection progress:\n"
+                    + json.dumps(progress, ensure_ascii=False)
+                    + f"\n\nGeneration mode:\n{draft_mode}"
+                    + "\n\nDocument quality gate:\n"
+                    + json.dumps(document_quality_gate, ensure_ascii=False)
+                    + f"\n\n{content_label}:\n"
+                    + json.dumps(self._conversation_messages(messages), ensure_ascii=False)
+                    + f"\n\n{summary_label}:\n"
+                    + json.dumps(structured_requirement_model, ensure_ascii=False)
+                    + business_template_block
+                ),
+            },
+        ]
+
+    def _document_quality_gate(
+        self,
+        structured_requirement_model: dict[str, Any],
+        progress: dict[str, Any],
+        draft_mode: str,
+    ) -> dict[str, Any]:
+        model = normalize_structured_requirement_model(structured_requirement_model)
+        collection_status = model.get("collection_status", {})
+        confirmed_items: list[str] = []
+        pending_confirmation_items: list[dict[str, Any]] = []
+        conflict_items: list[dict[str, Any]] = []
+        missing_items: list[str] = []
+        for key in REQUIREMENT_ITEM_KEYS:
+            item = collection_status.get(key)
+            status = str(item.get("status", "missing")).strip().lower() if isinstance(item, dict) else "missing"
+            if status == "confirmed":
+                confirmed_items.append(key)
+            elif status == "conflict":
+                conflict_items.append(
+                    {
+                        "item": key,
+                        "reason": str(item.get("reason", "")).strip() if isinstance(item, dict) else "",
+                        "pending_questions": item.get("pending_questions", []) if isinstance(item, dict) else [],
+                    }
+                )
+            elif status == "missing":
+                missing_items.append(key)
+            else:
+                pending_confirmation_items.append(
+                    {
+                        "item": key,
+                        "status": status,
+                        "reason": str(item.get("reason", "")).strip() if isinstance(item, dict) else "",
+                        "pending_questions": item.get("pending_questions", []) if isinstance(item, dict) else [],
+                    }
+                )
+
+        return {
+            "generation_mode": draft_mode,
+            "progress": progress,
+            "confirmed_items": confirmed_items,
+            "pending_confirmation_items": pending_confirmation_items,
+            "conflict_items": conflict_items,
+            "missing_items": missing_items,
+            "mandatory_document_rules": [
+                "Use confirmed_items as facts.",
+                "Treat pending_confirmation_items as draft assumptions or explicit open questions.",
+                "Do not present captured or pending_confirmation items as confirmed facts.",
+                "Include conflicts and missing items in the open-questions or risk section.",
+                "Keep document sections complete enough for review, but label uncertainty visibly.",
+            ],
+        }
+
+    def _document_quality_gate_block_markdown(
+        self,
+        structured_requirement_model: dict[str, Any],
+        progress: dict[str, Any],
+        language: str,
+        document_type: str,
+    ) -> str:
+        language = self._normalize_language(language)
+        gate = self._document_quality_gate(
+            structured_requirement_model,
+            progress,
+            "quality_gate_blocked",
+        )
+        pending_items = gate["pending_confirmation_items"]
+        conflict_items = gate["conflict_items"]
+        missing_items = gate["missing_items"]
+
+        if language == "zh":
+            title = "正式文档质量门槛未通过"
+            doc_label = "PRD" if document_type == "prd" else "系统设计文档"
+            intro = (
+                f"当前不会生成正式{doc_label}，因为仍有需求项未完成确认。"
+                "请先完成下面的确认项，再生成正式文档。"
+            )
+            progress_line = (
+                f"- 文档就绪度：{progress.get('readiness_percentage', 0)}%\n"
+                f"- 收集覆盖率：{progress.get('collection_coverage_percentage', 0)}%\n"
+                f"- 确认完成度：{progress.get('confirmation_percentage', 0)}%\n"
+                f"- 核心项已确认：{'是' if progress.get('core_requirements_confirmed') else '否'}\n"
+                f"- 待确认项：{progress.get('pending_confirmation_count', 0)}\n"
+                f"- 冲突项：{progress.get('conflict_count', 0)}"
+            )
+            pending_title = "待确认项"
+            conflict_title = "冲突项"
+            missing_title = "缺失项"
+            next_step = "下一步：请在对话中确认上述问题；确认完成后再生成正式文档。"
+            empty = "无"
+        elif language == "de":
+            title = "Qualitaetsgate fuer das formale Dokument nicht erfuellt"
+            doc_label = "PRD" if document_type == "prd" else "Systemdesign-Dokument"
+            intro = (
+                f"Das formale {doc_label} wird noch nicht erzeugt, weil nicht alle Anforderungen bestaetigt sind. "
+                "Bitte bestaetige die folgenden Punkte zuerst."
+            )
+            progress_line = (
+                f"- Dokumentreife: {progress.get('readiness_percentage', 0)}%\n"
+                f"- Erfassungsquote: {progress.get('collection_coverage_percentage', 0)}%\n"
+                f"- Bestaetigungsstand: {progress.get('confirmation_percentage', 0)}%\n"
+                f"- Kernpunkte bestaetigt: {'Ja' if progress.get('core_requirements_confirmed') else 'Nein'}\n"
+                f"- Offene Bestaetigungen: {progress.get('pending_confirmation_count', 0)}\n"
+                f"- Konflikte: {progress.get('conflict_count', 0)}"
+            )
+            pending_title = "Offene Bestaetigungen"
+            conflict_title = "Konflikte"
+            missing_title = "Fehlende Punkte"
+            next_step = "Naechster Schritt: Bestaetige diese Punkte im Dialog und erzeuge danach das formale Dokument."
+            empty = "Keine"
+        elif language == "ms":
+            title = "Pintu kualiti dokumen rasmi belum lulus"
+            doc_label = "PRD" if document_type == "prd" else "dokumen reka bentuk sistem"
+            intro = (
+                f"Dokumen rasmi {doc_label} belum akan dijana kerana masih ada item keperluan yang belum disahkan. "
+                "Sila sahkan item berikut dahulu."
+            )
+            progress_line = (
+                f"- Kesediaan dokumen: {progress.get('readiness_percentage', 0)}%\n"
+                f"- Liputan kutipan: {progress.get('collection_coverage_percentage', 0)}%\n"
+                f"- Kemajuan pengesahan: {progress.get('confirmation_percentage', 0)}%\n"
+                f"- Item teras disahkan: {'Ya' if progress.get('core_requirements_confirmed') else 'Tidak'}\n"
+                f"- Item menunggu pengesahan: {progress.get('pending_confirmation_count', 0)}\n"
+                f"- Konflik: {progress.get('conflict_count', 0)}"
+            )
+            pending_title = "Item menunggu pengesahan"
+            conflict_title = "Konflik"
+            missing_title = "Item belum lengkap"
+            next_step = "Langkah seterusnya: sahkan item ini dalam perbualan, kemudian jana dokumen rasmi."
+            empty = "Tiada"
+        else:
+            title = "Formal Document Quality Gate Not Passed"
+            doc_label = "PRD" if document_type == "prd" else "System Design Document"
+            intro = (
+                f"The formal {doc_label} will not be generated yet because some requirement areas are not confirmed. "
+                "Confirm the items below first, then generate the formal document."
+            )
+            progress_line = (
+                f"- Document readiness: {progress.get('readiness_percentage', 0)}%\n"
+                f"- Collection coverage: {progress.get('collection_coverage_percentage', 0)}%\n"
+                f"- Confirmation progress: {progress.get('confirmation_percentage', 0)}%\n"
+                f"- Core items confirmed: {'Yes' if progress.get('core_requirements_confirmed') else 'No'}\n"
+                f"- Pending confirmation: {progress.get('pending_confirmation_count', 0)}\n"
+                f"- Conflicts: {progress.get('conflict_count', 0)}"
+            )
+            pending_title = "Pending Confirmation"
+            conflict_title = "Conflicts"
+            missing_title = "Missing Items"
+            next_step = "Next step: confirm these items in the conversation, then generate the formal document."
+            empty = "None"
+
+        def format_pending(values: list[dict[str, Any]]) -> list[str]:
+            if not values:
+                return [f"- {empty}"]
+            lines = []
+            for item in values:
+                question = ""
+                questions = item.get("pending_questions")
+                if isinstance(questions, list) and questions:
+                    question = str(questions[0]).strip()
+                reason = str(item.get("reason", "")).strip()
+                suffix = question or reason or str(item.get("status", "")).strip()
+                lines.append(f"- {item.get('item')}: {suffix}".rstrip())
+            return lines
+
+        def format_names(values: list[Any]) -> list[str]:
+            if not values:
+                return [f"- {empty}"]
+            return [f"- {value}" for value in values]
+
+        return "\n".join(
+            [
+                f"# {title}",
+                "",
+                intro,
+                "",
+                "## Progress",
+                progress_line,
+                "",
+                f"## {pending_title}",
+                *format_pending(pending_items),
+                "",
+                f"## {conflict_title}",
+                *format_pending(conflict_items),
+                "",
+                f"## {missing_title}",
+                *format_names(missing_items),
+                "",
+                f"> {next_step}",
+            ]
+        )
+
+    def _append_message(
+        self,
+        session_id: str,
+        role: str,
+        content: str,
+        thinking: str = "",
+        kind: str = CHAT_MESSAGE_KIND,
+        download_filename: str = "",
+        storage_path: str = "",
+        display_content: str = "",
+        created_at: str | None = None,
+    ) -> int:
+        created_at_value = created_at or datetime.now(timezone.utc).isoformat()
+        return self.session_store.append_message(
+            session_id=session_id,
+            role=role,
+            content=content,
+            created_at=created_at_value,
+            thinking=thinking,
+            kind=kind,
+            download_filename=download_filename,
+            storage_path=storage_path,
+            display_content=display_content,
+        )
+
+    def _require_session(self, session_id: str) -> Session:
+        session = self.get_session(session_id)
+        if session is None:
+            raise KeyError("Session not found.")
+        return session
+
+    def _session_has_user_messages(self, session: Session) -> bool:
+        return any(item.get("role") == "user" for item in session.messages)
+
+    def _update_session_title_from_message(self, session_id: str, user_message: str, language: str) -> None:
+        title = self._derive_session_title(user_message, language)
+        if title:
+            self.session_store.update_session_title(session_id, title)
+
+    def _derive_session_title(self, user_message: str, language: str) -> str:
+        collapsed = " ".join(user_message.split())
+        return self.session_store.format_session_title(collapsed, language)
+
+    def _default_design_doc(self, language: str) -> str:
+        language = self._normalize_language(language)
+        return DESIGN_DOC_EMPTY_BY_LANGUAGE.get(language, DESIGN_DOC_EMPTY_BY_LANGUAGE["en"])
+
+    def _build_design_doc_seed_markdown(
+        self,
+        structured_requirement_model: dict[str, Any],
+        progress: dict[str, Any],
+        language: str,
+    ) -> str:
+        language = self._normalize_language(language)
+        model = normalize_structured_requirement_model(structured_requirement_model)
+
+        copy = {
+            "title": "# System Design Document (Draft Scaffold)",
+            "draft_hint": (
+                "> This design draft is assembled from the structured requirement model first, "
+                "then refined by the LLM."
+            ),
+            "missing_hint": "> Missing or unconfirmed information is explicitly marked as TBD.",
+            "tbd": "TBD",
+            "readiness_label": "Document readiness",
+            "progress_label": "Collection coverage",
+            "confirmation_label": "Confirmation progress",
+            "sections": {
+                "scope_goals": "## 1. Scope and Goals",
+                "scope_in": "### 1.1 In Scope",
+                "scope_out": "### 1.2 Out of Scope",
+                "roles": "## 2. User Roles and Participants",
+                "use_cases": "## 3. System Use Cases",
+                "functional": "## 4. Functional Requirements",
+                "feature_overview": "### 4.1 Feature Overview",
+                "feature_details": "### 4.2 Feature Details",
+                "business_rules": "### 4.3 Business Rules",
+                "non_functional": "## 5. Non-functional Requirements",
+                "architecture": "## 6. High-level Architecture Design",
+                "modules": "## 7. Module Responsibilities",
+                "module_candidates": "### 7.1 Candidate Modules",
+                "page_touchpoints": "### 7.2 Page / Touchpoint Notes",
+                "api": "## 8. API Design (Draft)",
+                "data_model": "## 9. Data Model and Database Design",
+                "dependencies": "### 9.1 Known Data / Dependency Inputs",
+                "key_flows": "## 10. Key Flows / Sequence Notes",
+                "security": "## 11. Security, Privacy, and Compliance",
+                "observability": "## 12. Observability and Operations",
+                "deployment": "## 13. Deployment and Environment Planning",
+                "testing": "## 14. Testing and Acceptance Plan",
+                "risks": "## 15. Risks, Trade-offs, and Assumptions",
+                "milestones": "## 16. Milestones and Delivery Plan",
+                "open_questions": "## 17. Open Questions / Missing Inputs",
+            },
+            "fields": {
+                "project_name": "Project name",
+                "requirement_name": "Requirement name",
+                "background": "Background",
+                "objective": "Objective",
+                "description": "Description",
+                "trigger": "Trigger",
+                "processing_logic": "Processing logic",
+                "inputs": "Inputs",
+                "outputs": "Outputs",
+                "exception_cases": "Exception cases",
+                "page_name": "Page name",
+                "entry_point": "Entry point",
+                "page_elements": "Page elements",
+                "button_actions": "Button actions",
+                "draft_note": "Draft note",
+            },
+            "feature_label": "Feature",
+            "page_label": "Page",
+        }
+        if language == "zh":
+            copy = {
+                "title": "# 系统设计文档（草稿骨架）",
+                "draft_hint": "> 该设计文档会先基于结构化需求生成稳定骨架，再由模型补充和润色。",
+                "missing_hint": "> 缺失或未确认的信息会明确标记为 TBD。",
+                "tbd": "TBD",
+                "readiness_label": "文档就绪度",
+                "progress_label": "收集覆盖率",
+                "confirmation_label": "确认完成度",
+                "sections": {
+                    "scope_goals": "## 1. 范围与目标",
+                    "scope_in": "### 1.1 本次范围",
+                    "scope_out": "### 1.2 非本次范围",
+                    "roles": "## 2. 用户角色与参与方",
+                    "use_cases": "## 3. 系统用例",
+                    "functional": "## 4. 功能需求",
+                    "feature_overview": "### 4.1 功能概述",
+                    "feature_details": "### 4.2 功能明细",
+                    "business_rules": "### 4.3 业务规则",
+                    "non_functional": "## 5. 非功能需求",
+                    "architecture": "## 6. 高层架构设计",
+                    "modules": "## 7. 模块职责划分",
+                    "module_candidates": "### 7.1 候选模块",
+                    "page_touchpoints": "### 7.2 页面 / 触点说明",
+                    "api": "## 8. API 设计（草案）",
+                    "data_model": "## 9. 数据模型与数据库设计",
+                    "dependencies": "### 9.1 已识别的数据 / 依赖输入",
+                    "key_flows": "## 10. 关键流程 / 时序说明",
+                    "security": "## 11. 安全、隐私与合规",
+                    "observability": "## 12. 可观测性与运维",
+                    "deployment": "## 13. 部署与环境规划",
+                    "testing": "## 14. 测试与验收方案",
+                    "risks": "## 15. 风险、权衡与假设",
+                    "milestones": "## 16. 里程碑与交付计划",
+                    "open_questions": "## 17. 待确认问题 / 缺失输入",
+                },
+                "fields": {
+                    "project_name": "项目名称",
+                    "requirement_name": "需求名称",
+                    "background": "背景说明",
+                    "objective": "目标",
+                    "description": "功能描述",
+                    "trigger": "触发方式",
+                    "processing_logic": "处理逻辑",
+                    "inputs": "输入项",
+                    "outputs": "输出结果",
+                    "exception_cases": "异常情况",
+                    "page_name": "页面名称",
+                    "entry_point": "入口位置",
+                    "page_elements": "页面元素",
+                    "button_actions": "按钮动作",
+                    "draft_note": "草稿说明",
+                },
+                "feature_label": "功能",
+                "page_label": "页面",
+            }
+
+        tbd = copy["tbd"]
+
+        def normalize_list(values: Any) -> list[str]:
+            if not isinstance(values, list):
+                return []
+            return [str(item).strip() for item in values if str(item).strip()]
+
+        def value_or_tbd(value: Any) -> str:
+            normalized = str(value or "").strip()
+            return normalized or tbd
+
+        def bullet_lines(values: Any) -> list[str]:
+            normalized = normalize_list(values)
+            if not normalized:
+                return ["", f"- {tbd}"]
+            return ["", *[f"- {item}" for item in normalized]]
+
+        def numbered_lines(values: Any) -> list[str]:
+            normalized = normalize_list(values)
+            if not normalized:
+                return ["", f"1. {tbd}"]
+            return ["", *[f"{index + 1}. {item}" for index, item in enumerate(normalized)]]
+
+        def feature_lines() -> list[str]:
+            features = model.get("functional_requirements", {}).get("feature_details", [])
+            if not isinstance(features, list):
+                return ["", f"- {tbd}"]
+
+            filtered: list[dict[str, Any]] = []
+            for item in features:
+                if not isinstance(item, dict):
+                    continue
+                if any(
+                    [
+                        str(item.get("feature_name", "")).strip(),
+                        str(item.get("description", "")).strip(),
+                        str(item.get("trigger", "")).strip(),
+                        str(item.get("processing_logic", "")).strip(),
+                        normalize_list(item.get("inputs")),
+                        normalize_list(item.get("outputs")),
+                        normalize_list(item.get("exception_cases")),
+                    ]
+                ):
+                    filtered.append(item)
+
+            if not filtered:
+                return ["", f"- {tbd}"]
+
+            lines = [""]
+            for index, item in enumerate(filtered, start=1):
+                title = (
+                    str(item.get("feature_name", "")).strip()
+                    or str(item.get("description", "")).strip()
+                    or tbd
+                )
+                lines.append(f"#### {copy['feature_label']} {index}: {title}")
+                lines.append("")
+                lines.append(f"- {copy['fields']['description']}: {value_or_tbd(item.get('description'))}")
+                lines.append(f"- {copy['fields']['trigger']}: {value_or_tbd(item.get('trigger'))}")
+                lines.append(
+                    f"- {copy['fields']['processing_logic']}: {value_or_tbd(item.get('processing_logic'))}"
+                )
+                lines.append(
+                    f"- {copy['fields']['inputs']}: {', '.join(normalize_list(item.get('inputs'))) or tbd}"
+                )
+                lines.append(
+                    f"- {copy['fields']['outputs']}: {', '.join(normalize_list(item.get('outputs'))) or tbd}"
+                )
+                lines.append(
+                    f"- {copy['fields']['exception_cases']}: "
+                    f"{', '.join(normalize_list(item.get('exception_cases'))) or tbd}"
+                )
+                if index < len(filtered):
+                    lines.append("")
+            return lines
+
+        def page_lines() -> list[str]:
+            pages = model.get("page_and_interaction", {}).get("pages", [])
+            if not isinstance(pages, list):
+                return ["", f"- {tbd}"]
+
+            filtered: list[dict[str, Any]] = []
+            for item in pages:
+                if not isinstance(item, dict):
+                    continue
+                if any(
+                    [
+                        str(item.get("page_name", "")).strip(),
+                        str(item.get("entry_point", "")).strip(),
+                        normalize_list(item.get("page_elements")),
+                        normalize_list(item.get("button_actions")),
+                    ]
+                ):
+                    filtered.append(item)
+
+            if not filtered:
+                return ["", f"- {tbd}"]
+
+            lines = [""]
+            for index, item in enumerate(filtered, start=1):
+                title = (
+                    str(item.get("page_name", "")).strip()
+                    or str(item.get("entry_point", "")).strip()
+                    or tbd
+                )
+                lines.append(f"#### {copy['page_label']} {index}: {title}")
+                lines.append("")
+                lines.append(f"- {copy['fields']['page_name']}: {value_or_tbd(item.get('page_name'))}")
+                lines.append(f"- {copy['fields']['entry_point']}: {value_or_tbd(item.get('entry_point'))}")
+                lines.append(
+                    f"- {copy['fields']['page_elements']}: "
+                    f"{', '.join(normalize_list(item.get('page_elements'))) or tbd}"
+                )
+                lines.append(
+                    f"- {copy['fields']['button_actions']}: "
+                    f"{', '.join(normalize_list(item.get('button_actions'))) or tbd}"
+                )
+                if index < len(filtered):
+                    lines.append("")
+            return lines
+
+        candidate_modules: list[str] = []
+        for item in model.get("functional_requirements", {}).get("feature_details", []):
+            if not isinstance(item, dict):
+                continue
+            module_name = str(item.get("feature_name", "")).strip() or str(item.get("description", "")).strip()
+            if module_name:
+                candidate_modules.append(module_name)
+        for item in model.get("page_and_interaction", {}).get("pages", []):
+            if not isinstance(item, dict):
+                continue
+            module_name = str(item.get("page_name", "")).strip() or str(item.get("entry_point", "")).strip()
+            if module_name:
+                candidate_modules.append(module_name)
+        candidate_modules = list(dict.fromkeys(candidate_modules))
+
+        pending_questions: list[str] = []
+        collection_status = model.get("collection_status", {})
+        if isinstance(collection_status, dict):
+            for item in collection_status.values():
+                if not isinstance(item, dict):
+                    continue
+                pending_questions.extend(normalize_list(item.get("pending_questions")))
+        open_questions = list(
+            dict.fromkeys([*normalize_list(model.get("open_questions")), *pending_questions])
+        )
+
+        risk_notes = normalize_list(model.get("risks_and_notes"))
+        if not progress.get("fully_confirmed"):
+            risk_notes = list(
+                dict.fromkeys(
+                    [
+                        f"{copy['fields']['draft_note']}: "
+                        + (
+                            "该文档仍包含基于未完全确认需求的草稿假设。"
+                            if language == "zh"
+                            else "This document still contains draft assumptions because not all requirements are fully confirmed."
+                        ),
+                        *risk_notes,
+                    ]
+                )
+            )
+
+        lines: list[str] = [
+            copy["title"],
+            "",
+            copy["draft_hint"],
+            copy["missing_hint"],
+            (
+                f"> {copy['readiness_label']}: {progress.get('readiness_percentage', 0)}% | "
+                f"{copy['progress_label']}: {progress.get('collection_coverage_percentage', 0)}% | "
+                f"{copy['confirmation_label']}: {progress.get('confirmation_percentage', 0)}%"
+            ),
+            "",
+            copy["sections"]["scope_goals"],
+            "",
+            f"- {copy['fields']['project_name']}: {value_or_tbd(model.get('document_info', {}).get('project_name'))}",
+            f"- {copy['fields']['requirement_name']}: {value_or_tbd(model.get('document_info', {}).get('requirement_name'))}",
+            f"- {copy['fields']['background']}: {value_or_tbd(model.get('background', {}).get('summary'))}",
+            f"- {copy['fields']['objective']}: {value_or_tbd(model.get('background', {}).get('objective'))}",
+            "",
+            copy["sections"]["scope_in"],
+            *bullet_lines(model.get("scope", {}).get("in_scope")),
+            "",
+            copy["sections"]["scope_out"],
+            *bullet_lines(model.get("scope", {}).get("out_of_scope")),
+            "",
+            copy["sections"]["roles"],
+            *bullet_lines(model.get("users_and_scenarios", {}).get("target_users")),
+            "",
+            copy["sections"]["use_cases"],
+            *numbered_lines(model.get("users_and_scenarios", {}).get("core_scenarios")),
+            "",
+            copy["sections"]["functional"],
+            "",
+            copy["sections"]["feature_overview"],
+            "",
+            value_or_tbd(model.get("functional_requirements", {}).get("overview")),
+            "",
+            copy["sections"]["feature_details"],
+            *feature_lines(),
+            "",
+            copy["sections"]["business_rules"],
+            *bullet_lines(model.get("business_rules")),
+            "",
+            copy["sections"]["non_functional"],
+            *bullet_lines([]),
+            "",
+            copy["sections"]["architecture"],
+            *bullet_lines([]),
+            "",
+            copy["sections"]["modules"],
+            "",
+            copy["sections"]["module_candidates"],
+            *bullet_lines(candidate_modules),
+            "",
+            copy["sections"]["page_touchpoints"],
+            *page_lines(),
+            "",
+            copy["sections"]["api"],
+            *bullet_lines([]),
+            "",
+            copy["sections"]["data_model"],
+            "",
+            copy["sections"]["dependencies"],
+            *bullet_lines(model.get("data_and_dependencies")),
+            "",
+            copy["sections"]["key_flows"],
+            *numbered_lines(model.get("page_and_interaction", {}).get("interaction_flow")),
+            "",
+            copy["sections"]["security"],
+            *bullet_lines([]),
+            "",
+            copy["sections"]["observability"],
+            *bullet_lines([]),
+            "",
+            copy["sections"]["deployment"],
+            *bullet_lines([]),
+            "",
+            copy["sections"]["testing"],
+            *bullet_lines(model.get("acceptance_criteria")),
+            "",
+            copy["sections"]["risks"],
+            *bullet_lines(risk_notes),
+            "",
+            copy["sections"]["milestones"],
+            *bullet_lines([]),
+            "",
+            copy["sections"]["open_questions"],
+            *bullet_lines(open_questions),
+        ]
+        return "\n".join(lines)
+
+    def _pm_prompt(self, session: Session, language: str) -> str:
+        language = self._normalize_language(language)
+        normalized = self._normalize_prompt_template(session.prompt_template)
+        base_prompt = PM_SYSTEM_PROMPT_ZH if language == "zh" else PM_SYSTEM_PROMPT
+        prompt_parts = [base_prompt]
+        prompt_parts.append(self._skill_style_ai_pm_method_prompt(language))
+        template_addendum = self._business_template_pm_addendum(session, language)
+        if template_addendum:
+            prompt_parts.append(template_addendum)
+            chain_state_addendum = self._conversation_chain_state_for_prompt(session, language)
+            if chain_state_addendum:
+                prompt_parts.append(chain_state_addendum)
+        elif normalized == PROMPT_TEMPLATE_PERSONAL_PROJECT:
+            addendum = PERSONAL_PROJECT_PM_ADDENDUM_ZH_V2 if language == "zh" else PERSONAL_PROJECT_PM_ADDENDUM_V2
+            prompt_parts.append(addendum)
+        prompt_parts.append(DEFAULT_TECH_STACK_POLICY_ZH if language == "zh" else DEFAULT_TECH_STACK_POLICY)
+        prompt_parts.append(self._language_output_instruction(language))
+        return "\n\n".join(part for part in prompt_parts if part)
+
+    def _design_doc_prompt(self, session: Session, language: str) -> str:
+        language = self._normalize_language(language)
+        normalized = self._normalize_prompt_template(session.prompt_template)
+        base_prompt = DESIGN_DOC_SYSTEM_PROMPT_ZH if language == "zh" else DESIGN_DOC_SYSTEM_PROMPT
+        prompt_parts = [base_prompt]
+        if session.applied_template_id:
+            prompt_parts.append(
+                "A business requirement template is active for this session.\n"
+                "- Respect the template's domain, section priorities, and business framing.\n"
+                "- Keep the design document aligned to the collected facts and the template context.\n"
+                "- Do not treat this session as a generic personal-project interview."
+            )
+        elif normalized == PROMPT_TEMPLATE_PERSONAL_PROJECT:
+            addendum = (
+                PERSONAL_PROJECT_DESIGN_DOC_ADDENDUM_ZH_V2
+                if language == "zh"
+                else PERSONAL_PROJECT_DESIGN_DOC_ADDENDUM_V2
+            )
+            prompt_parts.append(addendum)
+        prompt_parts.append(DEFAULT_TECH_STACK_POLICY_ZH if language == "zh" else DEFAULT_TECH_STACK_POLICY)
+        prompt_parts.append(
+            "Scaffold handling rules:\n"
+            "- A design document scaffold will be provided in the user message.\n"
+            "- Use that scaffold as the primary structure and preserve its section order.\n"
+            "- Expand or rewrite section content only when it is supported by the conversation or the structured requirement model.\n"
+            "- Keep unknown items explicitly marked as TBD; do not silently remove placeholders."
+        )
+        prompt_parts.append(self._language_output_instruction(language))
+        return "\n\n".join(part for part in prompt_parts if part)
+
+    def _prd_doc_prompt(self, session: Session, language: str) -> str:
+        language = self._normalize_language(language)
+        prompt_parts = [PRD_DOC_SYSTEM_PROMPT]
+        if session.applied_template_id:
+            prompt_parts.append(
+                "A business requirement template is active for this session.\n"
+                "- Use the applied template as the primary document structure instead of the generic simple PRD template.\n"
+                "- Follow the template section order closely.\n"
+                "- Keep missing facts marked as assumptions or open questions rather than inventing content."
+            )
+        prompt_parts.append(self._prd_skill_style_document_guidance(language))
+        prompt_parts.append(self._language_output_instruction(language))
+        return "\n\n".join(part for part in prompt_parts if part)
+
+    def _build_implementation_prompt(
+        self,
+        session_id: str,
+        session_title: str,
+        prd_path: str,
+        design_path: str,
+        language: str,
+    ) -> str:
+        normalized = self._normalize_language(language)
+        template = IMPLEMENTATION_PROMPT_TEMPLATE_BY_LANGUAGE.get(normalized, IMPLEMENTATION_PROMPT_TEMPLATE_EN)
+        return template.format(
+            session_id=session_id,
+            session_title=session_title or "Untitled Session",
+            prd_path=prd_path,
+            design_path=design_path,
+        )
+
+    def _normalize_language(self, language: str | None) -> str:
+        normalized = str(language or "").strip().lower()
+        if normalized in SUPPORTED_OUTPUT_LANGUAGES:
+            return normalized
+        return "zh"
+
+    def _language_for_user_message(self, language: str | None, user_message: str) -> str:
+        _ = user_message
+        return self._normalize_language(language)
+
+    def _normalize_template_start_mode(self, value: str | None) -> str:
+        normalized = str(value or "").strip().lower()
+        if normalized in {TEMPLATE_START_MODE_GUIDED, TEMPLATE_START_MODE_EXAMPLE}:
+            return normalized
+        raise ValueError("Field `template_start_mode` must be `guided` or `example`.")
+
+    def _parse_datetime(self, raw_value: Any) -> datetime | None:
+        try:
+            parsed = datetime.fromisoformat(str(raw_value))
+        except (TypeError, ValueError):
+            return None
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed
+
+    def _language_output_instruction(self, language: str) -> str:
+        normalized = self._normalize_language(language)
+        return OUTPUT_LANGUAGE_INSTRUCTIONS.get(normalized, OUTPUT_LANGUAGE_INSTRUCTIONS["en"])
+
+    def _normalize_prompt_template(self, prompt_template: str | None) -> str:
+        normalized = str(prompt_template or "").strip().lower()
+        if normalized == PROMPT_TEMPLATE_STANDARD:
+            return PROMPT_TEMPLATE_STANDARD
+        return PROMPT_TEMPLATE_PERSONAL_PROJECT
+
+    def _default_prd_doc(self, language: str) -> str:
+        language = self._normalize_language(language)
+        return PRD_EMPTY_BY_LANGUAGE.get(language, PRD_EMPTY_BY_LANGUAGE["en"])
+
+    def _build_generated_document_result(
+        self,
+        session_id: str,
+        document_kind: str,
+        language: str,
+        doc_markdown: str,
+        structured_requirement_model: dict[str, Any],
+        status: str,
+        save_history: bool,
+    ) -> dict[str, Any]:
+        if status == "quality_gate_blocked":
+            persisted = {
+                "filename": "",
+                "download_url": "",
+                "saved_at": datetime.now(timezone.utc).isoformat(),
+            }
+        elif save_history:
+            persisted = self._persist_generated_document(
+                session_id=session_id,
+                document_kind=document_kind,
+                language=language,
+                doc_markdown=doc_markdown,
+            )
+        else:
+            persisted = self._save_generated_document_snapshot(
+                session_id=session_id,
+                document_kind=document_kind,
+                language=language,
+                doc_markdown=doc_markdown,
+            )
+
+        return {
+            "session_id": session_id,
+            "document_markdown": doc_markdown,
+            "document_type": DOCUMENT_TYPE_BY_MESSAGE_KIND[document_kind],
+            "filename": persisted["filename"],
+            "download_url": persisted["download_url"],
+            "saved_at": persisted["saved_at"],
+            "summary": structured_requirement_model,
+            "structured_requirement_model": structured_requirement_model,
+            "status": status,
+        }
+
+    def _persist_generated_document(
+        self,
+        session_id: str,
+        document_kind: str,
+        language: str,
+        doc_markdown: str,
+    ) -> dict[str, Any]:
+        created_at = datetime.now(timezone.utc)
+        file_path, download_filename = self._write_generated_document_files(
+            session_id=session_id,
+            document_kind=document_kind,
+            language=language,
+            doc_markdown=doc_markdown,
+            created_at=created_at,
+        )
+        message_id = self._append_message(
+            session_id=session_id,
+            role="assistant",
+            content=doc_markdown,
+            kind=document_kind,
+            download_filename=download_filename,
+            storage_path=str(file_path),
+            created_at=created_at.isoformat(),
+        )
+        return {
+            "message_id": message_id,
+            "filename": download_filename,
+            "download_url": self._document_download_url(session_id, message_id),
+            "saved_at": created_at.isoformat(),
+        }
+
+    def _save_generated_document_snapshot(
+        self,
+        session_id: str,
+        document_kind: str,
+        language: str,
+        doc_markdown: str,
+    ) -> dict[str, str]:
+        created_at = datetime.now(timezone.utc)
+        _, download_filename = self._write_generated_document_files(
+            session_id=session_id,
+            document_kind=document_kind,
+            language=language,
+            doc_markdown=doc_markdown,
+            created_at=created_at,
+        )
+        return {
+            "filename": download_filename,
+            "download_url": self._legacy_document_download_url(session_id, document_kind),
+            "saved_at": created_at.isoformat(),
+        }
+
+    def _write_generated_document_files(
+        self,
+        session_id: str,
+        document_kind: str,
+        language: str,
+        doc_markdown: str,
+        created_at: datetime,
+    ) -> tuple[Path, str]:
+        directory = self._document_directory(document_kind)
+        directory.mkdir(parents=True, exist_ok=True)
+        download_filename = self._build_document_download_filename(document_kind, language, created_at)
+        versioned_path = (directory / download_filename).resolve()
+        versioned_path.write_text(doc_markdown, encoding="utf-8")
+        self._latest_document_path(session_id, document_kind).write_text(doc_markdown, encoding="utf-8")
+        return versioned_path, download_filename
+
+    def _document_directory(self, document_kind: str) -> Path:
+        if document_kind == PRD_MESSAGE_KIND:
+            return self.prd_docs_dir
+        return self.design_docs_dir
+
+    def _latest_document_path(self, session_id: str, document_kind: str) -> Path:
+        if document_kind == PRD_MESSAGE_KIND:
+            return self._prd_doc_path(session_id)
+        return self._design_doc_path(session_id)
+
+    def _design_doc_path(self, session_id: str) -> Path:
+        return self.design_docs_dir / f"{session_id}.md"
+
+    def _prd_doc_path(self, session_id: str) -> Path:
+        return self.prd_docs_dir / f"{session_id}.md"
+
+    def _build_document_download_filename(
+        self,
+        document_kind: str,
+        language: str,
+        created_at: datetime,
+    ) -> str:
+        normalized_language = self._normalize_language(language)
+        document_label = DOCUMENT_FILENAME_LABELS.get(document_kind, DOCUMENT_FILENAME_LABELS[DESIGN_MESSAGE_KIND]).get(
+            normalized_language,
+            DOCUMENT_FILENAME_LABELS[document_kind]["en"],
+        )
+        timestamp = created_at.strftime("%Y%m%d-%H%M%S-%f")
+        return f"{document_label}-{timestamp}.md"
+
+    def _markdown_to_docx_bytes(self, markdown: str) -> bytes:
+        body_parts = self._markdown_to_docx_body(markdown)
+        document_xml = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            "<w:body>"
+            + "".join(body_parts)
+            + (
+                "<w:sectPr>"
+                '<w:pgSz w:w="11906" w:h="16838"/>'
+                '<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" '
+                'w:header="708" w:footer="708" w:gutter="0"/>'
+                "</w:sectPr>"
+            )
+            + "</w:body></w:document>"
+        )
+        content_types_xml = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            '<Default Extension="xml" ContentType="application/xml"/>'
+            '<Override PartName="/word/document.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+            "</Types>"
+        )
+        rels_xml = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+            'Target="word/document.xml"/>'
+            "</Relationships>"
+        )
+
+        buffer = BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("[Content_Types].xml", content_types_xml)
+            archive.writestr("_rels/.rels", rels_xml)
+            archive.writestr("word/document.xml", document_xml)
+        return buffer.getvalue()
+
+    def _markdown_to_docx_body(self, markdown: str) -> list[str]:
+        markdown = self._plain_text_math_for_docx(markdown)
+        lines = markdown.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+        body_parts: list[str] = []
+        index = 0
+
+        while index < len(lines):
+            raw_line = lines[index]
+            line = raw_line.rstrip()
+            stripped = line.strip()
+            if not stripped:
+                body_parts.append(self._docx_paragraph(""))
+                index += 1
+                continue
+
+            fence_match = re.match(r"^\s*```([\w-]*)\s*$", line)
+            if fence_match:
+                language = fence_match.group(1).strip().lower()
+                code_lines: list[str] = []
+                index += 1
+                while index < len(lines) and not re.match(r"^\s*```\s*$", lines[index]):
+                    code_lines.append(lines[index])
+                    index += 1
+                if index < len(lines):
+                    index += 1
+                if language == "mermaid":
+                    body_parts.append(self._docx_paragraph("Mermaid diagram source:", bold=True))
+                for code_line in code_lines or [""]:
+                    body_parts.append(self._docx_paragraph(code_line, code=True))
+                continue
+
+            heading_match = re.match(r"^(#{1,6})\s+(.+?)\s*#*\s*$", line)
+            if heading_match:
+                level = min(len(heading_match.group(1)), 6)
+                body_parts.append(self._docx_paragraph(heading_match.group(2), heading_level=level))
+                index += 1
+                continue
+
+            if self._is_markdown_table_start(lines, index):
+                table_rows, next_index = self._collect_markdown_table(lines, index)
+                body_parts.append(self._docx_table(table_rows))
+                index = next_index
+                continue
+
+            unordered_match = re.match(r"^\s*[-*+]\s+(.+)$", line)
+            ordered_match = re.match(r"^\s*(\d+)[.)]\s+(.+)$", line)
+            if unordered_match:
+                body_parts.append(self._docx_paragraph(unordered_match.group(1), prefix="• "))
+                index += 1
+                continue
+            if ordered_match:
+                body_parts.append(self._docx_paragraph(ordered_match.group(2), prefix=f"{ordered_match.group(1)}. "))
+                index += 1
+                continue
+
+            quote_match = re.match(r"^\s*>\s?(.*)$", line)
+            if quote_match:
+                body_parts.append(self._docx_paragraph(quote_match.group(1), italic=True))
+                index += 1
+                continue
+
+            body_parts.append(self._docx_paragraph(stripped))
+            index += 1
+
+        return body_parts
+
+    def _plain_text_math_for_docx(self, markdown: str) -> str:
+        text = markdown
+        text = re.sub(
+            r"\$\$([\s\S]*?)\$\$",
+            lambda match: "\n" + self._latex_to_plain_formula(match.group(1)) + "\n",
+            text,
+        )
+        text = re.sub(
+            r"\\\[([\s\S]*?)\\\]",
+            lambda match: "\n" + self._latex_to_plain_formula(match.group(1)) + "\n",
+            text,
+        )
+        text = re.sub(
+            r"\\\(([\s\S]*?)\\\)",
+            lambda match: self._latex_to_plain_formula(match.group(1)),
+            text,
+        )
+        return text
+
+    def _latex_to_plain_formula(self, formula: str) -> str:
+        normalized = " ".join(formula.replace("\n", " ").split())
+        normalized = re.sub(r"\\text\s*\{([^{}]*)\}", r"\1", normalized)
+        normalized = re.sub(r"\\mathrm\s*\{([^{}]*)\}", r"\1", normalized)
+
+        def replace_frac(match: re.Match[str]) -> str:
+            numerator = self._latex_to_plain_formula(match.group(1))
+            denominator = self._latex_to_plain_formula(match.group(2))
+            return f"({numerator}) / ({denominator})"
+
+        previous = None
+        while previous != normalized:
+            previous = normalized
+            normalized = re.sub(r"\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}", replace_frac, normalized)
+
+        normalized = normalized.replace("\\times", "x")
+        normalized = normalized.replace("\\cdot", "*")
+        normalized = normalized.replace("\\%", "%")
+        normalized = normalized.replace("\\_", "_")
+        normalized = normalized.replace("\\&", "&")
+        normalized = re.sub(r"\\[a-zA-Z]+", "", normalized)
+        normalized = normalized.replace("{", "").replace("}", "")
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        normalized = re.sub(r"\s*([=+*/()x-])\s*", r" \1 ", normalized)
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return normalized
+
+    def _docx_paragraph(
+        self,
+        text: str,
+        *,
+        heading_level: int = 0,
+        prefix: str = "",
+        bold: bool = False,
+        italic: bool = False,
+        code: bool = False,
+    ) -> str:
+        paragraph_props = ""
+        if heading_level:
+            size = max(24, 36 - ((heading_level - 1) * 2))
+            paragraph_props = (
+                "<w:pPr>"
+                f'<w:outlineLvl w:val="{heading_level - 1}"/>'
+                "</w:pPr>"
+            )
+            return (
+                "<w:p>"
+                + paragraph_props
+                + self._docx_run(text, bold=True, size=size)
+                + "</w:p>"
+            )
+
+        run_props = ""
+        if code:
+            run_props = '<w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/><w:sz w:val="18"/></w:rPr>'
+        runs = self._docx_inline_runs(f"{prefix}{text}", bold=bold, italic=italic, run_props=run_props)
+        return f"<w:p>{paragraph_props}{runs}</w:p>"
+
+    def _docx_inline_runs(self, text: str, *, bold: bool = False, italic: bool = False, run_props: str = "") -> str:
+        if run_props:
+            return self._docx_run(text, raw_props=run_props)
+
+        parts: list[str] = []
+        pattern = re.compile(r"(`[^`]+`|\*\*[^*]+\*\*)")
+        position = 0
+        for match in pattern.finditer(text):
+            if match.start() > position:
+                parts.append(self._docx_run(text[position : match.start()], bold=bold, italic=italic))
+            token = match.group(0)
+            if token.startswith("`"):
+                parts.append(
+                    self._docx_run(
+                        token[1:-1],
+                        raw_props='<w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/></w:rPr>',
+                    )
+                )
+            else:
+                parts.append(self._docx_run(token[2:-2], bold=True, italic=italic))
+            position = match.end()
+        if position < len(text):
+            parts.append(self._docx_run(text[position:], bold=bold, italic=italic))
+        return "".join(parts) or self._docx_run("")
+
+    def _docx_run(
+        self,
+        text: str,
+        *,
+        bold: bool = False,
+        italic: bool = False,
+        size: int = 0,
+        raw_props: str = "",
+    ) -> str:
+        props = raw_props
+        if not props and (bold or italic or size):
+            prop_parts = ["<w:rPr>"]
+            if bold:
+                prop_parts.append("<w:b/>")
+            if italic:
+                prop_parts.append("<w:i/>")
+            if size:
+                prop_parts.append(f'<w:sz w:val="{size}"/>')
+            prop_parts.append("</w:rPr>")
+            props = "".join(prop_parts)
+        return f'<w:r>{props}<w:t xml:space="preserve">{escape(text)}</w:t></w:r>'
+
+    def _is_markdown_table_start(self, lines: list[str], index: int) -> bool:
+        if index + 1 >= len(lines):
+            return False
+        header = lines[index]
+        divider = lines[index + 1]
+        return "|" in header and bool(re.match(r"^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$", divider))
+
+    def _collect_markdown_table(self, lines: list[str], index: int) -> tuple[list[list[str]], int]:
+        rows = [self._split_markdown_table_row(lines[index])]
+        index += 2
+        while index < len(lines) and "|" in lines[index] and lines[index].strip():
+            rows.append(self._split_markdown_table_row(lines[index]))
+            index += 1
+        return rows, index
+
+    def _split_markdown_table_row(self, line: str) -> list[str]:
+        return [
+            cell.strip()
+            for cell in line.strip().strip("|").split("|")
+        ]
+
+    def _docx_table(self, rows: list[list[str]]) -> str:
+        if not rows:
+            return self._docx_paragraph("")
+        table_parts = [
+            "<w:tbl>",
+            (
+                "<w:tblPr><w:tblBorders>"
+                '<w:top w:val="single" w:sz="4" w:space="0" w:color="D9E2F3"/>'
+                '<w:left w:val="single" w:sz="4" w:space="0" w:color="D9E2F3"/>'
+                '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="D9E2F3"/>'
+                '<w:right w:val="single" w:sz="4" w:space="0" w:color="D9E2F3"/>'
+                '<w:insideH w:val="single" w:sz="4" w:space="0" w:color="D9E2F3"/>'
+                '<w:insideV w:val="single" w:sz="4" w:space="0" w:color="D9E2F3"/>'
+                "</w:tblBorders></w:tblPr>"
+            ),
+        ]
+        for row_index, row in enumerate(rows):
+            table_parts.append("<w:tr>")
+            for cell in row:
+                table_parts.append(
+                    "<w:tc>"
+                    "<w:tcPr><w:tcW w:w=\"2400\" w:type=\"dxa\"/></w:tcPr>"
+                    + self._docx_paragraph(cell, bold=row_index == 0)
+                    + "</w:tc>"
+                )
+            table_parts.append("</w:tr>")
+        table_parts.append("</w:tbl>")
+        return "".join(table_parts)
+
+    def _safe_parse_structured_requirement_model(self, raw_model: str) -> dict[str, Any]:
+        parsed = self._parse_json_from_model_output(raw_model)
+        if parsed is None:
+            fallback = self._empty_structured_requirement_model()
+            fallback["open_questions"] = [f"Structured requirement parse failed. Raw output: {raw_model}"]
+            return fallback
+
+        return normalize_structured_requirement_model(parsed)
+
+    def _split_thinking(self, text: str) -> tuple[str, str]:
+        think_regex = re.compile(r"<think>([\s\S]*?)</think>", re.IGNORECASE)
+        thinking_parts = [chunk.strip() for chunk in think_regex.findall(text) if chunk.strip()]
+        cleaned = think_regex.sub("", text).strip()
+        return cleaned, "\n\n".join(thinking_parts)
+
+    def _parse_json_from_model_output(self, raw: str) -> dict[str, Any] | None:
+        if not raw:
+            return None
+
+        cleaned, _ = self._split_thinking(raw)
+        candidates = [cleaned]
+
+        fenced = re.findall(r"```(?:json)?\s*([\s\S]*?)```", cleaned, flags=re.IGNORECASE)
+        candidates.extend(fenced)
+
+        for candidate in candidates:
+            obj = self._try_load_first_json_object(candidate)
+            if obj is not None:
+                return obj
+        return None
+
+    def _try_load_first_json_object(self, text: str) -> dict[str, Any] | None:
+        stripped = text.strip()
+        if not stripped:
+            return None
+
+        # First, try whole text directly.
+        try:
+            parsed = json.loads(stripped)
+            return parsed if isinstance(parsed, dict) else None
+        except json.JSONDecodeError:
+            pass
+
+        # Then, scan for the first balanced JSON object.
+        start = stripped.find("{")
+        while start != -1:
+            depth = 0
+            in_string = False
+            escaped = False
+            for i in range(start, len(stripped)):
+                ch = stripped[i]
+                if in_string:
+                    if escaped:
+                        escaped = False
+                    elif ch == "\\":
+                        escaped = True
+                    elif ch == '"':
+                        in_string = False
+                    continue
+                if ch == '"':
+                    in_string = True
+                elif ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0:
+                        snippet = stripped[start : i + 1]
+                        try:
+                            parsed = json.loads(snippet)
+                            return parsed if isinstance(parsed, dict) else None
+                        except json.JSONDecodeError:
+                            break
+            start = stripped.find("{", start + 1)
+        return None
+
+    def _empty_structured_requirement_model(self) -> dict[str, Any]:
+        return empty_structured_requirement_model()
+
+    def _build_prd_doc_messages(
+        self,
+        session: Session,
+        messages: list[dict[str, Any]],
+        structured_requirement_model: dict[str, Any],
+        progress: dict[str, Any],
+        language: str,
+    ) -> list[dict[str, str]]:
+        language = self._normalize_language(language)
+        content_label = CONVERSATION_LABELS.get(language, CONVERSATION_LABELS["en"])
+        summary_label = SUMMARY_LABELS.get(language, SUMMARY_LABELS["en"])
+        template_content = self._load_prd_template(session, language)
+        draft_mode = "draft_with_assumptions" if not progress.get("fully_confirmed") else "confirmed_prd"
+        business_template_context = self._business_template_document_context(session, language)
+        business_template_block = f"\n\n{business_template_context}" if business_template_context else ""
+        document_quality_gate = self._document_quality_gate(
+            structured_requirement_model,
+            progress,
+            draft_mode,
+        )
+        return [
+            {"role": "system", "content": self._prd_doc_prompt(session, language)},
+            {
+                "role": "user",
+                "content": (
+                    "PRD template:\n"
+                    + template_content
+                    + "\n\nCollection progress:\n"
+                    + json.dumps(progress, ensure_ascii=False)
+                    + f"\n\nGeneration mode:\n{draft_mode}"
+                    + "\n\nDocument quality gate:\n"
+                    + json.dumps(document_quality_gate, ensure_ascii=False)
+                    + f"\n\n{content_label}:\n"
+                    + json.dumps(self._conversation_messages(messages), ensure_ascii=False)
+                    + f"\n\n{summary_label}:\n"
+                    + json.dumps(structured_requirement_model, ensure_ascii=False)
+                    + business_template_block
+                ),
+            },
+        ]
+
+    def _load_prd_template(self, session: Session, language: str) -> str:
+        if session.applied_template_id:
+            template_markdown = self.business_template_library.get_template_markdown(
+                session.applied_template_id,
+                self._normalize_language(language),
+            )
+            if template_markdown:
+                return template_markdown
+
+        normalized = self._normalize_language(language)
+        filename = PRD_TEMPLATE_FILE_BY_LANGUAGE.get(normalized, PRD_TEMPLATE_FILE_BY_LANGUAGE["en"])
+        template_path = self.prd_templates_dir / filename
+        if not template_path.exists():
+            return ""
+        return template_path.read_text(encoding="utf-8")
+
+    def _structured_requirement_progress(self, structured_requirement_model: dict[str, Any]) -> dict[str, Any]:
+        collection_status = structured_requirement_model.get("collection_status")
+        if not isinstance(collection_status, dict):
+            collection_status = {}
+
+        statuses_by_key: list[tuple[str, str]] = []
+        for key in REQUIREMENT_ITEM_KEYS:
+            item = collection_status.get(key)
+            if isinstance(item, dict):
+                status_value = str(item.get("status", "missing")).strip().lower()
+            else:
+                status_value = "missing"
+            if status_value not in STRUCTURED_REQUIREMENT_STATUS_READINESS_POINTS:
+                status_value = "missing"
+            statuses_by_key.append((key, status_value))
+
+        statuses_by_name = dict(statuses_by_key)
+        statuses = [status for _, status in statuses_by_key]
+        total_count = len(statuses)
+        confirmed_count = sum(1 for status in statuses if status == "confirmed")
+        collected_count = sum(1 for status in statuses if status != "missing")
+        conflict_count = sum(1 for status in statuses if status == "conflict")
+        pending_confirmation_count = sum(
+            1
+            for status in statuses
+            if status not in {"missing", "confirmed", "conflict"}
+        )
+        collection_coverage_percentage = (
+            round((collected_count / total_count) * 100) if total_count else 0
+        )
+        confirmation_percentage = (
+            round((confirmed_count / total_count) * 100) if total_count else 0
+        )
+        fully_confirmed = (
+            total_count > 0
+            and confirmed_count == total_count
+            and conflict_count == 0
+        )
+        total_weight = sum(
+            STRUCTURED_REQUIREMENT_PROGRESS_WEIGHTS.get(key, 1.0)
+            for key, _ in statuses_by_key
+        )
+        earned_weight = sum(
+            STRUCTURED_REQUIREMENT_PROGRESS_WEIGHTS.get(key, 1.0)
+            * STRUCTURED_REQUIREMENT_STATUS_READINESS_POINTS.get(status, 0.0)
+            for key, status in statuses_by_key
+        )
+        readiness_percentage = round((earned_weight / total_weight) * 100) if total_weight else 0
+        if fully_confirmed:
+            readiness_percentage = 100
+        elif conflict_count:
+            readiness_percentage = min(readiness_percentage, 69)
+        elif pending_confirmation_count:
+            readiness_percentage = min(readiness_percentage, 94)
+        core_requirements_confirmed = all(
+            statuses_by_name.get(key) == "confirmed"
+            for key in STRUCTURED_REQUIREMENT_GENERATION_CORE_KEYS
+        )
+        ready_to_generate = (
+            total_count > 0
+            and collection_coverage_percentage == 100
+            and conflict_count == 0
+            and core_requirements_confirmed
+            and confirmation_percentage >= STRUCTURED_REQUIREMENT_GENERATION_MIN_CONFIRMATION
+            and readiness_percentage >= STRUCTURED_REQUIREMENT_GENERATION_MIN_READINESS
+        )
+
+        return {
+            "total_count": total_count,
+            "confirmed_count": confirmed_count,
+            "collected_count": collected_count,
+            "pending_confirmation_count": pending_confirmation_count,
+            "conflict_count": conflict_count,
+            "readiness_percentage": readiness_percentage,
+            "collection_coverage_percentage": collection_coverage_percentage,
+            "confirmation_percentage": confirmation_percentage,
+            "fully_confirmed": fully_confirmed,
+            "core_requirements_confirmed": core_requirements_confirmed,
+            "ready_to_generate": ready_to_generate,
+        }

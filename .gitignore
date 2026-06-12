@@ -1,0 +1,27 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environment
+.venv/
+venv/
+
+# IDE files
+.idea/
+.vscode/
+
+.env
+
+node_modules/
+
+# Runtime data
+
+*.sqlite3
+.DS_Store
+.codegraph/
+.playwright-cli/
+.serena/
+app/.DS_Store
+data/*
+tests/
+recordings/
