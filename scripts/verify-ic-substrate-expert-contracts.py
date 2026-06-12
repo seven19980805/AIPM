@@ -67,6 +67,11 @@ def main() -> None:
     prd_prompt = method_body(collector, "_prd_doc_prompt")
     document_quality_gate = method_body(collector, "_document_quality_gate")
     quality_gate_block = method_body(collector, "_document_quality_gate_block_markdown")
+    evidence_appendix = method_body(collector, "_append_ic_substrate_prd_evidence_appendix")
+    evidence_appendix_heading = method_body(collector, "_ic_substrate_prd_evidence_appendix_heading")
+    evidence_appendix_formatter = method_body(collector, "_format_ic_substrate_prd_evidence_appendix")
+    stream_prd_document = method_body(collector, "stream_prd_document")
+    build_prd_document = method_body(collector, "build_prd_document")
     readiness_gate = method_body(collector, "_ic_substrate_readiness_evidence_gate")
     browser_handoff = method_body(collector, "build_browser_handoff_payload")
     implementation_context = method_body(collector, "build_implementation_context")
@@ -97,6 +102,49 @@ def main() -> None:
         "_ic_substrate_readiness_evidence_gate" in document_quality_gate
         and "ic_substrate_readiness_evidence" in document_quality_gate,
         "document quality gate does not expose IC Substrate readiness evidence",
+    )
+    require_all(
+        build_prd_document,
+        ["_append_ic_substrate_prd_evidence_appendix", "doc_markdown=doc_markdown"],
+        "non-streaming PRD evidence appendix",
+    )
+    require_all(
+        stream_prd_document,
+        [
+            "_append_ic_substrate_prd_evidence_appendix",
+            "yield {\"event\": \"content\", \"delta\": appendix_delta}",
+            "doc_markdown = appended_doc_markdown",
+        ],
+        "streaming PRD evidence appendix",
+    )
+    require_all(
+        evidence_appendix,
+        [
+            "_ic_substrate_readiness_evidence_gate",
+            "_format_ic_substrate_prd_evidence_appendix",
+            "IC Substrate Expert Evidence Appendix",
+        ],
+        "PRD evidence appendix append guard",
+    )
+    require_all(
+        evidence_appendix_formatter,
+        [
+            "ready_count",
+            "missing_evidence",
+            "mandatory_rules",
+            "Evidence status",
+        ],
+        "PRD evidence appendix formatter",
+    )
+    require_all(
+        evidence_appendix_heading,
+        [
+            "IC Substrate Expert Evidence Appendix",
+            "IC Substrate 专家证据附录",
+            "IC Substrate Experten-Evidence-Anhang",
+            "Lampiran Evidence Pakar IC Substrate",
+        ],
+        "PRD evidence appendix four-language headings",
     )
     require_all(
         language_router,

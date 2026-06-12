@@ -1901,6 +1901,12 @@ class RequirementCollectorService:
         doc_markdown = doc_markdown.strip()
         if not doc_markdown:
             doc_markdown = self._load_prd_template(session, language) or self._default_prd_doc(language)
+        doc_markdown = self._append_ic_substrate_prd_evidence_appendix(
+            doc_markdown,
+            session,
+            structured_requirement_model,
+            language,
+        )
         return self._build_generated_document_result(
             session_id=session_id,
             document_kind=PRD_MESSAGE_KIND,
@@ -1995,6 +2001,21 @@ class RequirementCollectorService:
 
         if not doc_markdown:
             raise RuntimeError("LLM returned empty streamed PRD document.")
+
+        appended_doc_markdown = self._append_ic_substrate_prd_evidence_appendix(
+            doc_markdown,
+            session,
+            structured_requirement_model,
+            language,
+        )
+        if appended_doc_markdown != doc_markdown:
+            appendix_delta = (
+                appended_doc_markdown[len(doc_markdown):]
+                if appended_doc_markdown.startswith(doc_markdown)
+                else f"\n\n{appended_doc_markdown}"
+            )
+            yield {"event": "content", "delta": appendix_delta}
+            doc_markdown = appended_doc_markdown
 
         if thinking_text:
             yield {"event": "thinking_done", "thinking": thinking_text}
@@ -6177,6 +6198,132 @@ class RequirementCollectorService:
         if ic_substrate_gate:
             gate["ic_substrate_readiness_evidence"] = ic_substrate_gate
         return gate
+
+    def _append_ic_substrate_prd_evidence_appendix(
+        self,
+        doc_markdown: str,
+        session: Session | None,
+        structured_requirement_model: dict[str, Any],
+        language: str,
+    ) -> str:
+        gate = self._ic_substrate_readiness_evidence_gate(session, structured_requirement_model)
+        if not gate:
+            return doc_markdown
+
+        heading = self._ic_substrate_prd_evidence_appendix_heading(language)
+        if heading in doc_markdown or "IC Substrate Expert Evidence Appendix" in doc_markdown:
+            return doc_markdown
+
+        appendix = self._format_ic_substrate_prd_evidence_appendix(gate, language)
+        if not appendix:
+            return doc_markdown
+        return f"{doc_markdown.rstrip()}\n\n{appendix}"
+
+    def _ic_substrate_prd_evidence_appendix_heading(self, language: str) -> str:
+        normalized = self._normalize_language(language)
+        if normalized == "zh":
+            return "## 9. IC Substrate 专家证据附录"
+        if normalized == "de":
+            return "## 9. IC Substrate Experten-Evidence-Anhang"
+        if normalized == "ms":
+            return "## 9. Lampiran Evidence Pakar IC Substrate"
+        return "## 9. IC Substrate Expert Evidence Appendix"
+
+    def _format_ic_substrate_prd_evidence_appendix(
+        self,
+        gate: dict[str, Any],
+        language: str,
+    ) -> str:
+        checks = gate.get("checks")
+        if not isinstance(checks, list) or not checks:
+            return ""
+
+        normalized = self._normalize_language(language)
+        if normalized == "zh":
+            labels = {
+                "heading": self._ic_substrate_prd_evidence_appendix_heading(language),
+                "summary": "证据状态",
+                "missing": "缺失证据",
+                "none": "无",
+                "ready": "就绪",
+                "not_ready": "待补齐",
+                "evidence": "证据",
+                "follow_up": "待确认追问",
+                "rules": "强制规则",
+            }
+        elif normalized == "de":
+            labels = {
+                "heading": self._ic_substrate_prd_evidence_appendix_heading(language),
+                "summary": "Evidence-Status",
+                "missing": "Fehlende Evidence",
+                "none": "Keine",
+                "ready": "Bereit",
+                "not_ready": "Offen",
+                "evidence": "Evidence",
+                "follow_up": "Zu klaerende Rueckfrage",
+                "rules": "Pflichtregeln",
+            }
+        elif normalized == "ms":
+            labels = {
+                "heading": self._ic_substrate_prd_evidence_appendix_heading(language),
+                "summary": "Status evidence",
+                "missing": "Evidence belum lengkap",
+                "none": "Tiada",
+                "ready": "Ready",
+                "not_ready": "Belum ready",
+                "evidence": "Evidence",
+                "follow_up": "Soalan pengesahan",
+                "rules": "Peraturan wajib",
+            }
+        else:
+            labels = {
+                "heading": self._ic_substrate_prd_evidence_appendix_heading(language),
+                "summary": "Evidence status",
+                "missing": "Missing evidence",
+                "none": "None",
+                "ready": "Ready",
+                "not_ready": "Missing",
+                "evidence": "Evidence",
+                "follow_up": "Required follow-up",
+                "rules": "Mandatory rules",
+            }
+
+        ready_count = sum(1 for check in checks if isinstance(check, dict) and check.get("ready"))
+        total_count = sum(1 for check in checks if isinstance(check, dict))
+        missing = gate.get("missing_evidence") if isinstance(gate.get("missing_evidence"), list) else []
+        missing_text = ", ".join(str(item) for item in missing) if missing else labels["none"]
+        lines = [
+            labels["heading"],
+            "",
+            f"- **{labels['summary']}**: {ready_count}/{total_count}",
+            f"- **{labels['missing']}**: {missing_text}",
+            "",
+        ]
+
+        for check in checks:
+            if not isinstance(check, dict):
+                continue
+            label = self._single_line_markdown(str(check.get("label", "")).strip() or str(check.get("key", "")))
+            status = labels["ready"] if check.get("ready") else labels["not_ready"]
+            evidence = self._single_line_markdown(str(check.get("evidence", "")).strip())
+            follow_up = self._single_line_markdown(str(check.get("if_missing", "")).strip())
+            lines.append(f"- **{label}**: {status}")
+            if evidence:
+                lines.append(f"  - {labels['evidence']}: {evidence}")
+            if not check.get("ready") and follow_up:
+                lines.append(f"  - {labels['follow_up']}: {follow_up}")
+
+        mandatory_rules = gate.get("mandatory_rules")
+        if isinstance(mandatory_rules, list) and mandatory_rules:
+            lines.extend(["", f"**{labels['rules']}**"])
+            for rule in mandatory_rules:
+                rule_text = self._single_line_markdown(str(rule).strip())
+                if rule_text:
+                    lines.append(f"- {rule_text}")
+        return "\n".join(lines).strip()
+
+    def _single_line_markdown(self, text: str) -> str:
+        return " ".join(text.replace("|", "\\|").split())
 
     def _document_quality_gate_block_markdown(
         self,
