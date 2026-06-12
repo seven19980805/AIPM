@@ -74,6 +74,8 @@ def main() -> None:
     language_router = method_body(collector, "_language_for_user_message")
     choice_formatter = method_body(collector, "_ensure_choice_question_format")
     fallback_choice_block = method_body(collector, "_fallback_choice_block")
+    json_parser = method_body(collector, "_parse_json_from_model_output")
+    json_trailing_comma_repair = method_body(collector, "_remove_json_trailing_commas")
     expert_gate = method_body(collector, "_ic_substrate_expert_prd_quality_gate_for_prompt")
     department_playbook = method_body(collector, "_ic_substrate_production_tdi_quality_playbook_guidance")
     extraction_contract = method_body(collector, "_ic_substrate_structured_extraction_contract")
@@ -133,6 +135,16 @@ def main() -> None:
             "A. Terima cadangan",
         ],
         "four-language fallback choice blocks",
+    )
+    require_all(
+        json_parser,
+        ["_json_candidate_variants", "_try_load_first_json_object"],
+        "structured requirement JSON parser repair path",
+    )
+    require_all(
+        json_trailing_comma_repair,
+        ['lstrip("\\ufeff")', "in_string", "lookahead", 'cleaned[lookahead] in \"}]\"'],
+        "structured requirement JSON trailing comma repair",
     )
 
     expert_gate_terms = [

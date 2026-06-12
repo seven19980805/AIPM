@@ -7429,12 +7429,57 @@ class RequirementCollectorService:
 
         fenced = re.findall(r"```(?:json)?\s*([\s\S]*?)```", cleaned, flags=re.IGNORECASE)
         candidates.extend(fenced)
+        for candidate in list(candidates):
+            candidates.extend(self._json_candidate_variants(candidate))
 
         for candidate in candidates:
             obj = self._try_load_first_json_object(candidate)
             if obj is not None:
                 return obj
         return None
+
+    def _json_candidate_variants(self, text: str) -> list[str]:
+        return [self._remove_json_trailing_commas(text)]
+
+    def _remove_json_trailing_commas(self, text: str) -> str:
+        cleaned = text.strip().lstrip("\ufeff")
+        if not cleaned:
+            return cleaned
+
+        result: list[str] = []
+        in_string = False
+        escaped = False
+        index = 0
+        while index < len(cleaned):
+            ch = cleaned[index]
+            if in_string:
+                result.append(ch)
+                if escaped:
+                    escaped = False
+                elif ch == "\\":
+                    escaped = True
+                elif ch == '"':
+                    in_string = False
+                index += 1
+                continue
+
+            if ch == '"':
+                in_string = True
+                result.append(ch)
+                index += 1
+                continue
+
+            if ch == ",":
+                lookahead = index + 1
+                while lookahead < len(cleaned) and cleaned[lookahead].isspace():
+                    lookahead += 1
+                if lookahead < len(cleaned) and cleaned[lookahead] in "}]":
+                    index += 1
+                    continue
+
+            result.append(ch)
+            index += 1
+        return "".join(result)
 
     def _try_load_first_json_object(self, text: str) -> dict[str, Any] | None:
         stripped = text.strip()
