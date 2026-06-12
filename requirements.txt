@@ -3,3 +3,4 @@ requests==2.32.3
 websocket-client==1.8.0
 pydub==0.25.1
 google-auth==2.49.2
+waitress==3.0.2

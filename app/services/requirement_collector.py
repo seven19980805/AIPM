@@ -1478,6 +1478,7 @@ class RequirementCollectorService:
         llm_messages = self._build_llm_messages(system_prompt, session.messages)
         assistant_text_raw = self.llm_client.chat(llm_messages)
         assistant_text, thinking_text = self._split_thinking(assistant_text_raw)
+        assistant_text = self._ensure_choice_question_format(assistant_text, response_language)
 
         self._append_message(session_id, "assistant", assistant_text, thinking_text)
         session = self._require_session(session_id)
@@ -1541,6 +1542,15 @@ class RequirementCollectorService:
             thinking_text = f"{thinking_text}\n{content_embedded_thinking}".strip()
         if not assistant_text:
             raise RuntimeError("LLM returned empty streamed content.")
+        formatted_assistant_text = self._ensure_choice_question_format(assistant_text, response_language)
+        if formatted_assistant_text != assistant_text:
+            assistant_delta = (
+                formatted_assistant_text[len(assistant_text):]
+                if formatted_assistant_text.startswith(assistant_text)
+                else f"\n\n{formatted_assistant_text}"
+            )
+            yield {"event": "content", "delta": assistant_delta}
+            assistant_text = formatted_assistant_text
 
         self._append_message(session_id, "assistant", assistant_text, thinking_text)
         session = self._require_session(session_id)
@@ -5365,6 +5375,7 @@ class RequirementCollectorService:
                 "- 像专业访谈 skill 一样推进：沿需求决策树逐支拆解，先解决会改变产品边界的依赖问题，再问局部细节。\n"
                 "- 每一轮只问一个问题；如果一个问题可由当前对话、附件、模板或结构化模型推断，就不要再问用户。\n"
                 "- 每个问题必须带一个可快速确认的推荐答案或选项示例，例如：'我建议首版先按 lot 粒度，因为它最接近现有追溯和责任边界；是否按这个口径？'\n"
+                "- 面向指令遵循较弱的内网模型时，最后一段必须使用 A/B/C 选项格式：A. 同意建议口径；B. 补充实际口径；C. 暂记待确认。不要只留下开放式问题。\n"
                 "- 推荐答案必须明确标记为建议或假设，不得伪装成已确认事实；如果用户不同意，以用户口径为准。\n"
                 "- 建立共享领域语言：持续识别关键名词、状态、KPI、对象和 owner；发现同词异义、同义词或模糊词时，立即用一个问题澄清 canonical term。\n"
                 "- 对 IC Substrate，优先统一部门、业务对象、粒度、状态、指标口径、数据源、验收 owner；不要自造现场术语、状态名、公式、系统名或 SLA。\n"
@@ -5380,6 +5391,7 @@ class RequirementCollectorService:
                 "- Arbeite entlang des Requirement-Decision-Trees; klaere zuerst Abhaengigkeiten, die Produktgrenzen veraendern, dann Details.\n"
                 "- Pro Runde genau eine Frage. Wenn die Antwort aus Konversation, Anhang, Template oder strukturiertem Modell ableitbar ist, frage den Nutzer nicht erneut.\n"
                 "- Jede Frage enthaelt eine empfohlene Antwort oder konkrete Optionen, damit der Nutzer schnell bestaetigen kann.\n"
+                "- Fuer intern gehostete Modelle mit schwaecherer Instruktionsbefolgung muss der letzte Absatz A/B/C-Optionen enthalten: A. Empfehlung bestaetigen; B. echte Fachdefinition ergaenzen; C. als offen markieren. Keine rein offene Frage am Ende.\n"
                 "- Empfehlungen muessen als Empfehlung oder Annahme markiert sein, nie als bestaetigte Tatsache. Nutzerdefinitionen haben Vorrang.\n"
                 "- Baue eine gemeinsame Fachsprache auf: erkenne Begriffe, Status, KPIs, Objekte und Owner; bei Mehrdeutigkeit sofort mit einer Frage den canonical term klaeren.\n"
                 "- Fuer IC Substrate zuerst Bereich, Business Object, Grain, Status, KPI-Definition, Datenquelle und Acceptance Owner vereinheitlichen; keine Site-Begriffe, Status, Formeln, Systeme oder SLA erfinden.\n"
@@ -5394,6 +5406,7 @@ class RequirementCollectorService:
                 "- Gerakkan temu bual mengikut requirement decision tree; selesaikan dependency yang mengubah boundary produk dahulu, kemudian butiran kecil.\n"
                 "- Tanya tepat satu soalan setiap pusingan. Jika jawapan boleh disimpulkan daripada perbualan, lampiran, templat atau structured model, jangan tanya semula.\n"
                 "- Setiap soalan mesti ada jawapan cadangan atau pilihan contoh supaya pengguna boleh sahkan dengan cepat.\n"
+                "- Untuk model dalaman yang kurang patuh arahan, perenggan akhir mesti guna pilihan A/B/C: A. sahkan cadangan; B. tambah definisi sebenar; C. simpan sebagai belum disahkan. Jangan akhiri dengan soalan terbuka sahaja.\n"
                 "- Cadangan mesti dilabel sebagai cadangan atau assumption, bukan fakta sah. Definisi pengguna sentiasa mengatasi cadangan.\n"
                 "- Bina shared domain language: kenal pasti term, status, KPI, objek dan owner; jika istilah kabur atau overloaded, tanya satu soalan untuk canonical term.\n"
                 "- Untuk IC Substrate, utamakan penyelarasan department, business object, grain, status, KPI definition, data source dan acceptance owner; jangan reka site term, status, formula, system name atau SLA.\n"
@@ -5407,6 +5420,7 @@ class RequirementCollectorService:
             "- Interview along the requirement decision tree; resolve dependencies that change product boundaries before local details.\n"
             "- Ask exactly one question per turn. If the answer can be inferred from conversation, attachment, template, or structured model, do not ask the user again.\n"
             "- Every question must include a recommended answer or concrete options so the user can confirm quickly.\n"
+            "- For internally hosted models with weaker instruction following, the final paragraph must use A/B/C options: A. confirm the suggested interpretation; B. provide the real business wording; C. keep it pending. Do not end with only an open-ended question.\n"
             "- Mark recommendations as suggestions or assumptions, never as confirmed facts. The user's definition wins.\n"
             "- Build shared domain language: identify terms, states, KPIs, objects, and owners; when a term is ambiguous, overloaded, or conflicting, ask one question to establish the canonical term.\n"
             "- For IC Substrate, prioritize department, business object, grain, state, KPI definition, data source, and acceptance owner; do not invent site terms, states, formulas, system names, or SLAs.\n"
@@ -6335,6 +6349,72 @@ class RequirementCollectorService:
     def _language_output_instruction(self, language: str) -> str:
         normalized = self._normalize_language(language)
         return OUTPUT_LANGUAGE_INSTRUCTIONS.get(normalized, OUTPUT_LANGUAGE_INSTRUCTIONS["en"])
+
+    def _ensure_choice_question_format(self, text: str, language: str) -> str:
+        stripped = text.strip()
+        if not stripped:
+            return stripped
+        if not self._looks_like_clarification_question(stripped, language):
+            return stripped
+        if self._has_choice_options(stripped):
+            return stripped
+        return f"{stripped}\n\n{self._fallback_choice_block(language)}"
+
+    def _looks_like_clarification_question(self, text: str, language: str) -> bool:
+        normalized = self._normalize_language(language)
+        if text.rstrip().endswith(("?", "？")):
+            return True
+        lowered = text.lower()
+        if normalized == "zh":
+            return bool(re.search(r"(请确认|是否|是不是|能否|要不要|你希望|你们希望|按.*口径|这个口径)", text))
+        if normalized == "de":
+            return bool(re.search(r"\b(bitte bestaetigen|bestaetigen|welche|welcher|welches|soll|koennen sie)\b", lowered))
+        if normalized == "ms":
+            return bool(re.search(r"\b(sila sahkan|adakah|bolehkah|yang mana|patut|anda mahu)\b", lowered))
+        return bool(
+            re.search(
+                r"\b(please confirm|confirm|which|what|do you|does this|should we|would you|can you|could you)\b",
+                lowered,
+            )
+        )
+
+    def _has_choice_options(self, text: str) -> bool:
+        option_matches = re.findall(r"(?im)(?:^|\n)\s*(?:[A-CＡ-Ｃ][\.\)\]、：:]|选项\s*[A-CＡ-Ｃ]|Option\s*[A-C])", text)
+        return len(option_matches) >= 2
+
+    def _fallback_choice_block(self, language: str) -> str:
+        normalized = self._normalize_language(language)
+        if normalized == "zh":
+            return (
+                "为了方便你快速确认，我先给三个选项：\n"
+                "A. 同意按上面的建议口径作为首版假设继续推进\n"
+                "B. 不同意，我补充实际业务口径或例外情况\n"
+                "C. 这个点先记为待确认，继续推进下一个关键需求\n\n"
+                "建议回复 A、B、C，或直接写你的补充。"
+            )
+        if normalized == "de":
+            return (
+                "Zur schnellen Bestaetigung schlage ich drei Optionen vor:\n"
+                "A. Die oben genannte Empfehlung als Annahme fuer Version 1 verwenden\n"
+                "B. Nicht korrekt; ich ergaenze die echte Fachdefinition oder Ausnahme\n"
+                "C. Diesen Punkt vorerst offen lassen und mit der naechsten Kernanforderung fortfahren\n\n"
+                "Bitte antworte mit A, B, C oder deiner Ergaenzung."
+            )
+        if normalized == "ms":
+            return (
+                "Untuk pengesahan cepat, saya cadangkan tiga pilihan:\n"
+                "A. Terima cadangan di atas sebagai andaian versi pertama\n"
+                "B. Tidak tepat; saya tambah definisi bisnes sebenar atau pengecualian\n"
+                "C. Simpan perkara ini sebagai belum disahkan dan teruskan ke keperluan utama seterusnya\n\n"
+                "Sila balas A, B, C atau tulis tambahan anda."
+            )
+        return (
+            "To make this quick to confirm, choose one option:\n"
+            "A. Use the suggested interpretation above as the version-one assumption\n"
+            "B. Not quite; I will provide the real business wording or exception\n"
+            "C. Keep this point pending and move to the next key requirement\n\n"
+            "Reply with A, B, C, or write your correction directly."
+        )
 
     def _normalize_prompt_template(self, prompt_template: str | None) -> str:
         normalized = str(prompt_template or "").strip().lower()

@@ -11,12 +11,15 @@ venv/
 .vscode/
 
 .env
+.env.docker
 
 node_modules/
+frontend/dist/
 
 # Runtime data
 
 *.sqlite3
+release/
 .DS_Store
 .codegraph/
 .playwright-cli/
