@@ -36,6 +36,29 @@ type PreviewCopy = {
   missingHint: string
   featureLabel: string
   pageLabel: string
+  icEvidence: {
+    ready: string
+    missing: string
+    noVisibleUnresolvedTerms: string
+    labels: {
+      entryOwner: string
+      businessAction: string
+      objectGrain: string
+      workflowStateOwner: string
+      dataReconciliation: string
+      acceptanceEvidence: string
+      openQuestions: string
+    }
+    missingPrompts: {
+      entryOwner: string
+      businessAction: string
+      objectGrain: string
+      workflowStateOwner: string
+      dataReconciliation: string
+      acceptanceEvidence: string
+      openQuestions: string
+    }
+  }
   fields: {
     projectName: string
     requirementName: string
@@ -153,6 +176,29 @@ const enCopy: PreviewCopy = {
   missingHint: '> Missing or unconfirmed information is marked as TBD.',
   featureLabel: 'Feature',
   pageLabel: 'Page',
+  icEvidence: {
+    ready: 'ready',
+    missing: 'missing',
+    noVisibleUnresolvedTerms: 'No visible unresolved terms',
+    labels: {
+      entryOwner: 'Entry department and owner',
+      businessAction: 'Business action or decision',
+      objectGrain: 'Object grain',
+      workflowStateOwner: 'Workflow state and owner',
+      dataReconciliation: 'Data source and reconciliation',
+      acceptanceEvidence: 'Acceptance evidence',
+      openQuestions: 'Open questions / assumptions',
+    },
+    missingPrompts: {
+      entryOwner: 'Confirm the v1 requesting entry and who signs off.',
+      businessAction: 'Clarify the business action before implementation design.',
+      objectGrain: 'Confirm lot/panel/unit/case grain and route/station/time-window boundary.',
+      workflowStateOwner: 'Confirm current state names, owners, and exception closure.',
+      dataReconciliation: 'Confirm source of truth, refresh, reconciliation, and interface boundary.',
+      acceptanceEvidence: 'Confirm the evidence used for business sign-off.',
+      openQuestions: 'List unconfirmed formulas, states, system names, SLA values, or owner roles.',
+    },
+  },
   fields: {
     projectName: 'Project name',
     requirementName: 'Requirement name',
@@ -255,6 +301,29 @@ const zhCopy: PreviewCopy = {
   missingHint: '> \u5c1a\u672a\u786e\u8ba4\u6216\u7f3a\u5931\u7684\u4fe1\u606f\u4f1a\u6807\u8bb0\u4e3a TBD\u3002',
   featureLabel: '\u529f\u80fd',
   pageLabel: '\u9875\u9762',
+  icEvidence: {
+    ready: '\u5df2\u5177\u5907',
+    missing: '\u7f3a\u5931',
+    noVisibleUnresolvedTerms: '\u6682\u65e0\u663e\u5f0f\u672a\u51b3\u9879',
+    labels: {
+      entryOwner: '\u5165\u53e3\u90e8\u95e8\u4e0e owner',
+      businessAction: '\u4e1a\u52a1\u52a8\u4f5c\u6216\u51b3\u7b56',
+      objectGrain: '\u4e1a\u52a1\u5bf9\u8c61\u7c92\u5ea6',
+      workflowStateOwner: '\u6d41\u7a0b\u72b6\u6001\u4e0e owner',
+      dataReconciliation: '\u6570\u636e\u6e90\u4e0e\u5bf9\u8d26',
+      acceptanceEvidence: '\u9a8c\u6536\u8bc1\u636e',
+      openQuestions: '\u5f85\u786e\u8ba4\u95ee\u9898 / \u5047\u8bbe',
+    },
+    missingPrompts: {
+      entryOwner: '\u786e\u8ba4\u9996\u7248\u7531\u54ea\u4e2a\u5165\u53e3\u63d0\u9700\u4ee5\u53ca\u8c01\u8d1f\u8d23 sign-off\u3002',
+      businessAction: '\u5148\u786e\u8ba4\u7cfb\u7edf\u8981\u652f\u6491\u7684\u4e1a\u52a1\u52a8\u4f5c\uff0c\u518d\u8fdb\u5165\u5b9e\u73b0\u8bbe\u8ba1\u3002',
+      objectGrain: '\u786e\u8ba4 lot/panel/unit/case \u7c92\u5ea6\u4ee5\u53ca route/station/time-window \u8fb9\u754c\u3002',
+      workflowStateOwner: '\u786e\u8ba4\u73b0\u884c\u72b6\u6001\u540d\u3001owner \u548c\u5f02\u5e38\u5173\u95ed\u65b9\u5f0f\u3002',
+      dataReconciliation: '\u786e\u8ba4 source of truth\u3001\u5237\u65b0\u9891\u7387\u3001\u5bf9\u8d26\u903b\u8f91\u548c\u63a5\u53e3\u8fb9\u754c\u3002',
+      acceptanceEvidence: '\u786e\u8ba4\u7528\u4ec0\u4e48\u8bc1\u636e\u652f\u6491\u4e1a\u52a1\u9a8c\u6536\u3002',
+      openQuestions: '\u5217\u51fa\u672a\u786e\u8ba4\u7684\u516c\u5f0f\u3001\u72b6\u6001\u3001\u7cfb\u7edf\u540d\u3001SLA \u6216 owner\u3002',
+    },
+  },
   fields: {
     projectName: '\u9879\u76ee\u540d\u79f0',
     requirementName: '\u9700\u6c42\u540d\u79f0',
@@ -359,6 +428,29 @@ const previewCopy: Record<LanguageCode, PreviewCopy> = {
     missingHint: '> Fehlende oder noch nicht bestaetigte Informationen werden als TBD markiert.',
     featureLabel: 'Funktion',
     pageLabel: 'Seite',
+    icEvidence: {
+      ready: 'bereit',
+      missing: 'fehlt',
+      noVisibleUnresolvedTerms: 'Keine sichtbaren offenen Punkte',
+      labels: {
+        entryOwner: 'Einstiegsbereich und Owner',
+        businessAction: 'Business-Aktion oder Entscheidung',
+        objectGrain: 'Objektgranularitaet',
+        workflowStateOwner: 'Workflow-Status und Owner',
+        dataReconciliation: 'Datenquelle und Reconciliation',
+        acceptanceEvidence: 'Abnahme-Evidence',
+        openQuestions: 'Offene Fragen / Annahmen',
+      },
+      missingPrompts: {
+        entryOwner: 'Bestaetige den v1-Einstiegsbereich und wer sign-off gibt.',
+        businessAction: 'Klaere die Business-Aktion vor dem Implementierungsdesign.',
+        objectGrain: 'Bestaetige lot/panel/unit/case-Granularitaet sowie route/station/time-window boundary.',
+        workflowStateOwner: 'Bestaetige aktuelle Statusnamen, Owner und Exception Closure.',
+        dataReconciliation: 'Bestaetige source of truth, refresh, reconciliation und interface boundary.',
+        acceptanceEvidence: 'Bestaetige die Evidence fuer Business Sign-off.',
+        openQuestions: 'Liste unbestaetigte Formeln, Status, Systemnamen, SLA-Werte oder Owner-Rollen.',
+      },
+    },
     fields: {
       projectName: 'Projektname',
       requirementName: 'Anforderungsname',
@@ -461,6 +553,29 @@ const previewCopy: Record<LanguageCode, PreviewCopy> = {
     missingHint: '> Maklumat yang belum lengkap atau belum disahkan ditandakan sebagai TBD.',
     featureLabel: 'Fungsi',
     pageLabel: 'Halaman',
+    icEvidence: {
+      ready: 'sedia',
+      missing: 'hilang',
+      noVisibleUnresolvedTerms: 'Tiada item terbuka yang jelas',
+      labels: {
+        entryOwner: 'Entry department dan owner',
+        businessAction: 'Business action atau decision',
+        objectGrain: 'Object grain',
+        workflowStateOwner: 'Workflow state dan owner',
+        dataReconciliation: 'Data source dan reconciliation',
+        acceptanceEvidence: 'Acceptance evidence',
+        openQuestions: 'Open questions / assumptions',
+      },
+      missingPrompts: {
+        entryOwner: 'Sahkan entry v1 dan siapa yang memberi sign-off.',
+        businessAction: 'Jelaskan business action sebelum implementation design.',
+        objectGrain: 'Sahkan grain lot/panel/unit/case dan boundary route/station/time-window.',
+        workflowStateOwner: 'Sahkan state name semasa, owner dan exception closure.',
+        dataReconciliation: 'Sahkan source of truth, refresh, reconciliation dan interface boundary.',
+        acceptanceEvidence: 'Sahkan evidence untuk business sign-off.',
+        openQuestions: 'Senaraikan formula, state, system name, SLA atau owner role yang belum disahkan.',
+      },
+    },
     fields: {
       projectName: 'Nama projek',
       requirementName: 'Nama keperluan',
@@ -839,48 +954,48 @@ function asIcSubstrateEvidenceSection(model: StructuredRequirementModel, labels:
   )
   const checks = [
     {
-      label: 'Entry department and owner',
+      label: labels.icEvidence.labels.entryOwner,
       ready:
         ['production', 'quality', 'tdi', 'general'].includes(context.requesting_department.trim().toLowerCase()) &&
         Boolean(context.business_owner.trim() || context.acceptance_owner.trim()),
       evidence: entryOwnerEvidence,
-      missing: 'Confirm the v1 requesting entry and who signs off.',
+      missing: labels.icEvidence.missingPrompts.entryOwner,
     },
     {
-      label: 'Business action or decision',
+      label: labels.icEvidence.labels.businessAction,
       ready: Boolean(context.decision_or_action.trim()),
       evidence: valueOrTbd(context.decision_or_action, labels.tbd),
-      missing: 'Clarify the business action before implementation design.',
+      missing: labels.icEvidence.missingPrompts.businessAction,
     },
     {
-      label: 'Object grain',
+      label: labels.icEvidence.labels.objectGrain,
       ready: hasAnyKeyword(allText, ['lot', 'panel', 'unit', 'case', 'route', 'station', '对象', '粒度', '工序', '站点']),
       evidence: firstEvidence(allText, ['lot', 'panel', 'unit', 'case', 'route', 'station', '对象', '粒度', '工序', '站点'], labels.tbd),
-      missing: 'Confirm lot/panel/unit/case grain and route/station/time-window boundary.',
+      missing: labels.icEvidence.missingPrompts.objectGrain,
     },
     {
-      label: 'Workflow state and owner',
+      label: labels.icEvidence.labels.workflowStateOwner,
       ready: hasAnyKeyword(allText, ['state', 'status', 'owner', 'hold', 'release', 'closure', 'rework', 'scrap', '状态', '责任', '放行', '关闭']),
       evidence: firstEvidence(allText, ['state', 'status', 'owner', 'hold', 'release', 'closure', '状态', '责任', '放行', '关闭'], labels.tbd),
-      missing: 'Confirm current state names, owners, and exception closure.',
+      missing: labels.icEvidence.missingPrompts.workflowStateOwner,
     },
     {
-      label: 'Data source and reconciliation',
+      label: labels.icEvidence.labels.dataReconciliation,
       ready: dataText.length > 0 && hasAnyKeyword(dataText, ['source', 'truth', 'refresh', 'reconciliation', 'interface', 'system', '数据源', '刷新', '对账', '接口']),
       evidence: firstEvidence(dataText, ['source', 'truth', 'refresh', 'reconciliation', 'interface', '数据源', '刷新', '对账', '接口'], labels.tbd),
-      missing: 'Confirm source of truth, refresh, reconciliation, and interface boundary.',
+      missing: labels.icEvidence.missingPrompts.dataReconciliation,
     },
     {
-      label: 'Acceptance evidence',
+      label: labels.icEvidence.labels.acceptanceEvidence,
       ready: acceptanceText.length > 0 && hasAnyKeyword(acceptanceText, ['accept', 'evidence', 'sign-off', 'verify', '验收', '证据', '签核', '验证']),
       evidence: firstEvidence(acceptanceText, ['accept', 'evidence', 'sign-off', 'verify', '验收', '证据', '签核', '验证'], labels.tbd),
-      missing: 'Confirm the evidence used for business sign-off.',
+      missing: labels.icEvidence.missingPrompts.acceptanceEvidence,
     },
     {
-      label: 'Open questions / assumptions',
+      label: labels.icEvidence.labels.openQuestions,
       ready: pendingQuestions.length > 0 || progressReadyEnough(model.collection_status),
-      evidence: pendingQuestions[0] || 'No visible unresolved terms',
-      missing: 'List unconfirmed formulas, states, system names, SLA values, or owner roles.',
+      evidence: pendingQuestions[0] || labels.icEvidence.noVisibleUnresolvedTerms,
+      missing: labels.icEvidence.missingPrompts.openQuestions,
     },
   ]
 
@@ -889,7 +1004,7 @@ function asIcSubstrateEvidenceSection(model: StructuredRequirementModel, labels:
     labels.developerSections.icSubstrateEvidence,
     '',
     ...checks.map((check) => {
-      const status = check.ready ? 'ready' : 'missing'
+      const status = check.ready ? labels.icEvidence.ready : labels.icEvidence.missing
       const detail = check.ready ? check.evidence : check.missing
       return `- [${status}] ${check.label}: ${detail}`
     }),
