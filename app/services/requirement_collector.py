@@ -3433,6 +3433,7 @@ class RequirementCollectorService:
                     "workflow": "lot release -> move-in/out -> hold/release -> rework/scrap -> Finished Lot 判定 -> 产量/质量/仓储对账确认；状态名由用户提供",
                     "source": "生产记录、站点流转、WIP/hold/报废/返工记录、质量 release、入库或交接记录；系统名和表名由用户确认",
                     "acceptance": "Production owner、Quality owner、必要时 Warehouse/Planning owner 对 Finished Lot 判定点、数量、状态、时间窗和对账差异 sign-off",
+                    "expert_checks": "yield 必须问 numerator/denominator、FPY/final yield/lot yield 差异、rework/scrap/hold 是否纳入；WIP aging 必须问 clock start/stop、pause 条件、cutoff timezone；Finished Lot 必须问质量 release、入库/交接和对账差异如何处理",
                     "ladder": "先问首版业务动作（排产/派工、WIP hold、Finished Lot、产量节拍、效率复盘）；再问 lot/panel/unit 与 route/station/time window；再问状态名、owner、异常处置；最后问 source of truth、对账、刷新和验收证据",
                 },
                 "tdi": {
@@ -3442,6 +3443,7 @@ class RequirementCollectorService:
                     "workflow": "trigger -> triage -> owner assignment -> action/approval -> handoff -> verification -> writeback -> closure；状态名由用户提供",
                     "source": "用户确认的 TDI 记录、生产/质量/工程/数据交接记录、审批/验证证据；不要预设 MES/QMS/ERP 等系统名",
                     "acceptance": "TDI owner、上下游业务 owner、最终验收 owner 对关闭条件、SLA 起止点、回写边界、重开规则和证据留存确认",
+                    "expert_checks": "TDI 只能按用户现场定义处理；case 必须问 trigger source、case category、priority、linked lot/project；SLA 必须问 clock start/pause/stop、handoff owner matrix、approval/verification evidence；关闭必须问 closure/reopen rule、writeback target 和历史 case 迁移",
                     "ladder": "先问 TDI 在现场的定义和 case 触发边界；再问 case 类型、优先级、状态机、owner/SLA；再问 handoff、approval、verification、writeback；最后问 closure/reopen、证据留存和历史 case 迁移",
                 },
                 "quality": {
@@ -3451,6 +3453,7 @@ class RequirementCollectorService:
                     "workflow": "inspection -> defect capture -> disposition/MRB -> root cause -> action/CAPA if used -> verification -> release/sign-off",
                     "source": "检测记录、缺陷记录、判定/处置记录、MRB/CAPA 记录、root cause 和验证证据；系统名和表名由用户确认",
                     "acceptance": "Quality owner、Production/Engineering owner、必要时 Customer owner 对缺陷口径、处置规则、release gate 和关闭证据 sign-off",
+                    "expert_checks": "defect rate 必须问 denominator、inspection coverage、defect code hierarchy、repeat defect 定义；spec/sampling 必须问版本、生效时间和例外处理；MRB/CAPA 必须问触发条件、disposition owner、verification evidence、release gate 和 customer/internal sign-off",
                     "ladder": "先问首版质量动作（inspection coverage、defect disposition、release gate、MRB/CAPA、root cause、趋势分析）；再问 defect taxonomy、spec/sampling、lot genealogy；再问 disposition owner 与 closure evidence；最后问 release sign-off、客户/内部验收和证据留存",
                 },
             }
@@ -3465,6 +3468,7 @@ class RequirementCollectorService:
                 f"- 软件要承载或反映的流程状态：{playbook['workflow']}\n"
                 f"- 软件数据来源与接口边界：{playbook['source']}\n"
                 f"- 软件验收与责任边界：{playbook['acceptance']}\n"
+                f"- 专家必确认清单：{playbook['expert_checks']}\n"
                 f"- 专家追问梯子：{playbook['ladder']}"
             )
 
@@ -3476,6 +3480,7 @@ class RequirementCollectorService:
                 "workflow": "lot release -> move-in/out -> hold/release -> rework/scrap -> Finished Lot decision -> production/quality/warehouse reconciliation, with user-provided state names",
                 "source": "production records, station movement, WIP/hold/scrap/rework records, quality release, warehouse or handoff records; user confirms system/table names",
                 "acceptance": "Production, Quality, and when needed Warehouse/Planning owners sign off Finished Lot decision point, quantities, states, time window, and reconciliation gaps",
+                "expert_checks": "for yield, confirm numerator/denominator, FPY/final yield/lot yield differences, and whether rework/scrap/hold is included; for WIP aging, confirm clock start/stop, pause conditions, and cutoff timezone; for Finished Lot, confirm quality release, warehouse/handoff, and reconciliation-gap handling",
                 "ladder": "first ask the v1 business action such as scheduling/dispatch, WIP hold, Finished Lot, output rhythm, or efficiency review; then lot/panel/unit with route/station/time window; then state names, owners, and exception handling; finally source of truth, reconciliation, refresh, and acceptance evidence",
             },
             "tdi": {
@@ -3485,6 +3490,7 @@ class RequirementCollectorService:
                 "workflow": "trigger -> triage -> owner assignment -> action/approval -> handoff -> verification -> writeback -> closure, with user-provided state names",
                 "source": "user-confirmed TDI records, production/quality/engineering/data handoff records, and approval/verification evidence; do not assume MES/QMS/ERP names",
                 "acceptance": "TDI owner, upstream/downstream business owners, and final acceptance owner confirm closure condition, SLA start/end, writeback boundary, reopen rule, and evidence retention",
+                "expert_checks": "treat TDI only as the user's site-defined term; for cases, confirm trigger source, case category, priority, and linked lot/project; for SLA, confirm clock start/pause/stop, handoff owner matrix, and approval/verification evidence; for closure, confirm closure/reopen rule, writeback target, and historical case migration",
                 "ladder": "first ask the user's TDI definition and case trigger boundary; then case type, priority, state machine, owner/SLA; then handoff, approval, verification, and writeback; finally closure/reopen, evidence retention, and historical case migration",
             },
             "quality": {
@@ -3494,6 +3500,7 @@ class RequirementCollectorService:
                 "workflow": "inspection -> defect capture -> disposition/MRB -> root cause -> action/CAPA if used -> verification -> release/sign-off",
                 "source": "inspection, defect, disposition, MRB/CAPA, root-cause, and verification records; user confirms system/table names",
                 "acceptance": "Quality, Production/Engineering, and when needed Customer owners sign off defect definition, disposition rule, release gate, and closure evidence",
+                "expert_checks": "for defect rate, confirm denominator, inspection coverage, defect code hierarchy, and repeat-defect definition; for spec/sampling, confirm version, effective time, and exception handling; for MRB/CAPA, confirm trigger, disposition owner, verification evidence, release gate, and customer/internal sign-off",
                 "ladder": "first ask the v1 quality action such as inspection coverage, defect disposition, release gate, MRB/CAPA, root cause, or trend analysis; then defect taxonomy, spec/sampling, and lot genealogy; then disposition owner and closure evidence; finally release sign-off, customer/internal acceptance, and evidence retention",
             },
         }
@@ -3508,6 +3515,7 @@ class RequirementCollectorService:
             f"- Workflow states the software must carry or reflect: {playbook['workflow']}\n"
             f"- Software data sources and integration boundary: {playbook['source']}\n"
             f"- Software acceptance and ownership boundary: {playbook['acceptance']}\n"
+            f"- Expert must-confirm checklist: {playbook['expert_checks']}\n"
             f"- Expert question ladder: {playbook['ladder']}"
         )
 

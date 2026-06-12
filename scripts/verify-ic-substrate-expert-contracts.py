@@ -226,10 +226,17 @@ def main() -> None:
         [
             "专家追问梯子",
             "Expert question ladder",
+            "专家必确认清单",
+            "Expert must-confirm checklist",
             "source of truth",
             "Finished Lot",
+            "numerator/denominator",
+            "clock start/pause/stop",
             "defect taxonomy",
+            "inspection coverage",
+            "defect code hierarchy",
             "closure/reopen",
+            "writeback target",
         ],
         "department expert playbook",
     )
