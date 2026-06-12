@@ -75,6 +75,14 @@ class FirstQuestionThenSparseExtraction:
         )
 
 
+class PrdOnlyModel:
+    """Fake model for PRD generation after the structured cache is pre-seeded."""
+
+    def chat(self, *args: Any, **kwargs: Any) -> str:
+        _ = args, kwargs
+        return "# Quality Defect Dashboard PRD\n\nConfirmed PRD body from fake model."
+
+
 def fail(message: str) -> None:
     print(f"FAIL: {message}", file=sys.stderr)
     raise SystemExit(1)
@@ -88,6 +96,74 @@ def require(condition: bool, message: str) -> None:
 def make_service(tmp_dir: str) -> RequirementCollectorService:
     store = SQLiteSessionStore(str(Path(tmp_dir) / "rqmd.sqlite3"))
     return RequirementCollectorService(SparseInternalModel(), store)
+
+
+def confirmed_quality_model(service: RequirementCollectorService) -> dict[str, Any]:
+    model = service._empty_structured_requirement_model()
+    model["document_info"] = {
+        "project_name": "Quality Defect Dashboard",
+        "requirement_name": "Quality defect disposition and CAPA dashboard",
+    }
+    model["product_context"] = {
+        "requesting_department": "Quality",
+        "business_owner": "Quality manager",
+        "software_type": "dashboard",
+        "primary_user": "Quality engineer",
+        "decision_or_action": "Prioritize defect disposition, CAPA closure, and release decisions.",
+        "acceptance_owner": "Quality manager",
+    }
+    model["background"] = {
+        "summary": "Quality needs a defect dashboard for IC Substrate lots.",
+        "objective": "Reduce unclear defect disposition and CAPA follow-up gaps.",
+    }
+    model["scope"] = {
+        "in_scope": [
+            "Defect code and defect type Pareto by lot, panel, station, and inspection date.",
+            "MRB, retest, rework, scrap, and release disposition tracking.",
+        ],
+        "out_of_scope": ["Automatic equipment recipe changes."],
+    }
+    model["users_and_scenarios"] = {
+        "target_users": ["Quality engineer", "Quality manager"],
+        "core_scenarios": [
+            "Review AOI/FVI/E-test inspection coverage and sampling results.",
+            "Track CAPA owner, root cause, closure evidence, reopen condition, and lot traceability.",
+        ],
+    }
+    model["functional_requirements"] = {
+        "overview": "Dashboard for defect taxonomy, inspection coverage, disposition, and CAPA closure.",
+        "feature_details": [
+            "Filter by lot, panel, unit, route, station, defect code, severity, and owner.",
+            "Show retest, rework, scrap, MRB, release, CAPA closure, and reopen status.",
+        ],
+    }
+    model["business_rules"] = [
+        "Defect taxonomy must include defect code, defect type, severity, and disposition rule.",
+        "Inspection coverage must distinguish sampling, full inspection, false call, and missed defect correction.",
+        "CAPA closure requires root cause, responsible department, owner, closure evidence, reopen rule, and lot traceability.",
+    ]
+    model["page_and_interaction"] = {
+        "pages": ["Dashboard", "Defect Detail", "CAPA Detail", "Export"],
+        "interaction_flow": ["Open dashboard", "Filter lot/station/defect", "Review disposition", "Export evidence"],
+    }
+    model["copywriting"] = ["Use Quality wording confirmed by site users."],
+    model["data_and_dependencies"] = [
+        "Source of truth is QMS/MES inspection records refreshed hourly through the confirmed interface.",
+        "Data reconciliation compares QMS defect records with MES lot/panel/unit route history.",
+    ]
+    model["risks_and_notes"] = ["Unconfirmed external customer complaint linkage remains out of scope for v1."],
+    model["acceptance_criteria"] = [
+        "Quality manager can verify defect code, severity, disposition, CAPA owner, closure evidence, and reopen status.",
+        "Exported evidence supports sign-off and retention for release review.",
+    ]
+    model["open_questions"] = []
+    for key in model["collection_status"]:
+        model["collection_status"][key] = {
+            "status": "confirmed",
+            "reason": "Confirmed by runtime verifier fixture.",
+            "pending_questions": [],
+        }
+    return model
 
 
 def canonical_model(service: RequirementCollectorService, session_id: str, message_count: int) -> dict[str, Any]:
@@ -302,12 +378,82 @@ def assert_api_first_message_preserves_expert_route() -> None:
         require(payload.get("structured_requirement_sync_status") == "ready", "API message response not marked ready")
 
 
+def assert_api_prd_document_includes_expert_evidence_appendix() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        previous_db_path = os.environ.get("SQLITE_DB_PATH")
+        os.environ["SQLITE_DB_PATH"] = str(Path(tmp) / "api-prd-rqmd.sqlite3")
+        try:
+            app = create_app()
+        finally:
+            if previous_db_path is None:
+                os.environ.pop("SQLITE_DB_PATH", None)
+            else:
+                os.environ["SQLITE_DB_PATH"] = previous_db_path
+
+        service: RequirementCollectorService = app.extensions["requirement_collector"]
+        service.llm_client = PrdOnlyModel()
+        app.config.update(TESTING=True)
+        client = app.test_client()
+
+        create_response = client.post(
+            "/api/sessions",
+            json={
+                "template_id": TEMPLATE_ID,
+                "template_start_mode": "guided",
+                "starter_department": "Quality",
+            },
+            headers={"X-Language": "zh"},
+        )
+        require(create_response.status_code == 201, f"API create session failed: {create_response.status_code}")
+        session_id = (create_response.get_json() or {}).get("session_id")
+        require(isinstance(session_id, str) and session_id, "API create session missing session_id")
+
+        service._append_message(session_id, "user", "缺陷看板需求已确认")
+        service._append_message(session_id, "assistant", "已确认 Quality 首版需求。")
+        session = service.get_session(session_id)
+        require(session is not None, "failed to reload PRD verifier session")
+        message_count = service._message_count(session.messages)
+        model = confirmed_quality_model(service)
+        service._save_structured_requirement_model_cache(
+            session_id,
+            STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
+            message_count,
+            model,
+        )
+        service._save_structured_requirement_model_cache(session_id, "zh", message_count, model)
+
+        prd_response = client.post(f"/api/sessions/{session_id}/prd-doc", json={"language": "zh"})
+        require(prd_response.status_code == 200, f"API PRD generation failed: {prd_response.status_code}")
+        payload = prd_response.get_json() or {}
+        document_markdown = str(payload.get("document_markdown", ""))
+        require(payload.get("status") == "ok", f"PRD status should be ok, got {payload.get('status')}")
+        require("Quality Defect Dashboard PRD" in document_markdown, "PRD missing fake model body")
+        require("IC Substrate 专家证据附录" in document_markdown, "PRD missing IC Substrate evidence appendix")
+        require("Quality defect taxonomy, severity, and disposition rule" in document_markdown, "PRD appendix missing Quality disposition evidence")
+        require("Quality CAPA, root-cause, closure/reopen, and traceability" in document_markdown, "PRD appendix missing CAPA evidence")
+        require(payload.get("document_type") == "prd_markdown", "PRD document_type mismatch")
+        download_url = str(payload.get("download_url", ""))
+        require(f"/api/sessions/{session_id}/messages/" in download_url, "PRD message download URL missing")
+        require(download_url.endswith("/download"), "PRD message download URL should target a generated document")
+
+        download_response = client.get(f"{download_url}?format=docx")
+        require(download_response.status_code == 200, f"PRD docx download failed: {download_response.status_code}")
+        require(
+            download_response.mimetype
+            == "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            f"PRD docx mimetype mismatch: {download_response.mimetype}",
+        )
+        content_disposition = download_response.headers.get("Content-Disposition", "")
+        require(".docx" in content_disposition, "PRD docx download filename missing .docx")
+
+
 def main() -> None:
     assert_starter_department_runtime()
     assert_sparse_extraction_preserves_department()
     assert_language_locked_evidence_guidance()
     assert_api_starter_department_contract()
     assert_api_first_message_preserves_expert_route()
+    assert_api_prd_document_includes_expert_evidence_appendix()
     print("IC Substrate runtime expert PM contracts verified.")
 
 
