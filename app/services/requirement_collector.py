@@ -2408,6 +2408,23 @@ class RequirementCollectorService:
                 previous_status.get(key),
             )
         current["collection_status"] = merged_status
+        current = self._preserve_previous_requesting_department(current, previous)
+        return current
+
+    def _preserve_previous_requesting_department(
+        self,
+        current_model: dict[str, Any],
+        previous_model: dict[str, Any],
+    ) -> dict[str, Any]:
+        current = normalize_structured_requirement_model(current_model)
+        previous = normalize_structured_requirement_model(previous_model)
+        current_department = str(current["product_context"].get("requesting_department", "")).strip()
+        previous_department = str(previous["product_context"].get("requesting_department", "")).strip()
+        if current_department or not previous_department:
+            return current
+        previous_track = self._ic_substrate_intent_track_from_text(previous_department)
+        if self._ic_substrate_is_department(previous_track):
+            current["product_context"]["requesting_department"] = previous_department
         return current
 
     def _merge_requirement_status_item(

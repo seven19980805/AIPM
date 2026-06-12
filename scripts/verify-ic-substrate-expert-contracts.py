@@ -77,6 +77,8 @@ def main() -> None:
     create_session_service = method_body(collector, "create_session")
     starter_department_seed = method_body(collector, "_seed_session_from_starter_department")
     starter_department_normalizer = method_body(collector, "_normalize_ic_substrate_starter_department")
+    merge_structured_model = method_body(collector, "_merge_structured_requirement_collection_status")
+    preserve_department = method_body(collector, "_preserve_previous_requesting_department")
     structured_model_track = method_body(collector, "_ic_substrate_intent_track_from_structured_model")
     chain_state = method_body(collector, "build_conversation_chain_state")
     readiness_gate = method_body(collector, "_ic_substrate_readiness_evidence_gate")
@@ -134,6 +136,16 @@ def main() -> None:
         starter_department_normalizer,
         ["production", "quality", "tdi", "general"],
         "starter department normalizer",
+    )
+    require_all(
+        merge_structured_model,
+        ["_preserve_previous_requesting_department", "current[\"collection_status\"] = merged_status"],
+        "starter department preserved during structured merge",
+    )
+    require_all(
+        preserve_department,
+        ["requesting_department", "_ic_substrate_intent_track_from_text", "_ic_substrate_is_department"],
+        "previous requesting department preservation",
     )
     require_all(
         structured_model_track,
