@@ -1703,6 +1703,7 @@ class RequirementCollectorService:
                     progress,
                     language,
                     "system_design",
+                    session,
                 ),
                 structured_requirement_model=structured_requirement_model,
                 status="quality_gate_blocked",
@@ -1773,6 +1774,7 @@ class RequirementCollectorService:
                 progress,
                 language,
                 "system_design",
+                session,
             )
             yield {"event": "content", "delta": doc_markdown}
             yield {
@@ -1879,6 +1881,7 @@ class RequirementCollectorService:
                     progress,
                     language,
                     "prd",
+                    session,
                 ),
                 structured_requirement_model=structured_requirement_model,
                 status="quality_gate_blocked",
@@ -1945,6 +1948,7 @@ class RequirementCollectorService:
                 progress,
                 language,
                 "prd",
+                session,
             )
             yield {"event": "content", "delta": doc_markdown}
             yield {
@@ -6150,12 +6154,14 @@ class RequirementCollectorService:
         progress: dict[str, Any],
         language: str,
         document_type: str,
+        session: Session | None = None,
     ) -> str:
         language = self._normalize_language(language)
         gate = self._document_quality_gate(
             structured_requirement_model,
             progress,
             "quality_gate_blocked",
+            session,
         )
         pending_items = gate["pending_confirmation_items"]
         conflict_items = gate["conflict_items"]
@@ -6179,6 +6185,7 @@ class RequirementCollectorService:
             pending_title = "待确认项"
             conflict_title = "冲突项"
             missing_title = "缺失项"
+            evidence_title = "IC Substrate 专家证据缺口"
             next_step = "下一步：请在对话中确认上述问题；确认完成后再生成正式文档。"
             empty = "无"
         elif language == "de":
@@ -6199,6 +6206,7 @@ class RequirementCollectorService:
             pending_title = "Offene Bestaetigungen"
             conflict_title = "Konflikte"
             missing_title = "Fehlende Punkte"
+            evidence_title = "IC Substrate Expert Evidence Gaps"
             next_step = "Naechster Schritt: Bestaetige diese Punkte im Dialog und erzeuge danach das formale Dokument."
             empty = "Keine"
         elif language == "ms":
@@ -6219,6 +6227,7 @@ class RequirementCollectorService:
             pending_title = "Item menunggu pengesahan"
             conflict_title = "Konflik"
             missing_title = "Item belum lengkap"
+            evidence_title = "Jurang evidence pakar IC Substrate"
             next_step = "Langkah seterusnya: sahkan item ini dalam perbualan, kemudian jana dokumen rasmi."
             empty = "Tiada"
         else:
@@ -6239,6 +6248,7 @@ class RequirementCollectorService:
             pending_title = "Pending Confirmation"
             conflict_title = "Conflicts"
             missing_title = "Missing Items"
+            evidence_title = "IC Substrate Expert Evidence Gaps"
             next_step = "Next step: confirm these items in the conversation, then generate the formal document."
             empty = "None"
 
@@ -6261,6 +6271,26 @@ class RequirementCollectorService:
                 return [f"- {empty}"]
             return [f"- {value}" for value in values]
 
+        def format_ic_substrate_evidence_gaps() -> list[str]:
+            ic_gate = gate.get("ic_substrate_readiness_evidence")
+            if not isinstance(ic_gate, dict):
+                return []
+            checks = ic_gate.get("checks")
+            if not isinstance(checks, list):
+                return []
+            lines = [f"## {evidence_title}"]
+            missing_lines = []
+            for raw_check in checks:
+                if not isinstance(raw_check, dict) or raw_check.get("ready"):
+                    continue
+                label = str(raw_check.get("label", raw_check.get("key", ""))).strip()
+                next_question = str(raw_check.get("if_missing", "")).strip()
+                suffix = f": {next_question}" if next_question else ""
+                missing_lines.append(f"- {label}{suffix}")
+            if not missing_lines:
+                missing_lines = [f"- {empty}"]
+            return [*lines, *missing_lines, ""]
+
         return "\n".join(
             [
                 f"# {title}",
@@ -6279,6 +6309,7 @@ class RequirementCollectorService:
                 f"## {missing_title}",
                 *format_names(missing_items),
                 "",
+                *format_ic_substrate_evidence_gaps(),
                 f"> {next_step}",
             ]
         )

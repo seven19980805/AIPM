@@ -62,6 +62,7 @@ def main() -> None:
     structured_prompt = method_body(collector, "_structured_requirement_model_prompt")
     prd_prompt = method_body(collector, "_prd_doc_prompt")
     document_quality_gate = method_body(collector, "_document_quality_gate")
+    quality_gate_block = method_body(collector, "_document_quality_gate_block_markdown")
     readiness_gate = method_body(collector, "_ic_substrate_readiness_evidence_gate")
     expert_gate = method_body(collector, "_ic_substrate_expert_prd_quality_gate_for_prompt")
     department_playbook = method_body(collector, "_ic_substrate_production_tdi_quality_playbook_guidance")
@@ -140,6 +141,15 @@ def main() -> None:
             "Never invent formulas",
         ],
         "IC Substrate readiness evidence gate",
+    )
+    require_all(
+        quality_gate_block,
+        [
+            "IC Substrate Expert Evidence Gaps",
+            "ic_substrate_readiness_evidence",
+            "if_missing",
+        ],
+        "quality gate blocked markdown",
     )
 
     language_markers = ['normalized_language == "zh"', 'normalized_language == "de"', 'normalized_language == "ms"']
