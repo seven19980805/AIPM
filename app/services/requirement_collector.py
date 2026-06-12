@@ -5517,6 +5517,60 @@ class RequirementCollectorService:
             "- Out of Scope must explicitly state what this version will not do, especially unopened departments, unconfirmed formulas, unconfirmed system integrations, and unconfirmed state flows."
         )
 
+    def _ic_substrate_prd_document_contract(self, session: Session, language: str | None = None) -> str:
+        template = self._resolve_business_template(session, language)
+        template_context = template or {
+            "template_id": session.applied_template_id,
+            "template_name": session.applied_template_name,
+        }
+        if not self._template_matches_ic_substrate_focus(template_context):
+            return ""
+
+        normalized_language = self._normalize_language(language)
+        if normalized_language == "zh":
+            return (
+                "IC Substrate URD/PRD 专家文档合同：\n"
+                "- 文档必须像资深 IC Substrate 产品经理交付给业务和 IT 的需求包，不是聊天总结。\n"
+                "- 前半部分必须包含 Glossary / Definitions：现场确认的业务术语、对象粒度、KPI/公式、状态名、owner、数据源；未确认项进入 Open Questions，不要隐式假设。\n"
+                "- Production/TDI/Quality/General 只按用户已确认的入口写，不要展开隐藏部门链路；其他部门诉求归入 General 或 Out of Scope。\n"
+                "- Functional Requirements 必须按业务动作组织：谁在什么触发条件下，对哪个 lot/panel/unit/case/page/action 做什么，系统输出什么判断、看板、提醒、导出或回写。\n"
+                "- Data & Dependencies 必须写清 source of truth、字段/对象粒度、刷新频率、对账逻辑、历史数据迁移和未确认接口；不要自造 MES/QMS/ERP/SAP 表名。\n"
+                "- Business Rules 必须区分已确认规则、draft assumption 和 open question；公式、SLA、状态流、缺陷分类、放行/关闭条件没有用户确认时不能写成事实。\n"
+                "- Acceptance Criteria 必须能被业务验收：主流程、异常流程、权限/owner、数据准确性、导出/下载、跨部门签核和证据留存。"
+            )
+        if normalized_language == "de":
+            return (
+                "IC Substrate URD/PRD Expert Document Contract:\n"
+                "- The document must read like a senior IC Substrate PM handoff to business and IT, not a chat summary.\n"
+                "- Include early Glossary / Definitions: confirmed business terms, object grain, KPI/formula, state names, owners, and data sources; unresolved items go to Open Questions.\n"
+                "- Write only the confirmed entry track among Production/TDI/Quality/General; keep hidden departments under General or Out of Scope.\n"
+                "- Functional Requirements must be organized by business action: who does what, under which trigger, to which lot/panel/unit/case/page/action, and what judgement, dashboard, alert, export, or writeback the system produces.\n"
+                "- Data & Dependencies must state source of truth, field/object grain, refresh frequency, reconciliation logic, historical migration, and unconfirmed interfaces. Do not invent MES/QMS/ERP/SAP table names.\n"
+                "- Business Rules must separate confirmed rules, draft assumptions, and open questions; unconfirmed formulas, SLAs, state flows, defect taxonomy, release/closure rules are not facts.\n"
+                "- Acceptance Criteria must be business-verifiable: main flow, exception flow, role/owner, data accuracy, export/download, cross-functional sign-off, and evidence retention."
+            )
+        if normalized_language == "ms":
+            return (
+                "Kontrak dokumen pakar IC Substrate URD/PRD:\n"
+                "- Dokumen mesti kelihatan seperti handoff PM IC Substrate senior kepada business dan IT, bukan ringkasan chat.\n"
+                "- Sertakan Glossary / Definitions awal: confirmed business terms, object grain, KPI/formula, state names, owners dan data sources; item belum jelas masuk Open Questions.\n"
+                "- Tulis hanya entry track Production/TDI/Quality/General yang disahkan pengguna; hidden departments kekal dalam General atau Out of Scope.\n"
+                "- Functional Requirements mesti disusun mengikut business action: siapa buat apa, trigger apa, object lot/panel/unit/case/page/action mana, dan system menghasilkan judgement, dashboard, alert, export atau writeback apa.\n"
+                "- Data & Dependencies mesti nyatakan source of truth, field/object grain, refresh frequency, reconciliation logic, historical migration dan unconfirmed interfaces. Jangan reka nama table MES/QMS/ERP/SAP.\n"
+                "- Business Rules mesti bezakan confirmed rules, draft assumptions dan open questions; formula, SLA, state flow, defect taxonomy, release/closure rules yang belum disahkan bukan fakta.\n"
+                "- Acceptance Criteria mesti boleh diverifikasi oleh business: main flow, exception flow, role/owner, data accuracy, export/download, cross-functional sign-off dan evidence retention."
+            )
+        return (
+            "IC Substrate URD/PRD expert document contract:\n"
+            "- The document must read like a senior IC Substrate PM handoff to business and IT, not a chat summary.\n"
+            "- Include early Glossary / Definitions: confirmed business terms, object grain, KPI/formula, state names, owners, and data sources; unresolved items go to Open Questions.\n"
+            "- Write only the confirmed entry track among Production/TDI/Quality/General; keep hidden departments under General or Out of Scope.\n"
+            "- Functional Requirements must be organized by business action: who does what, under which trigger, to which lot/panel/unit/case/page/action, and what judgement, dashboard, alert, export, or writeback the system produces.\n"
+            "- Data & Dependencies must state source of truth, field/object grain, refresh frequency, reconciliation logic, historical migration, and unconfirmed interfaces. Do not invent MES/QMS/ERP/SAP table names.\n"
+            "- Business Rules must separate confirmed rules, draft assumptions, and open questions; unconfirmed formulas, SLAs, state flows, defect taxonomy, release/closure rules are not facts.\n"
+            "- Acceptance Criteria must be business-verifiable: main flow, exception flow, role/owner, data accuracy, export/download, cross-functional sign-off, and evidence retention."
+        )
+
     def _ic_substrate_expert_prd_quality_gate_for_prompt(
         self,
         chain_state: dict[str, Any],
@@ -6431,6 +6485,7 @@ class RequirementCollectorService:
                 "- Keep missing facts marked as assumptions or open questions rather than inventing content."
             )
         prompt_parts.append(self._prd_skill_style_document_guidance(language))
+        prompt_parts.append(self._ic_substrate_prd_document_contract(session, language))
         prompt_parts.append(self._language_output_instruction(language))
         return "\n\n".join(part for part in prompt_parts if part)
 
