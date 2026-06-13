@@ -4,6 +4,8 @@
 
 本文档面向后续接手维护的人，优先说明如何跑起来、系统如何工作、关键文件在哪里、改功能时应该从哪里入手。
 
+IC Substrate 专家 AI PM 的上线验收清单见 [deploy/IC_Substrate_专家PM验收说明.md](deploy/IC_Substrate_专家PM验收说明.md)。
+
 ## 1. 功能概览
 
 - AI PM 对话：围绕项目目标、角色、场景、规则、数据、验收标准等持续追问。
