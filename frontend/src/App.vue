@@ -1219,6 +1219,14 @@ function apiUrl(path: string): string {
   return `${API_BASE_URL}${path}`
 }
 
+function absoluteApiUrl(path: string): string {
+  return new URL(apiUrl(path), window.location.origin).toString()
+}
+
+function pmApiBaseUrlForExternalHandoff(): string {
+  return absoluteApiUrl('/api').replace(/\/api\/?$/, '')
+}
+
 function resolveExternalUrl(rawValue: unknown, fallback: string): string {
   const candidate = String(rawValue || '').trim() || fallback
   try {
@@ -1641,7 +1649,7 @@ function redirectToGoCoding(token: string) {
   const targetUrl = new URL(GO_CODING_URL)
   targetUrl.searchParams.set('source', 'rqmd')
   targetUrl.searchParams.set('handoff_token', token)
-  targetUrl.searchParams.set('pm_api_base_url', apiUrl('/api').replace(/\/api$/, ''))
+  targetUrl.searchParams.set('pm_api_base_url', pmApiBaseUrlForExternalHandoff())
   window.location.assign(targetUrl.toString())
 }
 

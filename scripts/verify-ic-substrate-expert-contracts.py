@@ -129,6 +129,16 @@ def main() -> None:
         "frontend starter department handoff",
     )
     require_all(
+        frontend,
+        [
+            "absoluteApiUrl",
+            "window.location.origin",
+            "pmApiBaseUrlForExternalHandoff",
+            "pm_api_base_url",
+        ],
+        "frontend Go Coding absolute PM API base handoff",
+    )
+    require_all(
         create_session_service,
         ["starter_department", "_seed_session_from_starter_department", "_template_matches_ic_substrate_focus"],
         "service starter department seeding",
