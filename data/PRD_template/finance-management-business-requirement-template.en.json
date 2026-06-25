@@ -1,0 +1,1013 @@
+{
+  "template_id": "finance_management_business_requirement_template_en",
+  "template_key": "finance_management_business_requirement",
+  "template_name": "Finance Management Business Requirement Template",
+  "template_category": "business_requirement",
+  "business_domain": "finance_management",
+  "language": "en",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "A general business requirement template for expense reimbursement, budget control, payment requests, invoice management, accounts receivable/payable, and financial analytics.",
+  "tags": [
+    "finance",
+    "budget",
+    "expense",
+    "payment",
+    "invoice",
+    "reporting"
+  ],
+  "applicable_scenarios": [
+    "Expense reimbursement management",
+    "Budget control",
+    "Payment requests",
+    "Invoice management",
+    "Accounts receivable and payable management",
+    "Financial reporting and analytics"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/finance-management-business-requirement-template.en.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Basic Information",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.project_name",
+          "label": "Project",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Enter the project name"
+        },
+        {
+          "field_key": "document_info.requirement_name",
+          "label": "Requirement name",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Example: Expense reimbursement management optimization"
+        },
+        {
+          "field_key": "template_meta.requirement_type",
+          "label": "Requirement type",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "New build",
+            "Optimization",
+            "Refactor"
+          ]
+        },
+        {
+          "field_key": "template_meta.priority",
+          "label": "Priority",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "High",
+            "Medium",
+            "Low"
+          ]
+        },
+        {
+          "field_key": "template_meta.proposing_department",
+          "label": "Proposing department",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Enter the proposing department"
+        },
+        {
+          "field_key": "template_meta.requester",
+          "label": "Requester",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Enter the requester"
+        },
+        {
+          "field_key": "template_meta.request_date",
+          "label": "Request date",
+          "component": "date",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "YYYY-MM-DD"
+        }
+      ]
+    },
+    {
+      "section_key": "background",
+      "section_title": "Business Background",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "background.summary",
+          "label": "Background summary",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Describe the operating background, existing process, and reason for building the finance management capability"
+        },
+        {
+          "field_key": "template_meta.current_pain_points",
+          "label": "Current pain points",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "Enter one pain point per line"
+        },
+        {
+          "field_key": "background.objective",
+          "label": "Business objectives",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Describe the business goals this requirement should achieve"
+        },
+        {
+          "field_key": "template_meta.goal_metrics",
+          "label": "Quantified metrics",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "Example: Reduce average approval time by 50%"
+        }
+      ]
+    },
+    {
+      "section_key": "scope",
+      "section_title": "Business Scope",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "scope.in_scope",
+          "label": "In scope",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "Enter one in-scope item per line"
+        },
+        {
+          "field_key": "scope.out_of_scope",
+          "label": "Out of scope",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "Enter one out-of-scope item per line"
+        }
+      ]
+    },
+    {
+      "section_key": "users_and_scenarios",
+      "section_title": "Roles and Core Scenarios",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "users_and_scenarios.target_users",
+          "label": "Target roles",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "Example: employees, department owners, finance specialists"
+        },
+        {
+          "field_key": "users_and_scenarios.core_scenarios",
+          "label": "Core business scenarios",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "Enter one core business scenario per line"
+        }
+      ]
+    },
+    {
+      "section_key": "functional_requirements",
+      "section_title": "Functional Requirements",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "functional_requirements.overview",
+          "label": "Feature overview",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for finance management"
+        },
+        {
+          "field_key": "functional_requirements.feature_details",
+          "label": "Feature details",
+          "component": "object_array",
+          "data_type": "array<object>",
+          "required": true,
+          "item_schema": [
+            {
+              "field_key": "feature_name",
+              "label": "Feature name",
+              "component": "input",
+              "data_type": "string",
+              "required": true
+            },
+            {
+              "field_key": "description",
+              "label": "Description",
+              "component": "textarea",
+              "data_type": "string",
+              "required": true
+            },
+            {
+              "field_key": "trigger",
+              "label": "Trigger",
+              "component": "input",
+              "data_type": "string",
+              "required": false
+            },
+            {
+              "field_key": "processing_logic",
+              "label": "Processing logic",
+              "component": "textarea",
+              "data_type": "string",
+              "required": true
+            },
+            {
+              "field_key": "inputs",
+              "label": "Inputs",
+              "component": "string_array",
+              "data_type": "array<string>",
+              "required": false
+            },
+            {
+              "field_key": "outputs",
+              "label": "Outputs",
+              "component": "string_array",
+              "data_type": "array<string>",
+              "required": false
+            },
+            {
+              "field_key": "exception_cases",
+              "label": "Exception cases",
+              "component": "string_array",
+              "data_type": "array<string>",
+              "required": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "section_key": "business_rules",
+      "section_title": "Business Rules",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "business_rules",
+          "label": "Business rules list",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "Enter one business rule per line"
+        }
+      ]
+    },
+    {
+      "section_key": "page_and_interaction",
+      "section_title": "Pages and Interaction",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "page_and_interaction.pages",
+          "label": "Page list",
+          "component": "object_array",
+          "data_type": "array<object>",
+          "required": false,
+          "item_schema": [
+            {
+              "field_key": "page_name",
+              "label": "Page name",
+              "component": "input",
+              "data_type": "string",
+              "required": true
+            },
+            {
+              "field_key": "entry_point",
+              "label": "Entry point",
+              "component": "input",
+              "data_type": "string",
+              "required": false
+            },
+            {
+              "field_key": "page_elements",
+              "label": "Page elements",
+              "component": "string_array",
+              "data_type": "array<string>",
+              "required": false
+            },
+            {
+              "field_key": "button_actions",
+              "label": "Button actions",
+              "component": "string_array",
+              "data_type": "array<string>",
+              "required": false
+            }
+          ]
+        },
+        {
+          "field_key": "page_and_interaction.interaction_flow",
+          "label": "Interaction flow",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "Enter one process step per line"
+        }
+      ]
+    },
+    {
+      "section_key": "data_and_dependencies",
+      "section_title": "Data and Dependencies",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "data_and_dependencies",
+          "label": "Key data and external dependencies",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "Example: budget master data, vendor master data, ERP interface"
+        }
+      ]
+    },
+    {
+      "section_key": "risks_and_notes",
+      "section_title": "Risks and Notes",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "risks_and_notes",
+          "label": "Risks and notes",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "Enter one risk or note per line"
+        },
+        {
+          "field_key": "open_questions",
+          "label": "Open questions",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "Enter one open question per line"
+        }
+      ]
+    },
+    {
+      "section_key": "acceptance_criteria",
+      "section_title": "Acceptance Criteria",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "acceptance_criteria",
+          "label": "Acceptance criteria",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "Enter one verifiable acceptance criterion per line"
+        }
+      ]
+    }
+  ],
+  "default_structured_requirement_model": {
+    "document_info": {
+      "project_name": "",
+      "requirement_name": ""
+    },
+    "background": {
+      "summary": "",
+      "objective": ""
+    },
+    "scope": {
+      "in_scope": [],
+      "out_of_scope": []
+    },
+    "users_and_scenarios": {
+      "target_users": [],
+      "core_scenarios": []
+    },
+    "functional_requirements": {
+      "overview": "",
+      "feature_details": []
+    },
+    "business_rules": [],
+    "page_and_interaction": {
+      "pages": [],
+      "interaction_flow": []
+    },
+    "copywriting": [],
+    "data_and_dependencies": [],
+    "risks_and_notes": [],
+    "acceptance_criteria": [],
+    "open_questions": [],
+    "collection_status": {
+      "objective": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "scope": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "users": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "scenarios": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "features": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "pages": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "rules": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "integrations": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "acceptance": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      }
+    }
+  },
+  "example_structured_requirement_model": {
+    "document_info": {
+      "project_name": "Finance Management Platform",
+      "requirement_name": "Finance Management Business Requirement Template"
+    },
+    "background": {
+      "summary": "Current finance workflows are spread across Excel, email, ERP, and manual approvals, creating inconsistent data, low approval efficiency, and lagging budget control. A unified finance management capability is needed.",
+      "objective": "Create a unified finance business entry point, improve approval and payment efficiency, provide end-to-end budget control, and meet audit trail requirements."
+    },
+    "scope": {
+      "in_scope": [
+        "Expense requests",
+        "Reimbursement approval",
+        "Invoice upload and validation",
+        "Budget reservation and control",
+        "Payment request tracking",
+        "Finance ledger and reporting"
+      ],
+      "out_of_scope": [
+        "General ledger accounting",
+        "Tax filing",
+        "Direct bank integration",
+        "Consolidated reporting"
+      ]
+    },
+    "users_and_scenarios": {
+      "target_users": [
+        "Employee",
+        "Department owner",
+        "Finance specialist",
+        "Finance manager",
+        "Management",
+        "System administrator"
+      ],
+      "core_scenarios": [
+        "Employees initiate expense or payment requests and track progress.",
+        "Department owners approve business requests and confirm budget reasonableness.",
+        "Finance reviews documents, invoices, and contract attachments.",
+        "Approved requests enter the payment process and payment results are recorded.",
+        "Business data flows into ledgers and reports for analysis and audit."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "The requirement focuses on six capabilities: application, approval, budget control, invoice/document management, payment management, and reporting analytics, with the goal of connecting the finance processing chain.",
+      "feature_details": [
+        {
+          "feature_name": "Application Management",
+          "description": "Supports the initiation, draft saving, submission, withdrawal, and copying of expense, reimbursement, and payment requests.",
+          "trigger": "The user clicks New Request and submits the form.",
+          "processing_logic": "The system validates required fields, amount format, and attachment completeness, generates a request number, and routes the request to the next process.",
+          "inputs": [
+            "Request type",
+            "Department",
+            "Expense category",
+            "Amount",
+            "Project/contract/vendor information",
+            "Attachments"
+          ],
+          "outputs": [
+            "Request form",
+            "Request status",
+            "Operation log"
+          ],
+          "exception_cases": [
+            "Missing required fields",
+            "Invalid amount format",
+            "Missing attachments"
+          ]
+        },
+        {
+          "feature_name": "Approval Management",
+          "description": "Supports multi-level approval, countersignature, additional signature, rejection, and timeout reminders.",
+          "trigger": "A submitted request automatically enters the approval flow.",
+          "processing_logic": "The system routes the request according to organization structure and approval rules, and approval results drive status changes.",
+          "inputs": [
+            "Approval node configuration",
+            "Approval comments",
+            "Approval result"
+          ],
+          "outputs": [
+            "Approval records",
+            "Workflow status",
+            "Notifications"
+          ],
+          "exception_cases": [
+            "Missing approver",
+            "Approval timeout",
+            "Invalid workflow configuration"
+          ]
+        },
+        {
+          "feature_name": "Budget Control",
+          "description": "Performs budget validation, reservation, release, and warning during request and finance review stages.",
+          "trigger": "Triggered when a request is submitted or reviewed by finance.",
+          "processing_logic": "The system checks budget balances by department, project, and expense category. Over-budget items enter special approval or warning flows.",
+          "inputs": [
+            "Budget dimension",
+            "Budget amount",
+            "Current request amount"
+          ],
+          "outputs": [
+            "Budget validation result",
+            "Budget reservation record",
+            "Budget warning"
+          ],
+          "exception_cases": [
+            "Budget not configured",
+            "Insufficient budget balance",
+            "Mismatched budget dimension"
+          ]
+        },
+        {
+          "feature_name": "Invoice and Document Management",
+          "description": "Supports invoice information entry, attachment upload, duplicate checking, and document association.",
+          "trigger": "Triggered when users upload documents or finance reviews documents.",
+          "processing_logic": "The system validates document completeness and consistency, maintains document status, and links documents to request forms.",
+          "inputs": [
+            "Invoice number",
+            "Invoice amount",
+            "Issue date",
+            "Attachment file",
+            "Related contract number"
+          ],
+          "outputs": [
+            "Document record",
+            "Duplicate check result",
+            "Review status"
+          ],
+          "exception_cases": [
+            "Duplicate invoice",
+            "Invoice amount inconsistent with request amount",
+            "Damaged or missing document attachment"
+          ]
+        },
+        {
+          "feature_name": "Payment Management",
+          "description": "Supports payment review, payment execution, status write-back, and voucher archiving.",
+          "trigger": "Starts after finance review is approved.",
+          "processing_logic": "The system validates payee information and payment conditions, records payment status, and archives payment vouchers.",
+          "inputs": [
+            "Payee information",
+            "Payment amount",
+            "Payment account",
+            "Payment note"
+          ],
+          "outputs": [
+            "Payment order",
+            "Payment status",
+            "Payment voucher"
+          ],
+          "exception_cases": [
+            "Missing payee information",
+            "Payment failed",
+            "Duplicate payment risk"
+          ]
+        },
+        {
+          "feature_name": "Reporting and Analytics",
+          "description": "Provides report query and export capabilities across expense, budget, and payment dimensions.",
+          "trigger": "Triggered when users query reports or the system performs scheduled summaries.",
+          "processing_logic": "The system supports multidimensional filtering, summary display, and export for financial analysis and management decisions.",
+          "inputs": [
+            "Query conditions",
+            "Statistical dimensions",
+            "Time range"
+          ],
+          "outputs": [
+            "Expense summary report",
+            "Budget execution report",
+            "Payment progress report"
+          ],
+          "exception_cases": [
+            "Missing data",
+            "Inconsistent data definitions",
+            "Export failed"
+          ]
+        }
+      ]
+    },
+    "business_rules": [
+      "Every request must be associated with expense category, department, occurrence date, and other basic information.",
+      "Over-budget requests cannot pass directly and must enter special approval or strong reminder flows.",
+      "Invoices, contracts, and payment vouchers must be associated with request forms and archived.",
+      "Finance review starts only after approval is passed, and payment starts only after finance review is passed.",
+      "The same business request cannot be submitted for payment repeatedly.",
+      "After payment is completed, request status must automatically update to Paid or an equivalent status."
+    ],
+    "page_and_interaction": {
+      "pages": [
+        {
+          "page_name": "Request List",
+          "entry_point": "Finance Management Home / My Requests",
+          "page_elements": [
+            "Filter area",
+            "Request list",
+            "Status labels",
+            "Export button"
+          ],
+          "button_actions": [
+            "Create request",
+            "View details",
+            "Withdraw",
+            "Export"
+          ]
+        },
+        {
+          "page_name": "Request Detail",
+          "entry_point": "Click from the request list",
+          "page_elements": [
+            "Basic information",
+            "Expense details",
+            "Attachment area",
+            "Approval records",
+            "Budget validation result"
+          ],
+          "button_actions": [
+            "Submit",
+            "Save draft",
+            "Edit",
+            "Upload attachment"
+          ]
+        },
+        {
+          "page_name": "Approval Processing Page",
+          "entry_point": "To-do Center / Approval Tasks",
+          "page_elements": [
+            "Request information",
+            "Attachment information",
+            "Approval comment box",
+            "Budget reminder",
+            "Workflow nodes"
+          ],
+          "button_actions": [
+            "Approve",
+            "Reject",
+            "Transfer",
+            "Add signer"
+          ]
+        },
+        {
+          "page_name": "Payment Processing Page",
+          "entry_point": "Finance Workbench / Pending Payments",
+          "page_elements": [
+            "Payment information",
+            "Payee information",
+            "Voucher upload area",
+            "Payment status"
+          ],
+          "button_actions": [
+            "Confirm payment",
+            "Upload voucher",
+            "Mark failed"
+          ]
+        },
+        {
+          "page_name": "Finance Reports Page",
+          "entry_point": "Finance Analytics / Report Center",
+          "page_elements": [
+            "Filters",
+            "Metric cards",
+            "Charts",
+            "Detail table"
+          ],
+          "button_actions": [
+            "Search",
+            "Export",
+            "Switch statistical dimension"
+          ]
+        }
+      ],
+      "interaction_flow": [
+        "The user creates and submits a request.",
+        "The system validates required fields, budget, and attachment completeness.",
+        "Approvers complete approval, then finance performs review.",
+        "After review passes, the request enters payment processing and the final result is written back.",
+        "Data is synchronized into reports and ledgers."
+      ]
+    },
+    "copywriting": [],
+    "data_and_dependencies": [
+      "Organization structure data",
+      "Employee information data",
+      "Budget master data",
+      "Vendor and payee master data",
+      "External ERP / OA / HR systems"
+    ],
+    "risks_and_notes": [
+      "Inconsistent historical finance data may affect migration and reconciliation.",
+      "Complex approval rules may affect rollout if not clarified early.",
+      "Unstable external system interfaces may affect budget or payment result synchronization."
+    ],
+    "acceptance_criteria": [
+      "The request, approval, review, payment, and archive process can run end to end.",
+      "Budget validation logic meets business expectations.",
+      "Invoice duplicate checking and attachment validation rules take effect.",
+      "Report data is consistent with business document data.",
+      "Permission isolation is correct and unauthorized access is blocked.",
+      "All key nodes have audit logs."
+    ],
+    "open_questions": [
+      "Is real-time bidirectional synchronization with ERP required?",
+      "Should over-budget scenarios be blocked or routed through special approval?",
+      "Does invoice validation need to connect to an external verification capability?",
+      "Should report statistics follow finance definitions or business definitions?"
+    ],
+    "collection_status": {
+      "objective": {
+        "status": "confirmed",
+        "reason": "The template defines the typical objectives for this requirement type.",
+        "pending_questions": []
+      },
+      "scope": {
+        "status": "confirmed",
+        "reason": "The template provides typical in-scope and out-of-scope examples.",
+        "pending_questions": []
+      },
+      "users": {
+        "status": "confirmed",
+        "reason": "The template includes common finance management roles.",
+        "pending_questions": []
+      },
+      "scenarios": {
+        "status": "confirmed",
+        "reason": "The template provides a complete typical business flow.",
+        "pending_questions": []
+      },
+      "features": {
+        "status": "confirmed",
+        "reason": "The template includes feature overview and detailed examples.",
+        "pending_questions": []
+      },
+      "pages": {
+        "status": "captured",
+        "reason": "The template provides suggested pages, but final pages should be adjusted for the actual product form.",
+        "pending_questions": [
+          "Do we need separate report center and payment processing pages in the final product?"
+        ]
+      },
+      "rules": {
+        "status": "confirmed",
+        "reason": "The template covers common finance management business rules.",
+        "pending_questions": []
+      },
+      "integrations": {
+        "status": "captured",
+        "reason": "The template lists typical external dependencies, but concrete interface boundaries still need project confirmation.",
+        "pending_questions": [
+          "Do we need to integrate ERP, OA, HR, or banking systems?"
+        ]
+      },
+      "acceptance": {
+        "status": "confirmed",
+        "reason": "The template provides verifiable general acceptance criteria.",
+        "pending_questions": []
+      }
+    }
+  },
+  "template_meta": {
+    "requirement_type": "",
+    "priority": "",
+    "proposing_department": "",
+    "requester": "",
+    "request_date": "",
+    "current_pain_points": [],
+    "goal_metrics": []
+  },
+  "example_model": {
+    "document_info": {
+      "project_name": "Finance Management Portal",
+      "requirement_name": "Budget, expense, and settlement management"
+    },
+    "background": {
+      "summary": "Budget execution, expense claims, settlement records, and financial reports are maintained in multiple tools, causing delayed reconciliation and weak process traceability.",
+      "objective": "Unify budget control, expense approval, settlement tracking, and financial reporting to improve compliance and closing efficiency."
+    },
+    "scope": {
+      "in_scope": [
+        "Budget master data and quota control",
+        "Expense application and approval",
+        "Settlement and reimbursement tracking",
+        "Financial report export",
+        "Permission and audit control"
+      ],
+      "out_of_scope": [
+        "Core accounting engine replacement",
+        "Tax filing automation",
+        "Bank payment gateway build"
+      ]
+    },
+    "users_and_scenarios": {
+      "target_users": [
+        "Requester",
+        "Finance reviewer",
+        "Department manager",
+        "Budget owner",
+        "System administrator"
+      ],
+      "core_scenarios": [
+        "Requester submits an expense claim.",
+        "Finance checks budget and invoice evidence.",
+        "Manager approves and settlement status is updated."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "This default example includes Budget control, Expense approval, Settlement tracking.",
+      "feature_details": [
+        {
+          "feature_name": "Budget control",
+          "description": "Support budget control for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        },
+        {
+          "feature_name": "Expense approval",
+          "description": "Support expense approval for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        },
+        {
+          "feature_name": "Settlement tracking",
+          "description": "Support settlement tracking for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        }
+      ]
+    },
+    "business_rules": [
+      "Only authorized roles can view scoped data and perform sensitive actions.",
+      "Core business actions must keep an audit trail.",
+      "Exported data must follow the same filters and permission scope as the page.",
+      "Data refresh status and calculation definitions must be visible to users."
+    ],
+    "page_and_interaction": {
+      "pages": [
+        {
+          "page_name": "Budget control",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        },
+        {
+          "page_name": "Expense approval",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        },
+        {
+          "page_name": "Settlement tracking",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        }
+      ],
+      "interaction_flow": [
+        "Requester submits an expense claim.",
+        "Finance checks budget and invoice evidence.",
+        "Manager approves and settlement status is updated."
+      ]
+    },
+    "copywriting": [],
+    "data_and_dependencies": [
+      "User and organization master data",
+      "Business transaction data",
+      "Permission configuration",
+      "Reporting/export service"
+    ],
+    "risks_and_notes": [
+      "Metric ownership and data definitions must be confirmed.",
+      "Historical data quality may affect acceptance.",
+      "External system readiness may affect rollout scope."
+    ],
+    "acceptance_criteria": [
+      "The example scope can be generated into PRD and design documents.",
+      "Users can revise the seeded requirement through chat messages.",
+      "Main roles, flows, data, permissions, and acceptance criteria are represented."
+    ],
+    "open_questions": [
+      "Which roles need final approval authority?",
+      "Which fields and metrics are mandatory for MVP?",
+      "Which external systems must be integrated in the first release?"
+    ],
+    "template_meta": {
+      "example_note": "AI-generated default example business; replace with real business facts before final delivery."
+    }
+  }
+}

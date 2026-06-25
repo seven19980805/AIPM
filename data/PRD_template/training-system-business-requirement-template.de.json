@@ -1,0 +1,664 @@
+{
+  "template_id": "training_system_business_requirement_template_de",
+  "template_key": "training_system_business_requirement",
+  "template_name": "Vorlage fuer fachliche Anforderungen an ein Schulungssystem",
+  "template_category": "business_requirement",
+  "business_domain": "training_system",
+  "language": "de",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "Allgemeine Vorlage fuer fachliche Anforderungen an Kursverwaltung, Schulungsanmeldung, Online-Lernen, Pruefungen, Zertifikate, Lernprofile und Schulungsanalysen.",
+  "tags": [
+    "training",
+    "course",
+    "learning",
+    "exam",
+    "certificate",
+    "enrollment"
+  ],
+  "applicable_scenarios": [
+    "Kurs- und Inhaltsverwaltung",
+    "Schulungsplanung und Anmeldung",
+    "Online-Lernen und Fortschrittsverfolgung",
+    "Pruefungen und Bewertungen",
+    "Zertifikatsverwaltung",
+    "Lerndatenanalyse"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/training-system-business-requirement-template.de.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Basisinformationen",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.project_name",
+          "label": "Projekt",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Projektnamen eingeben"
+        },
+        {
+          "field_key": "document_info.requirement_name",
+          "label": "Anforderungsname",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Beispiel: Aufbau einer Unternehmens-Schulungsplattform"
+        },
+        {
+          "field_key": "template_meta.requirement_type",
+          "label": "Anforderungstyp",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "Neubau",
+            "Optimierung",
+            "Refactoring"
+          ]
+        },
+        {
+          "field_key": "template_meta.priority",
+          "label": "Prioritaet",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "Hoch",
+            "Mittel",
+            "Niedrig"
+          ]
+        },
+        {
+          "field_key": "template_meta.proposing_department",
+          "label": "Anfordernde Abteilung",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Anfordernde Abteilung eingeben"
+        },
+        {
+          "field_key": "template_meta.requester",
+          "label": "Anforderer",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Anforderer eingeben"
+        },
+        {
+          "field_key": "template_meta.request_date",
+          "label": "Anforderungsdatum",
+          "component": "date",
+          "data_type": "date",
+          "required": false,
+          "placeholder": "YYYY-MM-DD"
+        },
+        {
+          "field_key": "template_meta.version",
+          "label": "Version",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "V1.0"
+        }
+      ]
+    },
+    {
+      "section_key": "business_background",
+      "section_title": "Fachlicher Hintergrund",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "business_background.summary",
+          "label": "Hintergrundueberblick",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Beschreiben Sie den Schulungshintergrund, den aktuellen Prozess und den Grund fuer den Systemaufbau"
+        },
+        {
+          "field_key": "business_background.pain_points",
+          "label": "Aktuelle Schmerzpunkte",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beschreiben Sie den Schulungshintergrund, den aktuellen Prozess und den Grund fuer den Systemaufbau"
+        }
+      ]
+    },
+    {
+      "section_key": "business_objectives",
+      "section_title": "Fachliche Ziele",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "business_objectives.objectives",
+          "label": "Fachliche Ziele",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beschreiben Sie die fachlichen Ziele des Schulungssystems"
+        },
+        {
+          "field_key": "business_objectives.metrics",
+          "label": "Messbare Kennzahlen",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beispiel: Bearbeitungszeit fuer Kursanmeldungen um 50% reduzieren"
+        }
+      ]
+    },
+    {
+      "section_key": "business_scope",
+      "section_title": "Fachlicher Umfang",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "business_scope.in_scope",
+          "label": "Im Umfang",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Schulungssystems zusammen"
+        },
+        {
+          "field_key": "business_scope.out_scope",
+          "label": "Nicht im Umfang",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Schulungssystems zusammen"
+        }
+      ]
+    },
+    {
+      "section_key": "roles_and_scenarios",
+      "section_title": "Rollen und Kernszenarien",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "roles_and_scenarios.target_roles",
+          "label": "Zielrollen",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beispiel: Lernende, Trainer, Schulungsadministratoren, Abteilungsverantwortliche"
+        },
+        {
+          "field_key": "roles_and_scenarios.core_scenarios",
+          "label": "Kernszenarien",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beispiel: Lernende, Trainer, Schulungsadministratoren, Abteilungsverantwortliche"
+        }
+      ]
+    },
+    {
+      "section_key": "functional_requirements",
+      "section_title": "Funktionale Anforderungen",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "functional_requirements.overview",
+          "label": "Funktionsueberblick",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Schulungssystems zusammen"
+        },
+        {
+          "field_key": "functional_requirements.features",
+          "label": "Funktionsdetails",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "feature": "Funktion",
+            "description": "Beschreibung",
+            "trigger": "Ausloeser",
+            "logic": "Fachliche Regeln / Logik",
+            "inputs": "Eingaben",
+            "outputs": "Ausgaben",
+            "exceptions": "Ausnahmen"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "page_and_process",
+      "section_title": "Seiten und Prozesse",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "page_and_process.pages",
+          "label": "Seite / Einstieg",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "page": "Seite / Einstieg",
+            "entry": "Einstieg",
+            "elements": "Schluesselinhalte",
+            "actions": "Hauptaktionen",
+            "flow": "Ablauf"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "business_rules_and_data",
+      "section_title": "Fachliche Regeln und Daten",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "business_rules_and_data.rules",
+          "label": "Fachliche Regeln / Logik",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Schulungssystems zusammen"
+        },
+        {
+          "field_key": "business_rules_and_data.key_data",
+          "label": "Wichtige Datenobjekte",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beispiel: Kursstammdaten, Lernendendaten, Fragenbank, Zertifikatsdaten"
+        }
+      ]
+    },
+    {
+      "section_key": "nonfunctional_requirements",
+      "section_title": "Nichtfunktionale Anforderungen",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "nonfunctional_requirements.items",
+          "label": "Nichtfunktionale Anforderungen",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Schulungssystems zusammen"
+        }
+      ]
+    },
+    {
+      "section_key": "integration_dependencies",
+      "section_title": "Integrationen und Abhaengigkeiten",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "integration_dependencies.external_systems",
+          "label": "Externe Abhaengigkeiten",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Schulungssystems zusammen"
+        }
+      ]
+    },
+    {
+      "section_key": "risks_and_questions",
+      "section_title": "Risiken und offene Fragen",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "risks_and_questions.risks",
+          "label": "Risiken",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Schulungssystems zusammen"
+        },
+        {
+          "field_key": "risks_and_questions.open_questions",
+          "label": "Offene Fragen",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Offene Frage eingeben"
+        }
+      ]
+    },
+    {
+      "section_key": "milestone_acceptance",
+      "section_title": "Meilensteine und Abnahme",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "milestone_acceptance.milestones",
+          "label": "Meilenstein",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "milestone": "Meilenstein",
+            "target_date": "Zieldatum",
+            "acceptance": "Abnahmekriterien"
+          }
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "Upgrade-Projekt Schulungssystem",
+      "requirement_name": "Aufbau einer Unternehmens-Schulungsplattform"
+    },
+    "template_meta": {
+      "template_name": "Vorlage fuer fachliche Anforderungen an ein Schulungssystem",
+      "requirement_type": "Neubau",
+      "priority": "Hoch",
+      "proposing_department": "Personalwesen / Learning and Development Center",
+      "requester": "Schulungsadministrator",
+      "request_date": "2026-05-11",
+      "version": "V1.0"
+    },
+    "business_background": {
+      "summary": "Schulungsplaene, Kursanmeldungen, Lernnachweise, Pruefungsergebnisse und Zertifikate sind derzeit ueber E-Mail, Tabellen und mehrere Plattformen verteilt. Schulungsadministratoren koennen die Umsetzung schwer verfolgen, Lernende haben keinen einheitlichen Einstieg, und dem Management fehlen auswertbare Daten zur Schulungswirkung.",
+      "pain_points": [
+        "Veroeffentlichung von Schulungsplaenen und Anmeldung beruhen auf manuellen Benachrichtigungen",
+        "Kursressourcen sind verteilt und Lernfortschritt ist schwer einheitlich nachzuverfolgen",
+        "Pruefungsergebnisse, Zertifikate und Lernprofile werden nicht automatisch archiviert",
+        "Schulungsdaten sind uneinheitlich definiert und Reporting erfordert viel Handarbeit"
+      ]
+    },
+    "business_objectives": {
+      "objectives": [
+        "Einen einheitlichen Einstieg fuer Schulungsplaene, Kurse und Lernen schaffen",
+        "Anmeldung, Lernen, Pruefung und Zertifikat geschlossen verwalten",
+        "Effizienz der Schulungsdurchfuehrung und Genauigkeit der Lernnachweise verbessern",
+        "Auswertbare Schulungsdaten fuer Talententwicklungsentscheidungen aufbauen"
+      ],
+      "metrics": [
+        "Bearbeitungszeit fuer Kursanmeldungen um 50% reduzieren",
+        "Genauigkeit der Abschlussstatistik auf 98% bringen",
+        "90% der Zertifikate automatisch erzeugen und archivieren",
+        "Manuelle Reporting-Arbeit um 60% reduzieren"
+      ]
+    },
+    "business_scope": {
+      "in_scope": [
+        "Kurs- und Inhaltsverwaltung",
+        "Veroeffentlichung von Schulungsplaenen",
+        "Anmeldung und Freigabe fuer Lernende",
+        "Online-Lernen und Fortschrittsverfolgung",
+        "Pruefungen, Bewertungen und Ergebnisverwaltung",
+        "Zertifikate und Lernprofile",
+        "Schulungsberichte und Analysen"
+      ],
+      "out_scope": [
+        "Eigenentwicklung der zugrunde liegenden Live-Classroom-Engine",
+        "Komplexe LMS-Marktplatztransaktionen",
+        "Tiefgehender Inhalteinkauf von externen Hochschulplattformen",
+        "KI-basierte Empfehlung personalisierter Lernpfade"
+      ]
+    },
+    "roles_and_scenarios": {
+      "target_roles": [
+        "Lernende: Kurse durchsuchen, Schulungen buchen, Inhalte lernen, Pruefungen ablegen und Zertifikate einsehen",
+        "Trainer: Unterrichtsmaterialien pflegen, Teilnehmerlisten einsehen und Feedback pruefen",
+        "Schulungsadministrator: Plaene erstellen, Anmeldungen verwalten, Pruefungen und Zertifikate konfigurieren",
+        "Abteilungsverantwortliche: Teamanmeldungen freigeben und Lernfortschritt des Teams einsehen",
+        "Management: Abdeckung, Abschlussquote, Bestehensquote und Wirksamkeit der Schulung einsehen",
+        "Systemadministrator: Berechtigungen, Kategorien, Woerterbuecher und Grundkonfiguration pflegen"
+      ],
+      "core_scenarios": [
+        "Ein Schulungsadministrator veroeffentlicht einen Schulungsplan und oeffnet die Anmeldung fuer die Zielgruppe.",
+        "Ein Lernender waehlt im Schulungsportal einen Kurs, sendet die Anmeldung ab und erhaelt Benachrichtigungen.",
+        "Ein Abteilungsverantwortlicher genehmigt Teamanmeldungen, und das System aktualisiert den Anmeldestatus.",
+        "Ein Lernender schliesst Online-Lernen ab und nimmt an einer Bewertung teil.",
+        "Das System erzeugt gemaess Abschlussregeln ein Zertifikat und speichert das Lernprofil.",
+        "Das Management prueft Abschlussquote, Bestehensquote und Kursfeedback."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "Diese Anforderung umfasst sieben Faehigkeitsgruppen: Kursressourcen, Schulungsplaene, Anmeldefreigabe, Lernfortschritt, Pruefungen und Bewertungen, Zertifikate und Lernprofile sowie Analysen.",
+      "features": [
+        {
+          "feature": "Kurs- und Inhaltsverwaltung",
+          "description": "Pflegt Kurskategorien, Kursinformationen, Lerninhalte, Trainer und Zielgruppen.",
+          "trigger": "Ein Schulungsadministrator erstellt oder aktualisiert einen Kurs.",
+          "logic": [
+            "Unterstuetzt Veroeffentlichen, Zurueckziehen, Kategorien, Tags und Zielrollen",
+            "Unterstuetzt Videos, Dokumente, Aufgaben und weitere Inhaltsanhaenge",
+            "Unterstuetzt Kursversionen und Aenderungsverlauf"
+          ],
+          "inputs": "Kursname, Kategorie, Trainer, Inhalte, Zielgruppe",
+          "outputs": "Kursdetail, Katalog, Inhaltsliste",
+          "exceptions": "Doppelte Kurse, fehlende Inhalte, Loeschen blockiert wenn durch Plan referenziert"
+        },
+        {
+          "feature": "Schulungsplaene und Anmeldefreigabe",
+          "description": "Veroeffentlicht Schulungsplaene und verwaltet Anmeldung, Freigabe, Kontingente und Benachrichtigungen.",
+          "trigger": "Ein Plan wird erstellt oder eine Anmeldung eingereicht.",
+          "logic": [
+            "Unterstuetzt Anmeldung nach Organisation, Rolle oder benannten Personen",
+            "Unterstuetzt Kontingente, Wartelisten, Stornierung und Freigabeablaeufe",
+            "Unterstuetzt Benachrichtigungen fuer Anmeldung, Freigabe und Kursstart"
+          ],
+          "inputs": "Planname, Kurs, Zeitplan, Kontingent, Zielgruppe, Freigeber",
+          "outputs": "Schulungsplan, Anmeldeliste, Freigabeergebnis",
+          "exceptions": "Kontingent voll, Frist abgelaufen, doppelte Anmeldung, Freigabe ueberfaellig"
+        },
+        {
+          "feature": "Online-Lernen und Fortschrittsverfolgung",
+          "description": "Bietet einen einheitlichen Lerneinstieg und zeichnet Lernfortschritt auf.",
+          "trigger": "Ein Lernender startet das Lernen in einem Kurs.",
+          "logic": [
+            "Unterstuetzt Kurskatalog, Lernfortschritt, Dauer und Abschlussstatus",
+            "Unterstuetzt Fortsetzen, Pflicht-/Wahlkennzeichen und Erinnerungen",
+            "Unterstuetzt Mahnungen fuer ueberfaellige Lernaufgaben"
+          ],
+          "inputs": "Lernender, Kurs, Inhalt, Dauer, Abschlussstatus",
+          "outputs": "Lernnachweis, Fortschrittsstatistik, Abschlussnachweis",
+          "exceptions": "Wiedergabefehler, Fortschrittsmeldung fehlgeschlagen, doppelte Datensaetze zusammenfuehren"
+        },
+        {
+          "feature": "Pruefungen, Bewertungen und Ergebnisverwaltung",
+          "description": "Konfiguriert Fragenbank, Pruefungsbogen, Pruefungstermine, Bewertung und Ergebnisstatistiken.",
+          "trigger": "Ein Plan erfordert eine Pruefung oder ein Administrator veroeffentlicht eine.",
+          "logic": [
+            "Unterstuetzt Fragenbank, Pruefungsbogen, Pruefungszeit und Bestehensgrenze",
+            "Unterstuetzt automatische Bewertung, manuelle Bewertung und Wiederholungen",
+            "Unterstuetzt Ergebnisabfrage, Bestehensquoten und Export"
+          ],
+          "inputs": "Fragen, Pruefungsbogen, Pruefungseinrichtung, Antwortdatensaetze",
+          "outputs": "Ergebnisliste, Bestehensstatus, Pruefungsstatistik",
+          "exceptions": "Zeitueberschreitung, doppelte Abgabe, Betrugsmarkierung, fehlende Wiederholungsberechtigung"
+        },
+        {
+          "feature": "Zertifikate und Lernprofile",
+          "description": "Erzeugt Zertifikate basierend auf Abschluss und Pruefungsergebnissen und baut Lernprofile auf.",
+          "trigger": "Ein Lernender erfuellt die Ausgabebedingungen.",
+          "logic": [
+            "Unterstuetzt Zertifikatsvorlagen, Nummernregeln und Gueltigkeitsdauer",
+            "Unterstuetzt Erzeugung, Download, Widerruf und Ablaufhinweise",
+            "Aggregiert Lern- und Zertifikatsdaten je Mitarbeiter"
+          ],
+          "inputs": "Abschlussdatensatz, Ergebnis, Zertifikatsvorlage, Mitarbeiterdaten",
+          "outputs": "Zertifikat, Lernprofil, Zertifikatsregister",
+          "exceptions": "Fehler bei Zertifikatserzeugung, Ablauf, Audit Trail fuer Widerruf"
+        },
+        {
+          "feature": "Schulungsberichte und Analysen",
+          "description": "Stellt Statistiken zu Umsetzung, Lernwirkung und Ressourcennutzung bereit.",
+          "trigger": "Ein Manager oder Schulungsadministrator ruft Berichte auf.",
+          "logic": [
+            "Unterstuetzt Abdeckung und Abschluss nach Organisation, Kurs, Zeit und Rolle",
+            "Unterstuetzt Bestehensquote, Kursbewertung und Feedbackzusammenfassung",
+            "Unterstuetzt Export und geplante Zustellung"
+          ],
+          "inputs": "Anmeldungen, Lernnachweise, Ergebnisse, Feedback",
+          "outputs": "Schulungsdashboard, Statistikbericht, Exportdatei",
+          "exceptions": "Datenverzug, fehlende Berechtigung, Hinweis bei Aenderung der Definitionen"
+        }
+      ]
+    },
+    "page_and_process": {
+      "pages": [
+        {
+          "page": "Startseite Schulungsportal",
+          "entry": "Einstieg fuer Lernende",
+          "elements": "Empfohlene Kurse, offene Aufgaben, Zertifikate, Benachrichtigungen",
+          "actions": "Kurse suchen, anmelden, Lernen fortsetzen, Zertifikate ansehen",
+          "flow": "Ein Lernender meldet sich an, prueft Aufgaben und oeffnet einen Kurs."
+        },
+        {
+          "page": "Kursverwaltung",
+          "entry": "Administrationskonsole",
+          "elements": "Kursliste, Kursdetail, Inhalte, Trainer, Zielgruppe",
+          "actions": "Kurs anlegen, Inhalte bearbeiten, veroeffentlichen/zurueckziehen, Kurs kopieren",
+          "flow": "Ein Administrator pflegt einen Kurs und veroeffentlicht ihn fuer die sichtbare Zielgruppe."
+        },
+        {
+          "page": "Schulungsplanverwaltung",
+          "entry": "Administrationskonsole",
+          "elements": "Planliste, Anmeldeliste, Freigabestatus, Benachrichtigungen",
+          "actions": "Plan veroeffentlichen, Kontingent anpassen, Anmeldungen anzeigen, Liste exportieren",
+          "flow": "Ein Administrator erstellt einen Plan, das System oeffnet Anmeldung nach Zielgruppe und sendet Nachrichten."
+        },
+        {
+          "page": "Pruefungs- und Zertifikatsverwaltung",
+          "entry": "Administrationskonsole",
+          "elements": "Fragenbank, Pruefungsbogen, Pruefungseinrichtung, Ergebnisse, Zertifikatsvorlagen",
+          "actions": "Pruefung konfigurieren, bewerten, Zertifikat erzeugen, Zertifikat widerrufen",
+          "flow": "Nach Pruefungsende fasst das System Ergebnisse zusammen und erzeugt Zertifikate nach Regel."
+        },
+        {
+          "page": "Schulungsanalyse-Dashboard",
+          "entry": "Management-Einstieg",
+          "elements": "Abdeckung, Abschluss, Bestehensquote, Kursbewertung, Trends",
+          "actions": "Filtern, Drilldown, Export, Abonnement",
+          "flow": "Management prueft Schulungswirkung nach Organisation und Zeitraum."
+        }
+      ]
+    },
+    "business_rules_and_data": {
+      "rules": [
+        "Nach Ablauf der Frist ist Anmeldung standardmaessig geschlossen; Administratoren koennen mit Berechtigung nacherfassen.",
+        "Ein Lernender darf fuer denselben Schulungsplan nur einen aktiven Anmeldedatensatz haben.",
+        "Kursabschluss kann von Fortschritt, Dauer, Aufgabenabgabe und bestandener Pruefung abhaengen.",
+        "Zertifikatsnummern muessen global eindeutig sein und duerfen nach Widerruf nicht wiederverwendet werden.",
+        "Aenderungen an Ergebnissen und Zertifikaten muessen auditierbar sein."
+      ],
+      "key_data": [
+        "Kurs: Code, Name, Kategorie, Trainer, Inhalte, Zielgruppe, Status",
+        "Schulungsplan: Code, Kurs, Zeitplan, Kontingent, Zielgruppe, Freigaberegeln",
+        "Anmeldedatensatz: Lernender, Plan, Status, Freigeber, Freigabezeit",
+        "Lernnachweis: Lernender, Kurs, Fortschritt, Dauer, Abschlussstatus, Abschlusszeit",
+        "Pruefungsergebnis: Pruefung, Lernender, Punktzahl, Bestehensstatus, Bewertungsstatus",
+        "Zertifikat: Nummer, Lernender, Kurs/Plan, Ausgabezeit, Gueltigkeit, Status"
+      ]
+    },
+    "nonfunctional_requirements": {
+      "items": [
+        "Berechtigungen: Sichtbarkeit und Aktionen nach Rolle, Organisation und Datenbereich steuern.",
+        "Performance: Haeufige Listenabfragen innerhalb von 3 Sekunden; Berichte koennen asynchron erzeugt werden.",
+        "Benutzbarkeit: Wichtige Anmelde- und Lernablaeufe benoetigen Wiederholung und klare Fehlermeldungen.",
+        "Audit: Anmeldefreigabe, Ergebnisbearbeitung und Zertifikatserzeugung/-widerruf muessen protokolliert werden.",
+        "Sicherheit: Pruefungsantworten, Ergebnisse und Zertifikatsdaten als sensible Daten behandeln."
+      ]
+    },
+    "integration_dependencies": {
+      "external_systems": [
+        "Organisations- und Mitarbeiterstammdaten",
+        "Zentrale Identitaet / SSO",
+        "Benachrichtigungsdienst",
+        "Elektronisches Siegel oder Zertifikatsdienst",
+        "Unternehmens-DWH / BI"
+      ]
+    },
+    "risks_and_questions": {
+      "risks": [
+        "Uneinheitliche historische Schulungsdaten koennen die Migrationsqualitaet beeinflussen.",
+        "Unterschiedliche Inhaltsformate und Wiedergabefaehigkeiten koennen die Lernerfahrung beeintraechtigen.",
+        "Anforderungen an Betrugsschutz bei Pruefungen und Zertifikats-Compliance muessen frueh bestaetigt werden.",
+        "Unklare Berechtigungsgrenzen zwischen Organisationen koennen Datenisolierung beeintraechtigen."
+      ],
+      "open_questions": [
+        "Sollen Schulungsplaene firmenuebergreifende oder externe Anmeldungen unterstuetzen?",
+        "Sollen Abschlussregeln je Kurs, Plan oder Rolle unterschiedlich konfigurierbar sein?",
+        "Benoetigen Zertifikate elektronisches Siegel, QR-Pruefung oder Gueltigkeitsdauer?",
+        "Benoetigen Pruefungen Zeitlimit, Zufallsbogen, Betrugsschutz und Wiederholungsregeln?",
+        "Welche Schulungsmodule brauchen eigene Seiten im Endprodukt?"
+      ]
+    },
+    "milestone_acceptance": {
+      "milestones": [
+        {
+          "milestone": "Anforderungsbestaetigung",
+          "target_date": "T+1 Woche",
+          "acceptance": "Umfang, Rollen, Kernablaeufe und Reportingdefinitionen bestaetigen"
+        },
+        {
+          "milestone": "Prototyp-Review",
+          "target_date": "T+3 Wochen",
+          "acceptance": "Hauptseiten-Prototypen und Prozessreview abschliessen"
+        },
+        {
+          "milestone": "Entwicklung und Integration",
+          "target_date": "T+8 Wochen",
+          "acceptance": "Kernfunktionen und externe Integrationen abschliessen"
+        },
+        {
+          "milestone": "Pilotstart",
+          "target_date": "T+10 Wochen",
+          "acceptance": "Pilotorganisation starten und Pilotprobleme schliessen"
+        },
+        {
+          "milestone": "Produktivstart",
+          "target_date": "T+12 Wochen",
+          "acceptance": "Gesamtrelease, Schulung und Abnahme abschliessen"
+        }
+      ]
+    },
+    "summary": "Schulungsplaene, Kursanmeldungen, Lernnachweise, Pruefungsergebnisse und Zertifikate sind derzeit ueber E-Mail, Tabellen und mehrere Plattformen verteilt. Schulungsadministratoren koennen die Umsetzung schwer verfolgen, Lernende haben keinen einheitlichen Einstieg, und dem Management fehlen auswertbare Daten zur Schulungswirkung.",
+    "objective": "Einen einheitlichen Einstieg fuer Schulungsplaene, Kurse und Lernen schaffen; Anmeldung, Lernen, Pruefung und Zertifikat geschlossen verwalten; Effizienz der Schulungsdurchfuehrung und Genauigkeit der Lernnachweise verbessern; Auswertbare Schulungsdaten fuer Talententwicklungsentscheidungen aufbauen"
+  },
+  "prompt_hints": [
+    {
+      "hint_key": "training_hint_1",
+      "content": "Die Vorlage enthaelt typische Ziele, Umfaenge, Rollen, Prozesse und Funktionsmodule fuer Schulungssysteme."
+    },
+    {
+      "hint_key": "training_hint_2",
+      "content": "Klaeren Sie zuerst den geschlossenen Ablauf zwischen Kursen, Anmeldung, Lernen, Pruefung, Zertifikaten und Berichten."
+    },
+    {
+      "hint_key": "training_hint_3",
+      "content": "Definieren Sie Berechtigungen und Audit-Anforderungen fuer Ergebnisse, Zertifikate und sensible Daten klar."
+    }
+  ],
+  "prompt_questions": [
+    {
+      "question_key": "training_question_1",
+      "content": "Sollen Schulungsplaene firmenuebergreifende oder externe Anmeldungen unterstuetzen?"
+    },
+    {
+      "question_key": "training_question_2",
+      "content": "Sollen Abschlussregeln je Kurs, Plan oder Rolle unterschiedlich konfigurierbar sein?"
+    },
+    {
+      "question_key": "training_question_3",
+      "content": "Benoetigen Zertifikate elektronisches Siegel, QR-Pruefung oder Gueltigkeitsdauer?"
+    },
+    {
+      "question_key": "training_question_4",
+      "content": "Benoetigen Pruefungen Zeitlimit, Zufallsbogen, Betrugsschutz und Wiederholungsregeln?"
+    },
+    {
+      "question_key": "training_question_5",
+      "content": "Welche Schulungsmodule brauchen eigene Seiten im Endprodukt?"
+    }
+  ]
+}

@@ -1,0 +1,671 @@
+{
+  "template_id": "forum_community_business_requirement_template_en",
+  "template_key": "forum_community_business_requirement",
+  "template_name": "Forum Community System Business Requirement Template",
+  "template_category": "business_requirement",
+  "business_domain": "forum_community",
+  "language": "en",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "A general business requirement template for forum communities similar to Tieba, interest communities, Q&A discussion boards, and internal enterprise forums.",
+  "tags": [
+    "forum",
+    "community",
+    "thread",
+    "post",
+    "comment",
+    "moderation"
+  ],
+  "applicable_scenarios": [
+    "Board and moderator management",
+    "Thread publishing and editing",
+    "Replies, comments, and interactions",
+    "User levels and points",
+    "Moderation and report handling",
+    "Search, recommendation, and analytics"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/forum-community-business-requirement-template.en.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Basic Information",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.project_name",
+          "label": "Project",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Enter the project name"
+        },
+        {
+          "field_key": "document_info.requirement_name",
+          "label": "Requirement name",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Example: Interest community forum build"
+        },
+        {
+          "field_key": "template_meta.requirement_type",
+          "label": "Requirement type",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "New build",
+            "Optimization",
+            "Refactor"
+          ]
+        },
+        {
+          "field_key": "template_meta.priority",
+          "label": "Priority",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "High",
+            "Medium",
+            "Low"
+          ]
+        },
+        {
+          "field_key": "template_meta.proposing_department",
+          "label": "Proposing department",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Enter the proposing department"
+        },
+        {
+          "field_key": "template_meta.requester",
+          "label": "Requester",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Enter the requester"
+        },
+        {
+          "field_key": "template_meta.request_date",
+          "label": "Request date",
+          "component": "date",
+          "data_type": "date",
+          "required": false,
+          "placeholder": "YYYY-MM-DD"
+        },
+        {
+          "field_key": "template_meta.version",
+          "label": "Version",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "V1.0"
+        }
+      ]
+    },
+    {
+      "section_key": "business_background",
+      "section_title": "Business Background",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "business_background.summary",
+          "label": "Background summary",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Describe the forum community background, current communication approach, and reason for building the system"
+        },
+        {
+          "field_key": "business_background.pain_points",
+          "label": "Current pain points",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Describe the forum community background, current communication approach, and reason for building the system"
+        }
+      ]
+    },
+    {
+      "section_key": "business_objectives",
+      "section_title": "Business Objectives",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "business_objectives.objectives",
+          "label": "Business objectives",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Describe the business goals this forum system should achieve"
+        },
+        {
+          "field_key": "business_objectives.metrics",
+          "label": "Quantified metrics",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Example: Reduce average moderation handling time by 50%"
+        }
+      ]
+    },
+    {
+      "section_key": "business_scope",
+      "section_title": "Business Scope",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "business_scope.in_scope",
+          "label": "In scope",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the forum system"
+        },
+        {
+          "field_key": "business_scope.out_scope",
+          "label": "Out of scope",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the forum system"
+        }
+      ]
+    },
+    {
+      "section_key": "roles_and_scenarios",
+      "section_title": "Roles and Core Scenarios",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "roles_and_scenarios.target_roles",
+          "label": "Target roles",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Example: visitors, registered users, board moderators, operators, reviewers"
+        },
+        {
+          "field_key": "roles_and_scenarios.core_scenarios",
+          "label": "Core business scenarios",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Example: visitors, registered users, board moderators, operators, reviewers"
+        }
+      ]
+    },
+    {
+      "section_key": "functional_requirements",
+      "section_title": "Functional Requirements",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "functional_requirements.overview",
+          "label": "Feature overview",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the forum system"
+        },
+        {
+          "field_key": "functional_requirements.features",
+          "label": "Feature details",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "feature": "Feature",
+            "description": "Description",
+            "trigger": "Trigger",
+            "logic": "Business rules / logic",
+            "inputs": "Inputs",
+            "outputs": "Outputs",
+            "exceptions": "Exceptions"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "page_and_process",
+      "section_title": "Pages and Processes",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "page_and_process.pages",
+          "label": "Page / entry",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "page": "Page / entry",
+            "entry": "Entry",
+            "elements": "Key elements",
+            "actions": "Main actions",
+            "flow": "Flow"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "business_rules_and_data",
+      "section_title": "Business Rules and Data",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "business_rules_and_data.rules",
+          "label": "Business rules / logic",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the forum system"
+        },
+        {
+          "field_key": "business_rules_and_data.key_data",
+          "label": "Key data objects",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Example: boards, threads, replies, user relations, moderation records"
+        }
+      ]
+    },
+    {
+      "section_key": "nonfunctional_requirements",
+      "section_title": "Non-functional Requirements",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "nonfunctional_requirements.items",
+          "label": "Non-functional requirements",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the forum system"
+        }
+      ]
+    },
+    {
+      "section_key": "integration_dependencies",
+      "section_title": "Integrations and Dependencies",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "integration_dependencies.external_systems",
+          "label": "External dependencies",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the forum system"
+        }
+      ]
+    },
+    {
+      "section_key": "risks_and_questions",
+      "section_title": "Risks and Open Questions",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "risks_and_questions.risks",
+          "label": "Risks",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the forum system"
+        },
+        {
+          "field_key": "risks_and_questions.open_questions",
+          "label": "Open questions",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Enter an open question"
+        }
+      ]
+    },
+    {
+      "section_key": "milestone_acceptance",
+      "section_title": "Milestones and Acceptance",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "milestone_acceptance.milestones",
+          "label": "Milestone",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "milestone": "Milestone",
+            "target_date": "Target date",
+            "acceptance": "Acceptance criteria"
+          }
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "Community forum platform project",
+      "requirement_name": "Interest community forum build"
+    },
+    "template_meta": {
+      "template_name": "Forum Community System Business Requirement Template",
+      "requirement_type": "New build",
+      "priority": "High",
+      "proposing_department": "Community Operations / Product",
+      "requester": "Community product manager",
+      "request_date": "2026-05-14",
+      "version": "V1.0"
+    },
+    "business_background": {
+      "summary": "User discussions, experience sharing, and Q&A content are currently scattered across chat groups, spreadsheets, and temporary documents. Content is hard to retain, search is weak, and policy violations rely on manual patrol. A forum community system similar to Tieba is needed to support threaded discussions, board governance, content moderation, and community analytics.",
+      "pain_points": [
+        "Discussion content is hard to structure, retain, and search later",
+        "Boards, threads, replies, and user relations lack unified management",
+        "Violation discovery and handling are not timely, and moderation lacks audit trails",
+        "Trending content, active users, and community quality lack dashboards"
+      ]
+    },
+    "business_objectives": {
+      "objectives": [
+        "Build a board and thread structure organized by interest or business topic",
+        "Support a closed interaction loop for posting, replying, liking, collecting, following, and notifications",
+        "Build content governance for reports, moderation, bans, appeals, and operation audits",
+        "Accumulate community operation data for recommendation and operating decisions"
+      ],
+      "metrics": [
+        "Average time from publishing to visibility within 3 seconds",
+        "Reduce average moderation handling time by 50%",
+        "Improve community search hit rate to 90%",
+        "Track daily active users and post volume by core board"
+      ]
+    },
+    "business_scope": {
+      "in_scope": [
+        "Board management and permission configuration",
+        "Thread publishing, editing, deletion, pinning, and featured posts",
+        "Replies, comments, nested replies, and interactions",
+        "User profile, following, levels, points, and badges",
+        "Reports, moderation, blocking, bans, and appeals",
+        "Search, sorting, recommendation, and analytics dashboards"
+      ],
+      "out_scope": [
+        "Instant messaging group chat",
+        "Complex short-video authoring tools",
+        "External advertising delivery system",
+        "Fully automated AI content judgment"
+      ]
+    },
+    "roles_and_scenarios": {
+      "target_roles": [
+        "Visitor: browse public boards and threads, search content",
+        "Registered user: publish threads, reply, like, collect, follow, and report",
+        "Board moderator: manage board rules, pin/feature posts, and handle violations",
+        "Reviewer: review new posts, reports, and sensitive content",
+        "Operator: configure recommendations, campaigns, tags, and dashboards",
+        "System administrator: maintain permissions, dictionaries, sensitive words, and system parameters"
+      ],
+      "core_scenarios": [
+        "A user enters the forum home page and navigates to an interesting thread by board, hot list, or search.",
+        "A registered user publishes a thread in a target board and uploads images or attachments.",
+        "Other users reply, like, collect, or follow the author, and the system sends interaction notifications.",
+        "A user reports violating content, and a reviewer handles it in the moderation console with a recorded reason.",
+        "A moderator pins or features a quality post, while an operator configures recommendation slots.",
+        "Management views post volume, reply volume, active users, reports, and moderation efficiency."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "This requirement covers seven capability groups: board governance, content publishing, interactions, user growth, moderation and risk control, search and recommendation, and community analytics.",
+      "features": [
+        {
+          "feature": "Board and moderator management",
+          "description": "Maintain board categories, board profiles, rules, moderators, and access permissions.",
+          "trigger": "An operator creates or adjusts a board.",
+          "logic": [
+            "Support board creation, disabling, merging, sorting, and visibility configuration",
+            "Support board rules, announcements, tags, and moderator permissions",
+            "Support board statistics and anomaly alerts"
+          ],
+          "inputs": "Board name, category, rules, moderators, permission scope",
+          "outputs": "Board detail, announcement, moderator list, statistics",
+          "exceptions": "Duplicate board name, deletion blocked when posts exist, permission conflict warnings"
+        },
+        {
+          "feature": "Thread publishing and content editing",
+          "description": "Support thread publishing, drafts, rich text, images, attachments, and tags.",
+          "trigger": "A user clicks publish or edit.",
+          "logic": [
+            "Support title, body, images, attachments, tags, and anonymous options",
+            "Support draft saving, edit history, deletion, and recovery",
+            "Support pinning, featuring, locking, and burying posts"
+          ],
+          "inputs": "Title, body, board, tags, attachments, author",
+          "outputs": "Thread, draft, edit record, management status",
+          "exceptions": "Sensitive word hit, attachment limit exceeded, duplicate posting, no permission"
+        },
+        {
+          "feature": "Replies, comments, and interactions",
+          "description": "Support replies, nested comments, likes, collections, follows, and notifications.",
+          "trigger": "A user interacts with a thread or reply.",
+          "logic": [
+            "Support reply sorting, quoting, folding, and deletion",
+            "Support likes, collections, following authors/threads, and interaction notifications",
+            "Support blocking users and not-interested feedback"
+          ],
+          "inputs": "Thread, reply, user, interaction type",
+          "outputs": "Reply list, interaction record, notification",
+          "exceptions": "Frequent action limit, blocked user restriction, content deleted"
+        },
+        {
+          "feature": "User growth and community assets",
+          "description": "Maintain user profile, levels, points, badges, and contribution records.",
+          "trigger": "A user completes posting, interaction, check-in, or campaign tasks.",
+          "logic": [
+            "Support point rules, level rules, badge issuing, and task configuration",
+            "Show posts, collections, following, and followers on user profile",
+            "Support violation point deduction, mute, and credit recovery"
+          ],
+          "inputs": "User profile, behavior record, point rule, badge rule",
+          "outputs": "User profile, point ledger, level result, badge record",
+          "exceptions": "Point farming, point rollback, account anomaly"
+        },
+        {
+          "feature": "Moderation and report handling",
+          "description": "Handle sensitive content, reports, manual reviews, bans, and appeals.",
+          "trigger": "Content is published, reported, or hits a rule.",
+          "logic": [
+            "Support pre/post-publish moderation, sensitive words, and image review",
+            "Support report acceptance, conclusion, penalty action, and notification",
+            "Support bans, mutes, content blocking, appeals, and operation audit"
+          ],
+          "inputs": "Content, report reason, moderation rule, handler",
+          "outputs": "Moderation result, penalty record, appeal record, audit log",
+          "exceptions": "False-positive appeal, duplicate report, moderation timeout, penalty reversal"
+        },
+        {
+          "feature": "Search, recommendation, and analytics",
+          "description": "Provide content search, hot lists, recommendation slots, and community data.",
+          "trigger": "A user searches content or an operator views data.",
+          "logic": [
+            "Support search by board, keyword, tag, author, and time",
+            "Support hot thread list, recommendation slots, featured area, and campaign entry",
+            "Support dashboards for posts, active users, reports, and moderation efficiency"
+          ],
+          "inputs": "Threads, replies, tags, user behavior, moderation records",
+          "outputs": "Search results, hot list, recommendation list, analytics report",
+          "exceptions": "Index delay, recommended violating content, incomplete permission filtering"
+        }
+      ]
+    },
+    "page_and_process": {
+      "pages": [
+        {
+          "page": "Forum home",
+          "entry": "User entry",
+          "elements": "Recommended boards, hot list, search box, campaign entry",
+          "actions": "Search, enter board, view hot threads, sign in/up",
+          "flow": "A user enters the home page and opens threads by interest or hot list."
+        },
+        {
+          "page": "Board detail",
+          "entry": "Board entry",
+          "elements": "Board announcement, rules, thread list, filters and sorting",
+          "actions": "Publish thread, follow board, filter, view thread",
+          "flow": "A user browses threads in a board and starts discussion."
+        },
+        {
+          "page": "Thread detail",
+          "entry": "Thread list / search result",
+          "elements": "Main post, replies, nested replies, interactions, recommendations",
+          "actions": "Reply, like, collect, report, follow author",
+          "flow": "A user reads and interacts with a thread; the system records relations and notifications."
+        },
+        {
+          "page": "Post editor",
+          "entry": "Publish button",
+          "elements": "Title, body, images, attachments, tags, publish settings",
+          "actions": "Save draft, preview, publish, edit",
+          "flow": "A user edits content, and the system validates sensitive words and permissions before publishing."
+        },
+        {
+          "page": "Moderation console",
+          "entry": "Admin backend",
+          "elements": "Pending content, report list, handling records, penalty actions",
+          "actions": "Review, block, ban, reject, approve, notify",
+          "flow": "A reviewer handles content and leaves operation records."
+        },
+        {
+          "page": "Community analytics dashboard",
+          "entry": "Operations backend",
+          "elements": "Post volume, active users, hot threads, report volume, moderation efficiency",
+          "actions": "Filter, drill down, export, configure recommendations",
+          "flow": "Operators review community quality and growth."
+        }
+      ]
+    },
+    "business_rules_and_data": {
+      "rules": [
+        "Posting frequency limits can be configured by user level within each board.",
+        "Publishing requires sensitive word, image safety, and permission checks.",
+        "Deleted or blocked content is hidden from normal users, while audit records remain in the admin backend.",
+        "Report handling must record handler, time, conclusion, and penalty action.",
+        "Pinning, featuring, and recommendation slots must be authorized by role."
+      ],
+      "key_data": [
+        "Board: id, name, category, rules, moderators, status, visibility scope",
+        "Thread: id, board, title, body, author, status, interaction count, publish time",
+        "Reply: id, thread, parent reply, author, body, status, floor number",
+        "User relation: follow, block, collection, like, view record",
+        "Moderation record: content, rule, hit item, handler, conclusion, penalty action",
+        "Operation config: recommendation slot, hot list rule, tag, campaign entry"
+      ]
+    },
+    "nonfunctional_requirements": {
+      "items": [
+        "Performance: common home and thread detail queries return within 3 seconds; hot lists may be cached.",
+        "Security: protect identity, sensitive words, image content, and API frequency.",
+        "Usability: key flows such as posting, replying, and reporting need retry handling and clear prompts.",
+        "Audit: moderation, bans, deletion, recovery, and recommendation operations must be logged.",
+        "Extensibility: boards, tags, points, and moderation rules need configurable extension."
+      ]
+    },
+    "integration_dependencies": {
+      "external_systems": [
+        "Unified identity / SSO",
+        "Object storage or attachment service",
+        "Message notification service",
+        "Content safety / image review service",
+        "Search engine service",
+        "Data warehouse / BI"
+      ]
+    },
+    "risks_and_questions": {
+      "risks": [
+        "Open communities may produce spam, ads, and violating content; governance strategy must be clear.",
+        "Overly strict sensitive word and moderation rules may hurt normal discussion.",
+        "Opaque hot list and recommendation rules may create operations disputes.",
+        "Historical content migration may require data cleansing and permission mapping."
+      ],
+      "open_questions": [
+        "Should visitors be allowed to post, or only registered users?",
+        "Should posts be reviewed before publishing or inspected after publishing?",
+        "What are the permission boundaries and appointment process for board moderators?",
+        "Are levels, points, badges, and check-ins required?",
+        "Who maintains hot list, recommendation slot, and search ranking rules?"
+      ]
+    },
+    "milestone_acceptance": {
+      "milestones": [
+        {
+          "milestone": "Requirement confirmation",
+          "target_date": "T+1 week",
+          "acceptance": "Confirm roles, scope, core flows, and moderation strategy"
+        },
+        {
+          "milestone": "Prototype review",
+          "target_date": "T+3 weeks",
+          "acceptance": "Complete prototypes for home, board, thread, editor, and moderation console"
+        },
+        {
+          "milestone": "Development and integration",
+          "target_date": "T+8 weeks",
+          "acceptance": "Complete core features and integrations with content safety and search"
+        },
+        {
+          "milestone": "Pilot launch",
+          "target_date": "T+10 weeks",
+          "acceptance": "Pilot selected boards and close issues"
+        },
+        {
+          "milestone": "Production launch",
+          "target_date": "T+12 weeks",
+          "acceptance": "Complete full release, operation configuration, and acceptance"
+        }
+      ]
+    },
+    "summary": "User discussions, experience sharing, and Q&A content are currently scattered across chat groups, spreadsheets, and temporary documents. Content is hard to retain, search is weak, and policy violations rely on manual patrol. A forum community system similar to Tieba is needed to support threaded discussions, board governance, content moderation, and community analytics.",
+    "objective": "Build a board and thread structure organized by interest or business topic; Support a closed interaction loop for posting, replying, liking, collecting, following, and notifications; Build content governance for reports, moderation, bans, appeals, and operation audits; Accumulate community operation data for recommendation and operating decisions"
+  },
+  "prompt_hints": [
+    {
+      "hint_key": "forum_hint_1",
+      "content": "The template includes common roles, boards, threads, interactions, and moderation capabilities for forum communities."
+    },
+    {
+      "hint_key": "forum_hint_2",
+      "content": "Confirm content governance first, including moderation timing, penalties, and appeals."
+    },
+    {
+      "hint_key": "forum_hint_3",
+      "content": "Recommendation, hot list, levels, and point rules need clear operation maintenance entries."
+    }
+  ],
+  "prompt_questions": [
+    {
+      "question_key": "forum_question_1",
+      "content": "Should visitors be allowed to post, or only registered users?"
+    },
+    {
+      "question_key": "forum_question_2",
+      "content": "Should posts be reviewed before publishing or inspected after publishing?"
+    },
+    {
+      "question_key": "forum_question_3",
+      "content": "What are the permission boundaries and appointment process for board moderators?"
+    },
+    {
+      "question_key": "forum_question_4",
+      "content": "Are levels, points, badges, and check-ins required?"
+    },
+    {
+      "question_key": "forum_question_5",
+      "content": "Who maintains hot list, recommendation slot, and search ranking rules?"
+    }
+  ]
+}

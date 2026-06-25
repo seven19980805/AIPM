@@ -1,0 +1,665 @@
+{
+  "template_id": "shopping_mall_business_requirement_template_de",
+  "template_key": "shopping_mall_business_requirement",
+  "template_name": "Vorlage fuer fachliche Anforderungen an einen Online-Shop",
+  "template_category": "business_requirement",
+  "business_domain": "shopping_mall",
+  "language": "de",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "Allgemeine Vorlage fuer fachliche Anforderungen an B2C-Shops, Markenstores, Mitgliederstores und mehrkanalige E-Commerce-Transaktionssysteme.",
+  "tags": [
+    "ecommerce",
+    "product",
+    "order",
+    "cart",
+    "promotion",
+    "customer"
+  ],
+  "applicable_scenarios": [
+    "Produkt- und Kategorieverwaltung",
+    "Warenkorb und Checkout",
+    "Bestellung und Zahlung",
+    "Aktionen und Gutscheine",
+    "Mitglieder- und Kundenbetrieb",
+    "After-Sales und Commerce-Analysen"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/shopping-mall-business-requirement-template.de.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Basisinformationen",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.project_name",
+          "label": "Projekt",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Projektnamen eingeben"
+        },
+        {
+          "field_key": "document_info.requirement_name",
+          "label": "Anforderungsname",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Beispiel: Aufbau eines Marken-Online-Shops"
+        },
+        {
+          "field_key": "template_meta.requirement_type",
+          "label": "Anforderungstyp",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "Neubau",
+            "Optimierung",
+            "Refactoring"
+          ]
+        },
+        {
+          "field_key": "template_meta.priority",
+          "label": "Prioritaet",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "Hoch",
+            "Mittel",
+            "Niedrig"
+          ]
+        },
+        {
+          "field_key": "template_meta.proposing_department",
+          "label": "Anfordernde Abteilung",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Anfordernde Abteilung eingeben"
+        },
+        {
+          "field_key": "template_meta.requester",
+          "label": "Anforderer",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Anforderer eingeben"
+        },
+        {
+          "field_key": "template_meta.request_date",
+          "label": "Anforderungsdatum",
+          "component": "date",
+          "data_type": "date",
+          "required": false,
+          "placeholder": "YYYY-MM-DD"
+        },
+        {
+          "field_key": "template_meta.version",
+          "label": "Version",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "V1.0"
+        }
+      ]
+    },
+    {
+      "section_key": "business_background",
+      "section_title": "Fachlicher Hintergrund",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "business_background.summary",
+          "label": "Hintergrundueberblick",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Beschreiben Sie Commerce-Hintergrund, Vertriebskanaele und Grund fuer den Shop-Aufbau"
+        },
+        {
+          "field_key": "business_background.pain_points",
+          "label": "Aktuelle Schmerzpunkte",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beschreiben Sie Commerce-Hintergrund, Vertriebskanaele und Grund fuer den Shop-Aufbau"
+        }
+      ]
+    },
+    {
+      "section_key": "business_objectives",
+      "section_title": "Fachliche Ziele",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "business_objectives.objectives",
+          "label": "Fachliche Ziele",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beschreiben Sie die fachlichen Ziele des Online-Shops"
+        },
+        {
+          "field_key": "business_objectives.metrics",
+          "label": "Messbare Kennzahlen",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beispiel: Checkout-Konversion um 15% steigern"
+        }
+      ]
+    },
+    {
+      "section_key": "business_scope",
+      "section_title": "Fachlicher Umfang",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "business_scope.in_scope",
+          "label": "Im Umfang",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Shop-Systems zusammen"
+        },
+        {
+          "field_key": "business_scope.out_scope",
+          "label": "Nicht im Umfang",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Shop-Systems zusammen"
+        }
+      ]
+    },
+    {
+      "section_key": "roles_and_scenarios",
+      "section_title": "Rollen und Kernszenarien",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "roles_and_scenarios.target_roles",
+          "label": "Zielrollen",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beispiel: Besucher, Mitglieder, Operatoren, Kundenservice, Lager, Finanzen"
+        },
+        {
+          "field_key": "roles_and_scenarios.core_scenarios",
+          "label": "Kernszenarien",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beispiel: Besucher, Mitglieder, Operatoren, Kundenservice, Lager, Finanzen"
+        }
+      ]
+    },
+    {
+      "section_key": "functional_requirements",
+      "section_title": "Funktionale Anforderungen",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "functional_requirements.overview",
+          "label": "Funktionsueberblick",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Shop-Systems zusammen"
+        },
+        {
+          "field_key": "functional_requirements.features",
+          "label": "Funktionsdetails",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "feature": "Funktion",
+            "description": "Beschreibung",
+            "trigger": "Ausloeser",
+            "logic": "Fachliche Regeln / Logik",
+            "inputs": "Eingaben",
+            "outputs": "Ausgaben",
+            "exceptions": "Ausnahmen"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "page_and_process",
+      "section_title": "Seiten und Prozesse",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "page_and_process.pages",
+          "label": "Seite / Einstieg",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "page": "Seite / Einstieg",
+            "entry": "Einstieg",
+            "elements": "Schluesselinhalte",
+            "actions": "Hauptaktionen",
+            "flow": "Ablauf"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "business_rules_and_data",
+      "section_title": "Fachliche Regeln und Daten",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "business_rules_and_data.rules",
+          "label": "Fachliche Regeln / Logik",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Shop-Systems zusammen"
+        },
+        {
+          "field_key": "business_rules_and_data.key_data",
+          "label": "Wichtige Datenobjekte",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beispiel: Produkt, SKU, Warenkorb, Bestellung, Zahlung, After-Sales-Fall"
+        }
+      ]
+    },
+    {
+      "section_key": "nonfunctional_requirements",
+      "section_title": "Nichtfunktionale Anforderungen",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "nonfunctional_requirements.items",
+          "label": "Nichtfunktionale Anforderungen",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Shop-Systems zusammen"
+        }
+      ]
+    },
+    {
+      "section_key": "integration_dependencies",
+      "section_title": "Integrationen und Abhaengigkeiten",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "integration_dependencies.external_systems",
+          "label": "Externe Abhaengigkeiten",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Shop-Systems zusammen"
+        }
+      ]
+    },
+    {
+      "section_key": "risks_and_questions",
+      "section_title": "Risiken und offene Fragen",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "risks_and_questions.risks",
+          "label": "Risiken",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Shop-Systems zusammen"
+        },
+        {
+          "field_key": "risks_and_questions.open_questions",
+          "label": "Offene Fragen",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Offene Frage eingeben"
+        }
+      ]
+    },
+    {
+      "section_key": "milestone_acceptance",
+      "section_title": "Meilensteine und Abnahme",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "milestone_acceptance.milestones",
+          "label": "Meilenstein",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "milestone": "Meilenstein",
+            "target_date": "Zieldatum",
+            "acceptance": "Abnahmekriterien"
+          }
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "E-Commerce-Shop-Plattformprojekt",
+      "requirement_name": "Aufbau eines Marken-Online-Shops"
+    },
+    "template_meta": {
+      "template_name": "Vorlage fuer fachliche Anforderungen an einen Online-Shop",
+      "requirement_type": "Neubau",
+      "priority": "Hoch",
+      "proposing_department": "E-Commerce Operations / Produkt",
+      "requester": "Shop Product Manager",
+      "request_date": "2026-05-14",
+      "version": "V1.0"
+    },
+    "business_background": {
+      "summary": "Produktverkauf erfolgt derzeit ueber Filialen, Communities und manuelle Bestellungen. Produktinformationen, Bestand, Rabatte, Bestellungen und After-Sales werden getrennt verwaltet. Ein einheitlicher Online-Shop soll Produktdarstellung, Mitgliedskauf, Online-Zahlung, Fulfillment, After-Sales und Analysen unterstuetzen.",
+      "pain_points": [
+        "Produktinformationen und Preise sind verteilt und zwischen Frontend und Backend uneinheitlich",
+        "Bestellung, Zahlung, Bestandsabzug und Versand bilden keinen geschlossenen Ablauf",
+        "Aktionen werden manuell konfiguriert und abgerechnet und sind fehleranfaellig",
+        "After-Sales, Kundenservice und operative Daten werden nicht einheitlich verfolgt"
+      ]
+    },
+    "business_objectives": {
+      "objectives": [
+        "Ein einheitliches System fuer Produkt, SKU, Preis und Bestand aufbauen",
+        "Warenkorb, Bestellung, Zahlung, Versand und After-Sales zu einem Transaktionsablauf verbinden",
+        "Gutscheine, Mengenrabatte, Flash Sales, Mitgliederpreise und Kampagnen unterstuetzen",
+        "Kunden-, Bestell-, Konversions- und Wiederkaufsdaten fuer Operations sammeln"
+      ],
+      "metrics": [
+        "Checkout-Konversion um 15% steigern",
+        "Zahlungserfolgsquote auf 98% bringen",
+        "Durchschnittliche After-Sales-Bearbeitungszeit um 40% reduzieren",
+        "Aktionskonfigurationszeit um 60% reduzieren"
+      ]
+    },
+    "business_scope": {
+      "in_scope": [
+        "Produktkategorien, SPU/SKU, Preis- und Listing-Verwaltung",
+        "Suche, Filter, Produktdetail, Warenkorb und Checkout",
+        "Bestellerstellung, Zahlung, Storno, Versand und Empfangsbestaetigung",
+        "Gutscheine, Mengenrabatte, Flash Sales, Mitgliederpreise und Kampagnenseiten",
+        "Mitgliederprofil, Adresse, Merkliste, Browsing und Kundenbetrieb",
+        "Rueckerstattung/Rueckgabe, Service-Zusammenarbeit und Commerce-Dashboards"
+      ],
+      "out_scope": [
+        "Grenzueberschreitende Zoll- und internationale Steuerberechnung",
+        "Komplexes Marketplace-Haendler-Onboarding und Settlement",
+        "Umbau des Offline-POS",
+        "Eigenentwicklung einer Live-Commerce-Engine"
+      ]
+    },
+    "roles_and_scenarios": {
+      "target_roles": [
+        "Besucher: Produkte browsen, suchen, Kampagnen ansehen und anmelden",
+        "Mitglied: Warenkorb, Bestellung, Zahlung, Bestellungen ansehen und After-Sales beantragen",
+        "Operator: Produkte, Kampagnen, Empfehlungen und Inhaltsseiten pflegen",
+        "Kundenservice: Anfragen, Bestellfehler, Rueckgaben und Beschwerden behandeln",
+        "Lagerpersonal: Bestellungen empfangen, kommissionieren, versenden und Tracking synchronisieren",
+        "Finanzen: Zahlungen, Rueckerstattungen, Abstimmung und Rechnungsdaten ansehen",
+        "Systemadministrator: Berechtigungen, Woerterbuecher, Zahlung und Shop-Parameter pflegen"
+      ],
+      "core_scenarios": [
+        "Ein Operator listet Produkte und konfiguriert Bestand, Preise und Kampagnentags.",
+        "Ein Nutzer sucht Produkte, oeffnet die Detailseite, legt Artikel in den Warenkorb und sendet eine Bestellung ab.",
+        "Das System berechnet Rabatte, Versand und Zahlbetrag; der Nutzer bezahlt online.",
+        "Das Lager empfaengt Versandauftraege, kommissioniert, versendet und meldet Trackingnummern zurueck.",
+        "Ein Nutzer beantragt Rueckerstattung/Rueckgabe; Kundenservice prueft und loest Zahlungserstattung aus.",
+        "Operatoren sehen Konversion, Warenkorbwert, Wiederkauf, Bestand und Kampagnenerfolg."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "Diese Anforderung umfasst sieben Faehigkeitsgruppen: Produkte, Warenkorb, Bestellung und Zahlung, Aktionen, Mitglieder und Kunden, After-Sales und Analysen.",
+      "features": [
+        {
+          "feature": "Produkt- und SKU-Verwaltung",
+          "description": "Pflegt Kategorien, Marken, SPU/SKU, Bilder, Spezifikationen, Preise, Bestand und Listingstatus.",
+          "trigger": "Ein Operator erstellt oder aktualisiert ein Produkt.",
+          "logic": [
+            "Unterstuetzt Kategoriehierarchie, Marke, Attribute und SKU-Kombinationen",
+            "Unterstuetzt Entwurf, Vorschau, Listing/Delisting, Sortierung und Empfehlungstags",
+            "Unterstuetzt Preis, Bestand, Kauflimit und Verkaufsregion"
+          ],
+          "inputs": "Produktdaten, SKU, Preis, Bestand, Bilder, Tags",
+          "outputs": "Produktdetail, SKU-Liste, Listingstatus",
+          "exceptions": "SKU-Konflikt, zu wenig Bestand, Preisfehler, Produkt in Bestellung referenziert"
+        },
+        {
+          "feature": "Warenkorb und Checkout",
+          "description": "Unterstuetzt Warenkorb, Artikelauswahl, Mengenanpassung, Rabattberechnung und Bestellung.",
+          "trigger": "Ein Nutzer legt Artikel in den Warenkorb oder geht zum Checkout.",
+          "logic": [
+            "Unterstuetzt Menge, Auswahlstatus und Hinweise fuer ungueltige Artikel",
+            "Unterstuetzt Gutscheine, Mengenrabatte, Mitgliederpreise, Punkteabzug und Versandkosten",
+            "Unterstuetzt Adresse, Rechnung, Bemerkung und Lieferart"
+          ],
+          "inputs": "Nutzer, SKU, Menge, Rabatt, Adresse, Lieferart",
+          "outputs": "Warenkorb, Checkout-Beleg, Zahlbetrag",
+          "exceptions": "Zu wenig Bestand, Preisaenderung, Rabatt nicht nutzbar, Adresse nicht lieferbar"
+        },
+        {
+          "feature": "Bestellung und Zahlung",
+          "description": "Verwaltet Erstellung, Zahlung, Storno, Timeout-Schliessung, Versand und Empfangsbestaetigung.",
+          "trigger": "Nutzer sendet Bestellung ab oder Zahlungsrueckruf kommt an.",
+          "logic": [
+            "Unterstuetzt Bestellstatus, Zahlungsdatensatz, Rueckerstattung und Log",
+            "Unterstuetzt mehrere Zahlungsarten, Rueckrufpruefung und Timeout-Schliessung",
+            "Unterstuetzt geteilte Bestellungen, Teillieferung und Bemerkungen"
+          ],
+          "inputs": "Bestellung, Zahlung, Nutzer, Produkt, Betrag, Status",
+          "outputs": "Bestelldetail, Zahlungsergebnis, Versandaufgabe",
+          "exceptions": "Doppelzahlung, Zahlungsfehler, Timeout, Betragsabweichung"
+        },
+        {
+          "feature": "Aktionen und Mitgliederbetrieb",
+          "description": "Konfiguriert Gutscheine, Mengenrabatte, Flash Sales, Mitgliederpreise, Empfehlungsplaetze und Kampagnenseiten.",
+          "trigger": "Operator erstellt Kampagne oder Nutzer nimmt teil.",
+          "logic": [
+            "Unterstuetzt Kampagnenzeit, Produktumfang, Nutzerumfang und Stapelregeln",
+            "Unterstuetzt Gutscheinabruf, Einloesung, Ablauf und Schwellenwert",
+            "Unterstuetzt Kampagnenerfolg und Zielgruppen-Tags"
+          ],
+          "inputs": "Kampagne, Gutschein, Mitgliederlevel, Zielgruppe, Produktumfang",
+          "outputs": "Rabattergebnis, Kampagnenseite, Marketingbericht",
+          "exceptions": "Kampagnenkonflikt, falsche Stapelung, Bestandsreservierung"
+        },
+        {
+          "feature": "After-Sales und Service",
+          "description": "Bearbeitet Rueckerstattung, Rueckgabe, Umtausch, Beschwerden und Bestellfehler.",
+          "trigger": "Nutzer stellt After-Sales-Antrag oder Service erstellt Ticket.",
+          "logic": [
+            "Unterstuetzt Grund, Nachweis, Pruefung, Ruecksendung und Rueckerstattung",
+            "Unterstuetzt Servicenotizen, Verhandlungsdaten und Timeout-Erinnerungen",
+            "Unterstuetzt Statusfluss und Verantwortungszuordnung"
+          ],
+          "inputs": "After-Sales-Fall, Bestellung, Zahlung, Nachweis, Serviceprotokoll",
+          "outputs": "Pruefergebnis, Rueckerstattung, Fortschritt",
+          "exceptions": "Frist abgelaufen, Artikel nicht rueckgabefaehig, Rueckerstattung fehlgeschlagen, Sendung verloren"
+        },
+        {
+          "feature": "Commerce-Analysen",
+          "description": "Stellt Dashboards fuer Umsatz, Konversion, Bestand, Kunden und Kampagnen bereit.",
+          "trigger": "Operator oder Manager sieht Daten.",
+          "logic": [
+            "Unterstuetzt Umsatz, Warenkorbwert, Konversion und Wiederkauf",
+            "Unterstuetzt Produktsales, Bestandsumschlag, Kampagnen-ROI und Kanal",
+            "Unterstuetzt Export und Kennzahlendefinitionen"
+          ],
+          "inputs": "Bestellungen, Zahlungen, Produkte, Nutzerverhalten, Kampagnen",
+          "outputs": "Operations-Dashboard, Produktbericht, Kundenanalyse",
+          "exceptions": "Datenverzug, fehlende Berechtigung, Kennzahl geaendert"
+        }
+      ]
+    },
+    "page_and_process": {
+      "pages": [
+        {
+          "page": "Shop-Startseite",
+          "entry": "Kundeneinstieg",
+          "elements": "Suche, Banner, Kategorien, Empfehlungen, Kampagnen",
+          "actions": "Suchen, browsen, Produkt oeffnen, anmelden",
+          "flow": "Nutzer gelangt ueber Kategorie, Suche oder Kampagne zu Produkten."
+        },
+        {
+          "page": "Produktdetail",
+          "entry": "Produktliste / Suche",
+          "elements": "Bilder, Preis, Spezifikation, Bestand, Bewertungen, Empfehlungen",
+          "actions": "Spezifikation waehlen, Warenkorb, Sofortkauf, Merken",
+          "flow": "Nutzer bestaetigt Produktinformationen und kauft oder merkt vor."
+        },
+        {
+          "page": "Warenkorb und Checkout",
+          "entry": "Warenkorb-Einstieg",
+          "elements": "Artikel, Rabatte, Adresse, Lieferung, Rechnung, Betrag",
+          "actions": "Menge aendern, Rabatt waehlen, Bestellung senden",
+          "flow": "System prueft Bestand und Preis und erstellt unbezahlte Bestellung."
+        },
+        {
+          "page": "Bestellcenter",
+          "entry": "Mitgliederbereich",
+          "elements": "Bestellliste, Status, Tracking, Zahlung, After-Sales",
+          "actions": "Zahlen, stornieren, Empfang bestaetigen, After-Sales beantragen",
+          "flow": "Nutzer verfolgt Bestellung und bearbeitet Zahlung oder After-Sales."
+        },
+        {
+          "page": "Shop-Backend",
+          "entry": "Admin-Einstieg",
+          "elements": "Produkte, Kampagnen, Bestellungen, After-Sales, Kunden, Berichte",
+          "actions": "Produkt listen, Kampagne konfigurieren, Ausnahme behandeln, Bericht exportieren",
+          "flow": "Operatoren pflegen Shop-Betrieb und messen Ergebnisse."
+        }
+      ]
+    },
+    "business_rules_and_data": {
+      "rules": [
+        "Bestellung muss Preis-, Rabatt- und Bestandssnapshot sperren.",
+        "Nur bezahlte Bestellungen duerfen in Versandbereit wechseln; Timeout-Bestellungen werden geschlossen und Bestand freigegeben.",
+        "Aktionen muessen Produktumfang, Nutzerumfang, Zeit und Stapelregeln pruefen.",
+        "Rueckerstattung darf den bezahlten Betrag nicht ueberschreiten und muss Kanaltransaktionen behalten.",
+        "Preis-, Bestands-, Bestell- und After-Sales-Aenderungen muessen protokolliert werden."
+      ],
+      "key_data": [
+        "Produkt/SPU: ID, Name, Kategorie, Marke, Status, Hauptbild",
+        "SKU: Spezifikation, Preis, Bestand, Kauflimit, Verkaufsregion",
+        "Warenkorb: Nutzer, SKU, Menge, Auswahlstatus, Ungueltigkeitsstatus",
+        "Bestellung: Bestellnummer, Nutzer, Positionen, Betrag, Status, Lieferadresse",
+        "Zahlung: Zahlungsnummer, Kanal, Betrag, Status, Rueckruftransaktion",
+        "After-Sales-Fall: Bestellung, Grund, Nachweis, Pruefstatus, Rueckerstattungsstatus"
+      ]
+    },
+    "nonfunctional_requirements": {
+      "items": [
+        "Performance: Haeufige Startseiten- und Produktdetailabfragen innerhalb von 3 Sekunden.",
+        "Konsistenz: Bestellung, Zahlung, Bestand und Rueckerstattung brauchen Nachverfolgbarkeit und finale Konsistenz.",
+        "Sicherheit: Zahlungsrueckrufe, Nutzeradressen und Bestellbetraege brauchen Signatur- und Berechtigungspruefung.",
+        "Benutzbarkeit: Bestellung, Zahlung und Rueckerstattung brauchen Wiederholung und klare Hinweise.",
+        "Audit: Preis-, Bestands-, Bestell- und After-Sales-Aenderungen muessen Bearbeiter und Zeit erfassen."
+      ]
+    },
+    "integration_dependencies": {
+      "external_systems": [
+        "Payment Gateway",
+        "Logistik-Tracking-Service",
+        "Bestands-/Lagersystem",
+        "SMS- oder Nachrichtendienst",
+        "Rechnungs-/Steuerservice",
+        "Unternehmens-DWH / BI"
+      ]
+    },
+    "risks_and_questions": {
+      "risks": [
+        "Komplexe Rabattstapelung kann Preisfehler verursachen.",
+        "Inkonsistenz zwischen Zahlung und Bestand beeinflusst Fulfillment und Service.",
+        "Peak-Kampagnen koennen Bestandssperre und Bestellperformance belasten.",
+        "Unklare After-Sales-Policy kann Servicekonflikte verursachen."
+      ],
+      "open_questions": [
+        "Sollen Mehrlagerbestand und geteilte Lieferung unterstuetzt werden?",
+        "Duerfen Gutscheine, Mengenrabatte und Mitgliederpreise gestapelt werden?",
+        "Wie werden Bestell-Timeout und Bestandsfreigabe konfiguriert?",
+        "Brauchen Rueckerstattungen Originalweg und manuelle Pruefung?",
+        "Sind Rechnung, Punkte, Mitgliederlevel und Bewertungen erforderlich?"
+      ]
+    },
+    "milestone_acceptance": {
+      "milestones": [
+        {
+          "milestone": "Anforderungsbestaetigung",
+          "target_date": "T+1 Woche",
+          "acceptance": "Transaktionsablauf, Aktionen, Bestand und After-Sales bestaetigen"
+        },
+        {
+          "milestone": "Prototyp-Review",
+          "target_date": "T+3 Wochen",
+          "acceptance": "Startseite, Detail, Checkout, Bestellung und Backend-Prototypen abschliessen"
+        },
+        {
+          "milestone": "Entwicklung und Integration",
+          "target_date": "T+8 Wochen",
+          "acceptance": "Zahlung, Bestand, Logistik und Benachrichtigung integrieren"
+        },
+        {
+          "milestone": "Pilotstart",
+          "target_date": "T+10 Wochen",
+          "acceptance": "Ausgewaehlte Produkte und Nutzer im Gray Launch starten"
+        },
+        {
+          "milestone": "Produktivstart",
+          "target_date": "T+12 Wochen",
+          "acceptance": "Gesamtrelease, Betriebskonfiguration und Abnahme abschliessen"
+        }
+      ]
+    },
+    "summary": "Produktverkauf erfolgt derzeit ueber Filialen, Communities und manuelle Bestellungen. Produktinformationen, Bestand, Rabatte, Bestellungen und After-Sales werden getrennt verwaltet. Ein einheitlicher Online-Shop soll Produktdarstellung, Mitgliedskauf, Online-Zahlung, Fulfillment, After-Sales und Analysen unterstuetzen.",
+    "objective": "Ein einheitliches System fuer Produkt, SKU, Preis und Bestand aufbauen; Warenkorb, Bestellung, Zahlung, Versand und After-Sales zu einem Transaktionsablauf verbinden; Gutscheine, Mengenrabatte, Flash Sales, Mitgliederpreise und Kampagnen unterstuetzen; Kunden-, Bestell-, Konversions- und Wiederkaufsdaten fuer Operations sammeln"
+  },
+  "prompt_hints": [
+    {
+      "hint_key": "shopping_hint_1",
+      "content": "Die Vorlage enthaelt typische Commerce-Faehigkeiten fuer Produkt, Bestellung, Zahlung, Aktion und After-Sales."
+    },
+    {
+      "hint_key": "shopping_hint_2",
+      "content": "Klaeren Sie zuerst Konsistenzregeln zwischen Preis, Bestand, Aktion und Zahlung."
+    },
+    {
+      "hint_key": "shopping_hint_3",
+      "content": "Peak-Kampagnen benoetigen Limits, Bestandssperre und Kompensationsplaene."
+    }
+  ],
+  "prompt_questions": [
+    {
+      "question_key": "shopping_question_1",
+      "content": "Sollen Mehrlagerbestand und geteilte Lieferung unterstuetzt werden?"
+    },
+    {
+      "question_key": "shopping_question_2",
+      "content": "Duerfen Gutscheine, Mengenrabatte und Mitgliederpreise gestapelt werden?"
+    },
+    {
+      "question_key": "shopping_question_3",
+      "content": "Wie werden Bestell-Timeout und Bestandsfreigabe konfiguriert?"
+    },
+    {
+      "question_key": "shopping_question_4",
+      "content": "Brauchen Rueckerstattungen Originalweg und manuelle Pruefung?"
+    },
+    {
+      "question_key": "shopping_question_5",
+      "content": "Sind Rechnung, Punkte, Mitgliederlevel und Bewertungen erforderlich?"
+    }
+  ]
+}

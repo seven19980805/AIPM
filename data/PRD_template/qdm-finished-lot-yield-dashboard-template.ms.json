@@ -1,0 +1,621 @@
+{
+  "template_id": "qdm_finished_lot_yield_dashboard_template_ms",
+  "template_key": "qdm_finished_lot_yield_dashboard",
+  "template_name": "Templat Keperluan Dashboard Yield Finished Lot QDM",
+  "template_category": "business_requirement",
+  "business_domain": "data_visualization",
+  "language": "ms",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "Templat keperluan yang diadaptasi daripada dokumen D.CHQ.QDM Finished Lot Yield Dashboard. Templat ini merangkumi trend yield finished lot, KPI output dan loss, Pareto defect code, interaksi penapis, kontrak data, peraturan pengiraan yield, inventori carta, peraturan UI, spesifikasi teknikal dan kriteria penerimaan. Imej asal digantikan dengan penerangan teks.",
+  "tags": [
+    "qdm",
+    "finished-lot",
+    "yield",
+    "dashboard",
+    "defect-pareto",
+    "data-contract"
+  ],
+  "applicable_scenarios": [
+    "Dashboard yield Finished Lot",
+    "Pelaporan QDM Quality Operation Center",
+    "Analisis trend yield mingguan / bulanan / suku tahunan",
+    "Pareto nisbah loss mengikut defect code dan jabatan punca",
+    "Pengesahan formula manufacturing yield dan kontrak data",
+    "Dashboard responsif dengan peraturan eksport dan kebenaran"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/qdm-finished-lot-yield-dashboard-template.ms.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Maklumat Asas Dokumen",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.document_name",
+          "label": "Nama dokumen",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "D.CHQ.QDM Finish Yield Dashboard Requirement"
+        },
+        {
+          "field_key": "document_info.system_module",
+          "label": "Sistem / modul",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "FinishedLot / Quality Operation Center"
+        },
+        {
+          "field_key": "document_info.owner_department",
+          "label": "Jabatan pemula",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "QDM"
+        }
+      ]
+    },
+    {
+      "section_key": "background_objectives",
+      "section_title": "Latar Belakang dan Objektif",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "background_objectives.background",
+          "label": "Latar belakang bisnes",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Terangkan sebab kilang memerlukan dashboard yield finished lot automatik"
+        },
+        {
+          "field_key": "background_objectives.objectives",
+          "label": "Objektif",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Peningkatan yield, pengurangan kos, peningkatan output, ROI lebih cepat"
+        }
+      ]
+    },
+    {
+      "section_key": "page_presentation",
+      "section_title": "Persembahan Halaman / Fungsi",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "page_presentation.pages",
+          "label": "Definisi halaman",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Finished Lot Performance Overview Trend; Loss Ratio By Defect Code"
+        },
+        {
+          "field_key": "page_presentation.visual_descriptions",
+          "label": "Penerangan teks menggantikan screenshot",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Terangkan screenshot dashboard asal dalam bentuk teks"
+        }
+      ]
+    },
+    {
+      "section_key": "filters_interactions",
+      "section_title": "Syarat Query dan Interaksi Pengguna",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "filters_interactions.filters",
+          "label": "Penapis",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Customer, Plant, Date Type, Lot Type, Unit Type, Project Type"
+        },
+        {
+          "field_key": "filters_interactions.rules",
+          "label": "Peraturan interaksi",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Penapisan berhubung, status dipilih, tooltip, interaksi papan kekunci, konteks eksport"
+        }
+      ]
+    },
+    {
+      "section_key": "data_contract",
+      "section_title": "Penerangan Data dan Kontrak Data",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "data_contract.sources",
+          "label": "Sumber data",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "FinishedLotSummaryData_Internal dan FinishedLotSummaryDefectData_Internal"
+        },
+        {
+          "field_key": "data_contract.fields",
+          "label": "Medan data diperlukan",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "ATSDate, DateType, LotType, Project Type, Yield, Output_NSQM, DefectCode, DefectQty, Department"
+        },
+        {
+          "field_key": "data_contract.quality_rules",
+          "label": "Peraturan kualiti data",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Grain, refresh cadence, penapis, pengendalian null, skop kebenaran, rekonsiliasi"
+        }
+      ]
+    },
+    {
+      "section_key": "yield_calculation",
+      "section_title": "Logik Pengiraan Yield",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "yield_calculation.definitions",
+          "label": "Definisi yield",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Definisi Finished Yield / Product Yield"
+        },
+        {
+          "field_key": "yield_calculation.formulas",
+          "label": "Teks formula menggantikan imej formula",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Lot Product Yield; Weekly Product Yield; pendaraban process yield"
+        },
+        {
+          "field_key": "yield_calculation.example",
+          "label": "Contoh pengiraan",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "PAOI, E-test, CCAOI, Bump, FVI, Inline, Others input/output/loss/yield"
+        }
+      ]
+    },
+    {
+      "section_key": "layout",
+      "section_title": "Layout Halaman / Fungsi",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "layout.options",
+          "label": "Pilihan layout",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Primary-Detail / Hero; Nested / Drill-down; fallback Uniform Grid"
+        }
+      ]
+    },
+    {
+      "section_key": "chart_inventory",
+      "section_title": "Inventori dan Konfigurasi Carta",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "chart_inventory.charts",
+          "label": "Carta",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Finished Overall Trend; Defect Loss Ratio; carta perincian kanan"
+        }
+      ]
+    },
+    {
+      "section_key": "stakeholders",
+      "section_title": "Pihak Bertanggungjawab dan Stakeholder",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "stakeholders.roles",
+          "label": "Stakeholder",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Business owner, PO/BA, data owner, UI/UX reviewer, frontend developer, QA tester"
+        }
+      ]
+    },
+    {
+      "section_key": "ui_visual_design",
+      "section_title": "Keperluan UI dan Reka Bentuk Visual",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "ui_visual_design.rules",
+          "label": "Peraturan UI",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Gaya AITC, sistem warna, tipografi, spacing, panel, state responsif"
+        }
+      ]
+    },
+    {
+      "section_key": "technical_nonfunctional",
+      "section_title": "Keperluan Teknikal dan Bukan Fungsian",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "technical_nonfunctional.technical_specs",
+          "label": "Spesifikasi teknikal",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Frontend stack, chart library, responsiveness, performance, browser support, maintainability, security"
+        },
+        {
+          "field_key": "technical_nonfunctional.nonfunctional_items",
+          "label": "Keperluan bukan fungsian",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ketepatan data, performance, accessibility, reliability, compatibility, auditability"
+        }
+      ]
+    },
+    {
+      "section_key": "acceptance_questions",
+      "section_title": "Kriteria Penerimaan dan Soalan Terbuka",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "acceptance_questions.acceptance_criteria",
+          "label": "Kriteria penerimaan",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Senarai carta, definisi metrik, penapis, ketepatan data, layout responsif, eksport, pematuhan UI"
+        },
+        {
+          "field_key": "acceptance_questions.open_questions",
+          "label": "Soalan terbuka",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Kelulusan layout, join key sumber data, skop release, kebenaran eksport, refresh SLA"
+        }
+      ]
+    }
+  ],
+  "prompt_hints": [
+    {
+      "hint_key": "qdm_yield_hint_1",
+      "content": "Screenshot asal telah ditukar kepada penerangan teks; minta pengguna mengesahkan sama ada penerangan ini sepadan dengan niat UI akhir."
+    },
+    {
+      "hint_key": "qdm_yield_hint_2",
+      "content": "Nama metrik NSQM / NSOM kelihatan tidak konsisten dalam sumber; sahkan label yang diluluskan sebelum implementasi."
+    },
+    {
+      "hint_key": "qdm_yield_hint_3",
+      "content": "Sahkan sama ada formula yield hanya merangkumi PAOI, E-test, CCAOI, Bump AOI dan FVI, atau juga Inline dan Others seperti contoh pengiraan."
+    }
+  ],
+  "prompt_questions": [
+    {
+      "question_key": "qdm_yield_question_1",
+      "content": "Layout manakah diluluskan untuk release pertama: Primary-Detail / Hero, Nested drill-down, Uniform Grid atau pola lain?"
+    },
+    {
+      "question_key": "qdm_yield_question_2",
+      "content": "Apakah join key dan penapis query akhir untuk dua jadual sumber QDM?"
+    },
+    {
+      "question_key": "qdm_yield_question_3",
+      "content": "Peranan manakah boleh mengeksport imej carta atau data asas?"
+    },
+    {
+      "question_key": "qdm_yield_question_4",
+      "content": "Apakah refresh cadence dan SLA ketersediaan data yang perlu dipaparkan pada halaman?"
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "D.CHQ.QDM Finished Lot Yield Dashboard",
+      "requirement_name": "Dashboard Prestasi Finished Lot dan Nisbah Defect Loss",
+      "system_module": "FinishedLot",
+      "initiate_department": "QDM",
+      "author": "Ely Yi",
+      "version": "V1.0",
+      "creation_date": "2026-05-21"
+    },
+    "background": {
+      "summary": "Dashboard ini menyediakan paparan tahap tinggi untuk metrik yield utama bagi produk berbeza di kilang dan dikemas kini setiap hari melalui skrip berjadual automatik.",
+      "objective": "Mempercepat peningkatan yield, menurunkan kos produksi, meningkatkan output tanpa kos tambahan, dan mendapatkan semula kos pelaburan lebih awal melalui trend, drill-down, Pareto defect code dan atribusi punca."
+    },
+    "scope": {
+      "in_scope": [
+        "Finished Lot Performance Overview Trend page for finished yield, latest-week Output, Yield, and NSQM Loss.",
+        "Loss Ratio By Defect Code page for top 10 to 20 defect loss ratios, defect-code trend, and cause department distribution.",
+        "Unified filters: Customer, Plant, Date Type, Lot Type, Unit Type, and Project Type.",
+        "Finished Yield calculation logic for lot-level and weekly aggregated product yield.",
+        "Chart inventory, data contract, UI states, responsive layout, export permission, and acceptance validation."
+      ],
+      "out_of_scope": [
+        "Automated process-parameter optimization.",
+        "Formal QMS defect disposition workflow replacement.",
+        "Supplier or customer complaint management.",
+        "Self-service BI modeling beyond the approved chart inventory."
+      ]
+    },
+    "users_and_scenarios": {
+      "target_users": [
+        "Business owner: Yield team",
+        "Product owner / BA: QDM",
+        "Data owner: Yield team",
+        "UI/UX reviewer: Yield team",
+        "Frontend developer: QDM",
+        "QA tester: Yield team"
+      ],
+      "core_scenarios": [
+        "Yield team opens the Finished Lot Performance Overview Trend page to review weekly finished yield and latest-week Output, Yield, and NSQM Loss.",
+        "QDM user changes Customer, Plant, Date Type, Lot Type, Unit Type, or Project Type filters and expects affected charts to refresh without a full page reload where feasible.",
+        "Engineer clicks a trend segment to switch the detail panel on the right and inspect the selected time range or product segment.",
+        "Manager opens Loss Ratio By Defect Code to review top defect loss ratios, defect trends, and cause department distribution.",
+        "QA validates displayed values against the approved QDM source tables for default filters and representative filter combinations."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "The example contains two core analytic pages: Finished Lot Performance Overview Trend and Loss Ratio By Defect Code. Both pages share the same filter contract and must support interactive chart selection, readable tooltips, accessible legends, and permission-aware export.",
+      "feature_details": [
+        {
+          "feature_name": "Finished Lot Performance Overview Trend",
+          "description": "Display finished yield by selected time range and show latest-week Output, Yield, and NSQM Loss details.",
+          "trigger": "User opens the dashboard or changes the shared filter bar.",
+          "processing_logic": "Load weekly finished-lot summary data from DS-01. The main chart displays finished product yield by week by default; clicking the left chart switches the right-side detail view.",
+          "inputs": [
+            "Customer",
+            "Plant",
+            "Date Type",
+            "Lot Type",
+            "Unit Type",
+            "Project Type",
+            "Finished-lot summary records"
+          ],
+          "outputs": [
+            "Weekly/quarterly/monthly yield trend",
+            "Latest-week Output",
+            "Latest-week Yield",
+            "Latest-week NSQM Loss",
+            "Selected detail panel"
+          ],
+          "exception_cases": [
+            "No data for selected filter",
+            "Source refresh delay",
+            "User lacks data scope permission"
+          ]
+        },
+        {
+          "feature_name": "Loss Ratio By Defect Code",
+          "description": "Display top 10 to 20 defect loss ratios by defect code and show related defect-code trend and cause department detail.",
+          "trigger": "User navigates to the loss-ratio page or clicks a defect-code segment.",
+          "processing_logic": "Load defect summary data from DS-02, rank defect codes by loss ratio, render the main defect-loss chart, and update the right-side trend and department distribution based on selection.",
+          "inputs": [
+            "DefectCode",
+            "DefectQty",
+            "Department",
+            "Selected filters",
+            "Defect summary records"
+          ],
+          "outputs": [
+            "Top defect loss-ratio chart",
+            "Defect-code trend",
+            "Cause department pie/detail",
+            "Filtered defect detail"
+          ],
+          "exception_cases": [
+            "Defect code mapping missing",
+            "Department attribution missing",
+            "Chart cannot render due to insufficient data"
+          ]
+        },
+        {
+          "feature_name": "Unified filters and interactions",
+          "description": "Provide a shared filter bar and consistent interaction behavior for all applicable charts.",
+          "trigger": "User changes any filter, selects a chart segment, toggles a legend, opens a tooltip, or exports data.",
+          "processing_logic": "Apply filters to all affected charts without full page reload where technically feasible. Active chart segments must be visually indicated and the active filter context must remain visible.",
+          "inputs": [
+            "Customer",
+            "Plant",
+            "Date Type=Weekly",
+            "Lot Type=HVM",
+            "Unit Type=NSQM",
+            "Project Type=Overall"
+          ],
+          "outputs": [
+            "Updated charts",
+            "Visible active state",
+            "Readable tooltip or touch detail",
+            "Export with applied filter context"
+          ],
+          "exception_cases": [
+            "Filter value unavailable",
+            "Network/API failure",
+            "Keyboard focus or touch interaction unavailable"
+          ]
+        },
+        {
+          "feature_name": "Finished Yield calculation and data contract",
+          "description": "Define lot-level and weekly product yield calculations and bind all charts to approved QDM tables.",
+          "trigger": "Dashboard refresh or QA data validation.",
+          "processing_logic": "Calculate process yield as Output divided by Input, then multiply sequential process yields. Lot yield is calculated for one batch; weekly yield aggregates the selected week using the approved source query and shipment/finished output basis.",
+          "inputs": [
+            "ATSDate",
+            "DateType",
+            "LotType",
+            "Project Type",
+            "Yield",
+            "Output_NSQM",
+            "DefectCode",
+            "DefectQty",
+            "Department"
+          ],
+          "outputs": [
+            "Consistent finished yield",
+            "Output_NSQM",
+            "Defect loss ratio",
+            "Traceable calculation basis"
+          ],
+          "exception_cases": [
+            "Formula conflict",
+            "Null input/output",
+            "Source query mismatch"
+          ]
+        }
+      ]
+    },
+    "business_rules": [
+      "Filter defaults are Customer=All selected, Plant=All selected, Date Type=Weekly, Lot Type=HVM, Unit Type=NSQM, Project Type=Overall.",
+      "Filter changes shall update all affected charts without requiring a full page reload when technically feasible.",
+      "A selected chart segment must visually indicate active state and make the active filter visible to the user.",
+      "Tooltips must be readable on desktop and replaced by tap-friendly detail behavior on touch devices where needed.",
+      "Interactive chart legends must be keyboard reachable.",
+      "Export actions must follow data permission rules and include applied filter context where practical.",
+      "Finished Yield is based on the multiplication of Output/Input ratios across key processes.",
+      "Data owner must confirm source tables, field definitions, refresh cadence, join logic, and calculation rules before release."
+    ],
+    "page_and_interaction": {
+      "pages": [
+        {
+          "page_name": "Finished Lot Performance Overview Trend",
+          "entry_point": "Quality Operation Center",
+          "page_elements": [
+            "Display Finished Yield by time range and latest-week Output, Yield, and NSQM Loss.",
+            "Unified filter area: Customer, Plant, Date Type, Lot Type, Unit Type, Project Type",
+            "Main chart displays finished product yield by week by default; right side displays detailed data for the latest week by default and changes when the left chart is clicked.",
+            "Main chart displays week information by default; detail chart displays data description.",
+            "Screenshot description: page header is QUALITY OPERATION CENTER - Weekly Finished Lot Performance Overview; top area is the unified filter bar; the left hero chart shows Weekly Finished Lot Performance Overview Trend; the right panel shows latest-week Output, Yield, and NSQM Loss detail cards/charts."
+          ],
+          "button_actions": [
+            "Query / refresh by filters",
+            "Reset filters",
+            "Click chart segment",
+            "Export with filter context"
+          ],
+          "purpose": "Display Finished Yield by time range and latest-week Output, Yield, and NSQM Loss.",
+          "image_description": "Screenshot description: page header is QUALITY OPERATION CENTER - Weekly Finished Lot Performance Overview; top area is the unified filter bar; the left hero chart shows Weekly Finished Lot Performance Overview Trend; the right panel shows latest-week Output, Yield, and NSQM Loss detail cards/charts."
+        },
+        {
+          "page_name": "Loss Ratio By Defect Code",
+          "entry_point": "Quality Operation Center",
+          "page_elements": [
+            "Display top 10 to 20 defect loss ratios by defect code and defect-code trend.",
+            "Unified filter area: Customer, Plant, Date Type, Lot Type, Unit Type, Project Type",
+            "Main chart displays top 10 to 20 defect loss ratio; right side displays top defect-code trend and cause department.",
+            "Main chart displays defect code information; detail pie chart displays department information.",
+            "Screenshot description: page header remains QUALITY OPERATION CENTER - Weekly Finished Lot Performance Overview; top area keeps the same filters; the left chart ranks defect codes by loss ratio; the right area shows selected defect-code trend and cause department distribution."
+          ],
+          "button_actions": [
+            "Query / refresh by filters",
+            "Reset filters",
+            "Click chart segment",
+            "Export with filter context"
+          ],
+          "purpose": "Display top 10 to 20 defect loss ratios by defect code and defect-code trend.",
+          "image_description": "Screenshot description: page header remains QUALITY OPERATION CENTER - Weekly Finished Lot Performance Overview; top area keeps the same filters; the left chart ranks defect codes by loss ratio; the right area shows selected defect-code trend and cause department distribution."
+        }
+      ],
+      "interaction_flow": [
+        "User opens the dashboard and sees default Weekly / HVM / NSQM / Overall data.",
+        "User changes one or more filters; all affected charts refresh and keep the selected context visible.",
+        "User clicks a chart segment; the selected segment is highlighted and the right-side detail chart switches to the selected segment.",
+        "User hovers or taps a chart data point to inspect tooltip/detail information.",
+        "User exports chart data; export follows permission rules and includes applied filter context where practical."
+      ]
+    },
+    "copywriting": [
+      "QUALITY OPERATION CENTER - Weekly Finished Lot Performance Overview",
+      "Weekly Finished Lot Performance Overview Trend",
+      "Finished Lot Performance Overview Trend",
+      "Loss Ratio By Defect Code"
+    ],
+    "data_and_dependencies": [
+      "DS-01: [QDMProductionDB].[IDA].[Yield_Dashboard_FinishedLotSummaryData_Internal], grain Weekly/Quarterly/Monthly, weekly refresh, owner QDM.",
+      "DS-02: [QDMProductionDB].[IDA].[Yield_Dashboard_FinishedLotSummaryDefectData_Internal], grain Weekly/Quarterly/Monthly, weekly refresh, owner QDM.",
+      "Required fields from DS-01: ATSDate, DateType, LotType, Project Type, Yield, Output_NSQM.",
+      "Required fields from DS-02: DefectCode, DefectQty, Department.",
+      "Chart CH-01 Finished Overall Trend: line chart, metric Yield, dimensions Weekly/Quarterly/Monthly, source DS-01, hover tooltip and click-to-filter detail table.",
+      "Chart CH-02 Defect Loss Ratio: stacked bar chart, metric Defect Loss Ratio, dimension Top 20, source DS-02, legend toggle and click-to-filter related charts.",
+      "Chart CH-03 Detailed chart on the right: table/line/pie, content based on selected left data and current filters, source DS-01 + DS-02, supports pagination, sort, export.",
+      "Frontend stack expectation: HTML + Bootstrap + JavaScript/jQuery unless project standard confirms otherwise.",
+      "Approved enterprise browser baseline: current Chrome and Edge versions."
+    ],
+    "risks_and_notes": [
+      "The final default layout option still needs business confirmation if Primary-Detail / Hero is not accepted.",
+      "Final source tables/views/APIs and join keys must be confirmed by the data owner.",
+      "The mandatory first-release chart list must be confirmed by the business owner.",
+      "Export permissions for chart images or underlying data must be confirmed by security and business owner.",
+      "Refresh cadence and SLA for data availability must be confirmed by the data owner."
+    ],
+    "acceptance_criteria": [
+      "Business owner confirms chart list, metric definitions, filter list, default view, and layout pattern.",
+      "Data owner confirms source tables/views/APIs, field mapping, refresh cadence, join logic, and calculation rules.",
+      "All charts render correctly for default filters and at least three representative filter combinations.",
+      "Loading, empty, error, active, hover, focus, and disabled states are implemented and visually consistent.",
+      "The page is responsive on desktop, tablet, and mobile widths with no clipped text, overlapping controls, or unreadable chart labels.",
+      "Export behavior follows approved data permission rules and includes applied filter context where applicable.",
+      "QA verifies data accuracy against source queries or an approved reference report.",
+      "The final page follows the approved AITC color system and does not introduce unapproved primary colors or heavy decorative styling."
+    ],
+    "open_questions": [
+      "Which layout option is the approved default: Primary-Detail / Hero, Uniform Grid, Tabbed, or another pattern?",
+      "What are the final source tables/views/APIs and join keys?",
+      "Which charts are mandatory for first release and which are optional?",
+      "Which roles may export chart images or underlying data?",
+      "What is the approved refresh cadence and SLA for data availability?"
+    ],
+    "template_specific_details": {
+      "source_document": "C:/Users/admin/Desktop/D.CHQ.QDM Yield Dashboard Requirement .docx",
+      "image_descriptions": [
+        "Overview page screenshot: a Quality Operation Center page with a shared filter bar at the top, a large Weekly Finished Lot Performance Overview Trend chart on the left, and latest-week Output / Yield / NSQM Loss detail on the right.",
+        "Loss-ratio page screenshot: a shared filter bar at the top, a main chart ranking top 10 to 20 defect codes by loss ratio, and a right-side detail area for defect-code trend plus cause department distribution.",
+        "Filter screenshot: dropdown filters for Customer, Plant, Date Type, Lot Type, Unit Type, and Project Type with defaults All selected, All selected, Weekly, HVM, NSQM, and Overall.",
+        "Lot Product Yield formula image: finished yield for a single batch is calculated by multiplying each key process yield, where each process yield is Output divided by Input.",
+        "Weekly Product Yield formula image: weekly product yield is calculated from weekly aggregated shipment/finished output data using the approved QDM source query and the same Output/Input yield logic.",
+        "Calculation example image: a process table starts from 50,000 units and multiplies sequential process yields, for example GTY = 99.4% × 99.5% × 99.29% × 99.38% × 99.17% × 99.49% × 99.39%."
+      ],
+      "ui_style": {
+        "background": "#f6f8fb / #f3f5f7",
+        "panel": "#ffffff",
+        "primary_blue": "#2563eb",
+        "primary_hover": "#1d4ed8",
+        "border": "#d9e1e7",
+        "text": "#111315 / #17202a",
+        "radius": "8px general radius, 6px compact radius"
+      },
+      "non_functional_targets": [
+        "Displayed values must match approved source query results for the same filters.",
+        "Normal filter or chart refresh target is 3 seconds under standard data volume, subject to API performance.",
+        "Controls must be keyboard reachable with visible focus state and sufficient contrast.",
+        "Failure in one chart must not break the whole page; show chart-level error state.",
+        "Layout must remain readable across approved desktop, tablet, and mobile widths."
+      ]
+    },
+    "template_meta": {
+      "is_default_example": true,
+      "example_notice": "Ini ialah contoh terbina dalam untuk mula dengan templat berisi. Perubahan pengguna kemudian akan mengatasi contoh ini."
+    }
+  }
+}

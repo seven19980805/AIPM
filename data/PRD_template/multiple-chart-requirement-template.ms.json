@@ -1,0 +1,427 @@
+{
+  "template_id": "multiple_chart_requirement_template_ms",
+  "template_key": "multiple_chart_requirement",
+  "template_name": "Templat Keperluan Pelbagai Carta",
+  "template_category": "business_requirement",
+  "business_domain": "data_visualization",
+  "language": "ms",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "Templat untuk dashboard pelbagai carta responsif dengan beberapa sumber data, inventori carta, pemilihan susun atur, interaksi berkait, penapis, peraturan UI, spesifikasi teknikal dan kriteria penerimaan.",
+  "tags": [
+    "multiple-charts",
+    "dashboard",
+    "visualization",
+    "drill-down",
+    "data-contract"
+  ],
+  "applicable_scenarios": [
+    "Halaman dashboard pelbagai carta",
+    "Beberapa sumber data QDM berkaitan",
+    "Susun atur Primary-Detail atau Uniform Grid",
+    "Drill-down carta dan cross-filtering",
+    "Eksport dashboard dan validasi ketepatan data"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/multiple-chart-requirement-template.ms.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Maklumat Dokumen Asas",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.name",
+          "label": "Nama dokumen",
+          "component": "input",
+          "data_type": "string",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "background_objectives",
+      "section_title": "Latar Belakang dan Objektif",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "background_objectives.summary",
+          "label": "Latar belakang dan objektif",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "scope",
+      "section_title": "Skop",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "scope.items",
+          "label": "Skop",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "stakeholders",
+      "section_title": "Pihak Bertanggungjawab dan Berkepentingan",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "stakeholders.roles",
+          "label": "Stakeholder",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "data_contract",
+      "section_title": "Penerangan Data dan Kontrak Data",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "data_contract.items",
+          "label": "Kontrak data",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "layout",
+      "section_title": "Susun Atur Halaman / Fungsi",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "layout.options",
+          "label": "Pilihan susun atur",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "page_presentation",
+      "section_title": "Persembahan Halaman / Fungsi",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "page_presentation.areas",
+          "label": "Kawasan halaman",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "chart_inventory",
+      "section_title": "Inventori dan Konfigurasi Carta",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "chart_inventory.items",
+          "label": "Inventori carta",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "filters_interactions",
+      "section_title": "Syarat Carian dan Interaksi Pengguna",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "filters_interactions.items",
+          "label": "Penapis dan interaksi",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "ui_design",
+      "section_title": "Keperluan UI dan Reka Bentuk Visual",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "ui_design.requirements",
+          "label": "Keperluan UI",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "technical_specs",
+      "section_title": "Spesifikasi Teknikal",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "technical_specs.requirements",
+          "label": "Spesifikasi teknikal",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "non_functional",
+      "section_title": "Keperluan Bukan Fungsi",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "non_functional.requirements",
+          "label": "Keperluan bukan fungsi",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "acceptance",
+      "section_title": "Kriteria Penerimaan",
+      "sort_order": 13,
+      "fields": [
+        {
+          "field_key": "acceptance.criteria",
+          "label": "Kriteria penerimaan",
+          "component": "list",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "open_questions",
+      "section_title": "Soalan Terbuka dan Keputusan",
+      "sort_order": 14,
+      "fields": [
+        {
+          "field_key": "open_questions.questions",
+          "label": "Soalan terbuka",
+          "component": "table",
+          "data_type": "array",
+          "required": false
+        }
+      ]
+    },
+    {
+      "section_key": "additional_fields",
+      "section_title": "Medan Keperluan Tambahan Dicadangkan",
+      "sort_order": 15,
+      "fields": [
+        {
+          "field_key": "additional_fields.groups",
+          "label": "Medan tambahan",
+          "component": "table",
+          "data_type": "array",
+          "required": false
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "Projek contoh: Quality Operations Dashboard",
+      "requirement_name": "Keperluan contoh: Multi-chart dashboard for quality operations"
+    },
+    "background": {
+      "summary": "Ini ialah contoh perniagaan terbina dalam untuk memulakan templat berisi dengan pantas. Quality operations teams need a dashboard combining trend, Pareto, ranking, and detail charts. Existing reports are separated and cannot cross-filter.",
+      "objective": "Jana dokumen PRD dan reka bentuk berdasarkan contoh; perubahan pengguna kemudian mengatasi contoh."
+    },
+    "scope": {
+      "in_scope": [
+        "Shared filter area",
+        "KPI cards and trend chart",
+        "Defect Pareto chart",
+        "Product/line ranking chart",
+        "Linked detail table and export"
+      ],
+      "out_of_scope": [
+        "Real-time streaming alerts",
+        "Machine-learning root-cause recommendation",
+        "Mobile native app"
+      ]
+    },
+    "users_and_scenarios": {
+      "target_users": [
+        "Quality manager",
+        "Process engineer",
+        "Production supervisor",
+        "Data owner",
+        "Dashboard developer"
+      ],
+      "core_scenarios": [
+        "Manager checks daily quality KPIs.",
+        "Engineer selects a defect category and related charts update.",
+        "Supervisor exports affected lot details."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "This default example includes Shared dashboard filters, Linked chart interactions, Detail drill-down and export.",
+      "feature_details": [
+        {
+          "feature_name": "Shared dashboard filters",
+          "description": "Support shared dashboard filters for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        },
+        {
+          "feature_name": "Linked chart interactions",
+          "description": "Support linked chart interactions for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        },
+        {
+          "feature_name": "Detail drill-down and export",
+          "description": "Support detail drill-down and export for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        }
+      ]
+    },
+    "business_rules": [
+      "Only authorized roles can view scoped data and perform sensitive actions.",
+      "Core business actions must keep an audit trail.",
+      "Exported data must follow the same filters and permission scope as the page.",
+      "Data refresh status and calculation definitions must be visible to users."
+    ],
+    "page_and_interaction": {
+      "pages": [
+        {
+          "page_name": "Shared dashboard filters",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        },
+        {
+          "page_name": "Linked chart interactions",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        },
+        {
+          "page_name": "Detail drill-down and export",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        }
+      ],
+      "interaction_flow": [
+        "Manager checks daily quality KPIs.",
+        "Engineer selects a defect category and related charts update.",
+        "Supervisor exports affected lot details."
+      ]
+    },
+    "copywriting": [],
+    "data_and_dependencies": [
+      "User and organization master data",
+      "Business transaction data",
+      "Permission configuration",
+      "Reporting/export service"
+    ],
+    "risks_and_notes": [
+      "Metric ownership and data definitions must be confirmed.",
+      "Historical data quality may affect acceptance.",
+      "External system readiness may affect rollout scope."
+    ],
+    "acceptance_criteria": [
+      "The example scope can be generated into PRD and design documents.",
+      "Users can revise the seeded requirement through chat messages.",
+      "Main roles, flows, data, permissions, and acceptance criteria are represented."
+    ],
+    "open_questions": [
+      "Which roles need final approval authority?",
+      "Which fields and metrics are mandatory for MVP?",
+      "Which external systems must be integrated in the first release?"
+    ],
+    "template_meta": {
+      "example_note": "AI-generated default example business; replace with real business facts before final delivery."
+    }
+  }
+}

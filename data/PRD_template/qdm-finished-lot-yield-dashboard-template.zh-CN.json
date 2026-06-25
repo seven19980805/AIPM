@@ -1,0 +1,621 @@
+{
+  "template_id": "qdm_finished_lot_yield_dashboard_template_zh_cn",
+  "template_key": "qdm_finished_lot_yield_dashboard",
+  "template_name": "QDM Finished Lot 良率看板需求模板",
+  "template_category": "business_requirement",
+  "business_domain": "data_visualization",
+  "language": "zh-CN",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "从 D.CHQ.QDM Finished Lot Yield Dashboard 需求文档解析并适配的业务需求模板，覆盖 Finished Lot 良率趋势、产出与损失 KPI、缺陷代码 Pareto、筛选联动、数据契约、良率计算规则、图表清单、UI 规则、技术规格和验收标准。原文中的图片已转换为文字说明。",
+  "tags": [
+    "qdm",
+    "finished-lot",
+    "yield",
+    "dashboard",
+    "defect-pareto",
+    "data-contract"
+  ],
+  "applicable_scenarios": [
+    "Finished Lot 良率看板",
+    "QDM Quality Operation Center 报表",
+    "周 / 月 / 季良率趋势分析",
+    "按缺陷代码分析损失占比和责任部门",
+    "制造良率公式与数据契约确认",
+    "带导出和权限规则的响应式看板实现"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/qdm-finished-lot-yield-dashboard-template.zh-CN.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "基础文档信息",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.document_name",
+          "label": "文档名称",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "D.CHQ.QDM Finish Yield Dashboard Requirement"
+        },
+        {
+          "field_key": "document_info.system_module",
+          "label": "系统 / 模块",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "FinishedLot / Quality Operation Center"
+        },
+        {
+          "field_key": "document_info.owner_department",
+          "label": "发起部门",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "QDM"
+        }
+      ]
+    },
+    {
+      "section_key": "background_objectives",
+      "section_title": "背景与目标",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "background_objectives.background",
+          "label": "业务背景",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "说明工厂为什么需要自动化 Finished Lot 良率看板"
+        },
+        {
+          "field_key": "background_objectives.objectives",
+          "label": "目标",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "良率改善、成本下降、产出提升、投资回收加快"
+        }
+      ]
+    },
+    {
+      "section_key": "page_presentation",
+      "section_title": "页面 / 功能呈现",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "page_presentation.pages",
+          "label": "页面定义",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Finished Lot Performance Overview Trend；Loss Ratio By Defect Code"
+        },
+        {
+          "field_key": "page_presentation.visual_descriptions",
+          "label": "图片替代文字说明",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "用文字描述原始看板截图、筛选区、公式图和计算示例"
+        }
+      ]
+    },
+    {
+      "section_key": "filters_interactions",
+      "section_title": "查询条件与用户交互",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "filters_interactions.filters",
+          "label": "筛选条件",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Customer、Plant、Date Type、Lot Type、Unit Type、Project Type"
+        },
+        {
+          "field_key": "filters_interactions.rules",
+          "label": "交互规则",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "联动筛选、选中态、tooltip、键盘交互、导出上下文"
+        }
+      ]
+    },
+    {
+      "section_key": "data_contract",
+      "section_title": "数据说明与数据契约",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "data_contract.sources",
+          "label": "数据来源",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "FinishedLotSummaryData_Internal 和 FinishedLotSummaryDefectData_Internal"
+        },
+        {
+          "field_key": "data_contract.fields",
+          "label": "必要数据字段",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "ATSDate、DateType、LotType、Project Type、Yield、Output_NSQM、DefectCode、DefectQty、Department"
+        },
+        {
+          "field_key": "data_contract.quality_rules",
+          "label": "数据质量规则",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "粒度、刷新频率、筛选项、空值处理、权限范围、对账规则"
+        }
+      ]
+    },
+    {
+      "section_key": "yield_calculation",
+      "section_title": "良率计算逻辑",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "yield_calculation.definitions",
+          "label": "良率定义",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Finished Yield / Product Yield 定义"
+        },
+        {
+          "field_key": "yield_calculation.formulas",
+          "label": "公式文字说明",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Lot Product Yield；Weekly Product Yield；各工序良率连乘"
+        },
+        {
+          "field_key": "yield_calculation.example",
+          "label": "计算示例",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "PAOI、E-test、CCAOI、Bump、FVI、Inline、Others 的 input/output/loss/yield"
+        }
+      ]
+    },
+    {
+      "section_key": "layout",
+      "section_title": "页面 / 功能布局",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "layout.options",
+          "label": "布局选项",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Primary-Detail / Hero；Nested / Drill-down；Uniform Grid fallback"
+        }
+      ]
+    },
+    {
+      "section_key": "chart_inventory",
+      "section_title": "图表清单与配置",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "chart_inventory.charts",
+          "label": "图表",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Finished Overall Trend；Defect Loss Ratio；右侧明细图表"
+        }
+      ]
+    },
+    {
+      "section_key": "stakeholders",
+      "section_title": "责任方与干系人",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "stakeholders.roles",
+          "label": "干系人",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "业务负责人、PO/BA、数据负责人、UI/UX、前端开发、QA"
+        }
+      ]
+    },
+    {
+      "section_key": "ui_visual_design",
+      "section_title": "UI 与视觉设计要求",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "ui_visual_design.rules",
+          "label": "UI 规则",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "AITC 风格、色彩系统、字体、间距、面板、响应式状态"
+        }
+      ]
+    },
+    {
+      "section_key": "technical_nonfunctional",
+      "section_title": "技术与非功能需求",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "technical_nonfunctional.technical_specs",
+          "label": "技术规格",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "前端栈、图表库、响应式、性能、浏览器支持、可维护性、安全"
+        },
+        {
+          "field_key": "technical_nonfunctional.nonfunctional_items",
+          "label": "非功能需求",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "数据准确性、性能、可访问性、可靠性、兼容性、可审计性"
+        }
+      ]
+    },
+    {
+      "section_key": "acceptance_questions",
+      "section_title": "验收标准与待确认问题",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "acceptance_questions.acceptance_criteria",
+          "label": "验收标准",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "图表清单、指标定义、筛选项、数据准确性、响应式布局、导出、UI 一致性"
+        },
+        {
+          "field_key": "acceptance_questions.open_questions",
+          "label": "待确认问题",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "布局方案、数据源关联键、首发范围、导出权限、刷新 SLA"
+        }
+      ]
+    }
+  ],
+  "prompt_hints": [
+    {
+      "hint_key": "qdm_yield_hint_1",
+      "content": "原文截图已转换为文字描述；需求访谈时应请用户确认这些描述是否等同于最终 UI 意图。"
+    },
+    {
+      "hint_key": "qdm_yield_hint_2",
+      "content": "源文档中 NSQM / NSOM 命名存在不一致迹象；实现前需要确认最终指标标签。"
+    },
+    {
+      "hint_key": "qdm_yield_hint_3",
+      "content": "需要确认良率公式只包含 PAOI、E-test、CCAOI、Bump AOI、FVI，还是也包含计算示例里的 Inline 和 Others。"
+    }
+  ],
+  "prompt_questions": [
+    {
+      "question_key": "qdm_yield_question_1",
+      "content": "首发版本采用哪种布局：Primary-Detail / Hero、Nested drill-down、Uniform Grid，还是其他方案？"
+    },
+    {
+      "question_key": "qdm_yield_question_2",
+      "content": "两张 QDM 源表的最终关联键、筛选字段和查询条件是什么？"
+    },
+    {
+      "question_key": "qdm_yield_question_3",
+      "content": "哪些角色可以导出图表图片或底层数据？"
+    },
+    {
+      "question_key": "qdm_yield_question_4",
+      "content": "页面需要展示什么刷新频率和数据可用性 SLA？"
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "D.CHQ.QDM Finished Lot 良率看板",
+      "requirement_name": "Finished Lot 绩效趋势与缺陷损失占比看板",
+      "system_module": "FinishedLot",
+      "initiate_department": "QDM",
+      "author": "Ely Yi",
+      "version": "V1.0",
+      "creation_date": "2026-05-21"
+    },
+    "background": {
+      "summary": "该看板用于为工厂内不同产品提供当前关键良率指标的高层视图，并通过自动化脚本按计划每日更新，减少手工报表准备。",
+      "objective": "通过展示整体良率趋势、分段/产品下钻、缺陷代码 Pareto、损失工序和根因责任归属，帮助良率曲线更快改善、快速降低生产成本、在不增加额外成本的情况下提升产出，并更早回收投资成本。"
+    },
+    "scope": {
+      "in_scope": [
+        "Finished Lot Performance Overview Trend 页面：展示 Finished Yield、最新周 Output、Yield、NSQM Loss。",
+        "Loss Ratio By Defect Code 页面：展示 Top 10 到 Top 20 缺陷损失占比、缺陷代码趋势和原因部门分布。",
+        "统一筛选条件：Customer、Plant、Date Type、Lot Type、Unit Type、Project Type。",
+        "Finished Yield 的批次级与周汇总计算逻辑。",
+        "图表清单、数据契约、UI 状态、响应式布局、导出权限和验收验证。"
+      ],
+      "out_of_scope": [
+        "自动优化工艺参数。",
+        "替代 QMS 正式缺陷判定流程。",
+        "供应商或客户投诉管理。",
+        "超出已批准图表清单的自助 BI 建模。"
+      ]
+    },
+    "users_and_scenarios": {
+      "target_users": [
+        "业务负责人：Yield team",
+        "产品负责人 / BA：QDM",
+        "数据负责人：Yield team",
+        "UI/UX 评审：Yield team",
+        "前端开发：QDM",
+        "QA 测试：Yield team"
+      ],
+      "core_scenarios": [
+        "Yield team 打开 Finished Lot Performance Overview Trend 页面，查看周度 Finished Yield 以及最新周 Output、Yield、NSQM Loss。",
+        "QDM 用户调整 Customer、Plant、Date Type、Lot Type、Unit Type、Project Type，期望相关图表在技术可行时无需整页刷新即可更新。",
+        "工程师点击趋势图分段，右侧明细面板切换到所选时间段或产品分段。",
+        "经理打开 Loss Ratio By Defect Code 页面，查看 Top 缺陷损失占比、缺陷趋势和原因部门分布。",
+        "QA 使用默认筛选和代表性筛选组合，对照 QDM 源表验证页面数值。"
+      ]
+    },
+    "functional_requirements": {
+      "overview": "该示例包含两个核心分析页面：Finished Lot Performance Overview Trend 和 Loss Ratio By Defect Code。两页共用同一套筛选契约，并支持图表选择、可读 Tooltip、可访问图例和遵循权限的导出。",
+      "feature_details": [
+        {
+          "feature_name": "Finished Lot Performance Overview Trend",
+          "description": "按选择的时间范围展示 Finished Yield，并展示最新周 Output、Yield、NSQM Loss 明细。",
+          "trigger": "用户打开看板或调整共享筛选栏。",
+          "processing_logic": "从 DS-01 加载 Finished Lot 汇总数据。主图默认按周展示 Finished Yield；点击左侧图表后，右侧明细视图切换为所选对象。",
+          "inputs": [
+            "Customer",
+            "Plant",
+            "Date Type",
+            "Lot Type",
+            "Unit Type",
+            "Project Type",
+            "Finished Lot 汇总记录"
+          ],
+          "outputs": [
+            "周/季/月良率趋势",
+            "最新周 Output",
+            "最新周 Yield",
+            "最新周 NSQM Loss",
+            "所选明细面板"
+          ],
+          "exception_cases": [
+            "筛选条件下无数据",
+            "源数据刷新延迟",
+            "用户缺少数据范围权限"
+          ]
+        },
+        {
+          "feature_name": "Loss Ratio By Defect Code",
+          "description": "按缺陷代码展示 Top 10 到 Top 20 缺陷损失占比，并展示缺陷代码趋势和原因部门明细。",
+          "trigger": "用户进入损失占比页面或点击缺陷代码分段。",
+          "processing_logic": "从 DS-02 加载缺陷汇总数据，按损失占比排名缺陷代码，渲染主图，并根据选择更新右侧趋势和部门分布。",
+          "inputs": [
+            "DefectCode",
+            "DefectQty",
+            "Department",
+            "筛选条件",
+            "缺陷汇总记录"
+          ],
+          "outputs": [
+            "Top 缺陷损失占比图",
+            "缺陷代码趋势",
+            "原因部门饼图/明细",
+            "过滤后的缺陷明细"
+          ],
+          "exception_cases": [
+            "缺陷代码映射缺失",
+            "部门归因缺失",
+            "数据不足导致图表无法渲染"
+          ]
+        },
+        {
+          "feature_name": "统一筛选与交互",
+          "description": "为所有适用图表提供共享筛选栏和一致交互规则。",
+          "trigger": "用户修改筛选、选择图表分段、切换图例、查看 Tooltip 或执行导出。",
+          "processing_logic": "筛选变更应在技术可行时更新所有受影响图表且无需整页刷新；选中图表分段必须有视觉激活状态，并保持当前筛选上下文可见。",
+          "inputs": [
+            "Customer",
+            "Plant",
+            "Date Type=Weekly",
+            "Lot Type=HVM",
+            "Unit Type=NSQM",
+            "Project Type=Overall"
+          ],
+          "outputs": [
+            "更新后的图表",
+            "可见激活状态",
+            "可读 Tooltip 或触屏详情",
+            "带筛选上下文的导出结果"
+          ],
+          "exception_cases": [
+            "筛选值不可用",
+            "网络或 API 失败",
+            "键盘焦点或触屏交互不可用"
+          ]
+        },
+        {
+          "feature_name": "Finished Yield 计算与数据契约",
+          "description": "定义批次级和周汇总 Product Yield 计算，并将图表绑定到已批准的 QDM 数据表。",
+          "trigger": "看板刷新或 QA 数据验证。",
+          "processing_logic": "Process Yield 按 Output / Input 计算，再顺序相乘。Lot Yield 面向单批次；Weekly Yield 基于所选周的汇总出货/Finished Output 数据，并遵循已批准源查询。",
+          "inputs": [
+            "ATSDate",
+            "DateType",
+            "LotType",
+            "Project Type",
+            "Yield",
+            "Output_NSQM",
+            "DefectCode",
+            "DefectQty",
+            "Department"
+          ],
+          "outputs": [
+            "一致的 Finished Yield",
+            "Output_NSQM",
+            "缺陷损失占比",
+            "可追溯计算依据"
+          ],
+          "exception_cases": [
+            "公式口径冲突",
+            "Input/Output 为空",
+            "源查询结果不一致"
+          ]
+        }
+      ]
+    },
+    "business_rules": [
+      "筛选默认值为 Customer=All selected、Plant=All selected、Date Type=Weekly、Lot Type=HVM、Unit Type=NSQM、Project Type=Overall。",
+      "筛选变更应在技术可行时更新所有受影响图表，不要求整页刷新。",
+      "选中的图表分段必须有清晰的激活状态，并让用户可见当前激活筛选。",
+      "桌面端 Tooltip 必须可读；触屏设备需要替换为适合点击/触摸的详情行为。",
+      "交互式图例必须支持键盘访问。",
+      "导出必须遵循数据权限规则，并在可行时包含当前筛选上下文。",
+      "Finished Yield 基于关键工序 Output/Input 比率的连续乘积计算。",
+      "上线前数据负责人必须确认源表、字段定义、刷新频率、关联逻辑和计算规则。"
+    ],
+    "page_and_interaction": {
+      "pages": [
+        {
+          "page_name": "Finished Lot Performance Overview Trend",
+          "entry_point": "Quality Operation Center",
+          "page_elements": [
+            "按时间范围展示 Finished Yield，并展示最新周 Output、Yield、NSQM Loss。",
+            "统一筛选区：Customer、Plant、Date Type、Lot Type、Unit Type、Project Type",
+            "主图默认按周展示 Finished Yield；右侧默认展示最新周明细，点击左侧图表后切换。",
+            "主图默认展示周信息；明细图展示数据说明。",
+            "截图文字描述：页面标题为 QUALITY OPERATION CENTER - Weekly Finished Lot Performance Overview；顶部是统一筛选栏；左侧主图为 Weekly Finished Lot Performance Overview Trend；右侧展示最新周 Output、Yield、NSQM Loss 明细卡片/图表。"
+          ],
+          "button_actions": [
+            "按筛选条件查询 / 刷新",
+            "重置筛选",
+            "点击图表分段",
+            "按筛选上下文导出"
+          ],
+          "purpose": "按时间范围展示 Finished Yield，并展示最新周 Output、Yield、NSQM Loss。",
+          "image_description": "截图文字描述：页面标题为 QUALITY OPERATION CENTER - Weekly Finished Lot Performance Overview；顶部是统一筛选栏；左侧主图为 Weekly Finished Lot Performance Overview Trend；右侧展示最新周 Output、Yield、NSQM Loss 明细卡片/图表。"
+        },
+        {
+          "page_name": "Loss Ratio By Defect Code",
+          "entry_point": "Quality Operation Center",
+          "page_elements": [
+            "展示 Top 10 到 Top 20 缺陷损失占比和缺陷代码趋势。",
+            "统一筛选区：Customer、Plant、Date Type、Lot Type、Unit Type、Project Type",
+            "主图展示 Top 10 到 Top 20 缺陷损失占比；右侧展示 Top 缺陷代码趋势和原因部门。",
+            "主图展示缺陷代码信息；明细饼图展示部门信息。",
+            "截图文字描述：页面标题仍为 QUALITY OPERATION CENTER - Weekly Finished Lot Performance Overview；顶部保留同一套筛选条件；左侧图表按损失占比排序缺陷代码；右侧展示选中缺陷代码趋势和原因部门分布。"
+          ],
+          "button_actions": [
+            "按筛选条件查询 / 刷新",
+            "重置筛选",
+            "点击图表分段",
+            "按筛选上下文导出"
+          ],
+          "purpose": "展示 Top 10 到 Top 20 缺陷损失占比和缺陷代码趋势。",
+          "image_description": "截图文字描述：页面标题仍为 QUALITY OPERATION CENTER - Weekly Finished Lot Performance Overview；顶部保留同一套筛选条件；左侧图表按损失占比排序缺陷代码；右侧展示选中缺陷代码趋势和原因部门分布。"
+        }
+      ],
+      "interaction_flow": [
+        "用户打开看板，看到默认 Weekly / HVM / NSQM / Overall 数据。",
+        "用户修改一个或多个筛选条件，所有受影响图表刷新，并保持筛选上下文可见。",
+        "用户点击图表分段，分段高亮，右侧明细切换到所选分段。",
+        "用户悬停或触摸图表数据点，查看 Tooltip 或详情。",
+        "用户导出图表数据，导出结果遵循权限并在可行时包含筛选上下文。"
+      ]
+    },
+    "copywriting": [
+      "QUALITY OPERATION CENTER - Weekly Finished Lot Performance Overview",
+      "Weekly Finished Lot Performance Overview Trend",
+      "Finished Lot Performance Overview Trend",
+      "Loss Ratio By Defect Code"
+    ],
+    "data_and_dependencies": [
+      "DS-01：[QDMProductionDB].[IDA].[Yield_Dashboard_FinishedLotSummaryData_Internal]，粒度 Weekly/Quarterly/Monthly，每周刷新，Owner 为 QDM。",
+      "DS-02：[QDMProductionDB].[IDA].[Yield_Dashboard_FinishedLotSummaryDefectData_Internal]，粒度 Weekly/Quarterly/Monthly，每周刷新，Owner 为 QDM。",
+      "DS-01 必填字段：ATSDate、DateType、LotType、Project Type、Yield、Output_NSQM。",
+      "DS-02 必填字段：DefectCode、DefectQty、Department。",
+      "CH-01 Finished Overall Trend：折线图，指标 Yield，维度 Weekly/Quarterly/Monthly，来源 DS-01，支持 Hover Tooltip 和点击过滤明细。",
+      "CH-02 Defect Loss Ratio：堆叠柱状图，指标 Defect Loss Ratio，维度 Top 20，来源 DS-02，支持图例切换和点击过滤相关图表。",
+      "CH-03 右侧明细图：表格/折线/饼图，根据左侧选择和当前筛选展示，来源 DS-01 + DS-02，支持分页、排序、导出。",
+      "前端技术期望：HTML + Bootstrap + JavaScript/jQuery，除非项目标准另有确认。",
+      "企业浏览器基线：当前批准版本的 Chrome 和 Edge。"
+    ],
+    "risks_and_notes": [
+      "如果业务方不接受 Primary-Detail / Hero，最终默认布局仍需确认。",
+      "最终源表/视图/API 和 Join Key 必须由数据负责人确认。",
+      "首版必做图表清单必须由业务负责人确认。",
+      "图表图片或底层数据的导出权限必须由安全和业务负责人确认。",
+      "数据可用性的刷新频率和 SLA 必须由数据负责人确认。"
+    ],
+    "acceptance_criteria": [
+      "业务负责人确认图表清单、指标定义、筛选清单、默认视图和布局模式。",
+      "数据负责人确认源表/视图/API、字段映射、刷新频率、关联逻辑和计算规则。",
+      "所有图表在默认筛选和至少三组代表性筛选组合下正确渲染。",
+      "Loading、empty、error、active、hover、focus、disabled 状态实现并保持视觉一致。",
+      "页面在桌面、平板、移动端宽度下响应式可读，无文字截断、控件重叠或图表标签不可读。",
+      "导出行为遵循已批准的数据权限规则，并在适用时包含当前筛选上下文。",
+      "QA 对照源查询或批准的参考报表验证数据准确性。",
+      "最终页面遵循已批准的 AITC 色彩系统，不引入未经批准的主色或重装饰风格。"
+    ],
+    "open_questions": [
+      "默认布局选项最终选择 Primary-Detail / Hero、Uniform Grid、Tabbed，还是其他模式？",
+      "最终源表/视图/API 和 Join Key 是什么？",
+      "哪些图表是首版必做，哪些是可选？",
+      "哪些角色可以导出图表图片或底层数据？",
+      "数据可用性的批准刷新频率和 SLA 是什么？"
+    ],
+    "template_specific_details": {
+      "source_document": "C:/Users/admin/Desktop/D.CHQ.QDM Yield Dashboard Requirement .docx",
+      "image_descriptions": [
+        "Overview 页面截图：Quality Operation Center 页面顶部是共享筛选栏，左侧是大型 Weekly Finished Lot Performance Overview Trend 图，右侧是最新周 Output / Yield / NSQM Loss 明细。",
+        "Loss Ratio 页面截图：顶部是共享筛选栏，主图按 Defect Code 排列 Top 10 到 Top 20 缺陷损失占比，右侧展示缺陷代码趋势和原因部门分布。",
+        "筛选截图：包含 Customer、Plant、Date Type、Lot Type、Unit Type、Project Type 下拉筛选，默认值分别为 All selected、All selected、Weekly、HVM、NSQM、Overall。",
+        "Lot Product Yield 公式图：单批次 Finished Yield 通过每个关键工序良率连续相乘得到，其中单工序良率为 Output / Input。",
+        "Weekly Product Yield 公式图：周度 Product Yield 基于周汇总出货/Finished Output 数据和已批准 QDM 源查询，并沿用 Output/Input 良率逻辑。",
+        "计算示例图：工序表从 50,000 起始数量开始，连续相乘各工序良率，例如 GTY = 99.4% × 99.5% × 99.29% × 99.38% × 99.17% × 99.49% × 99.39%。"
+      ],
+      "ui_style": {
+        "background": "#f6f8fb / #f3f5f7",
+        "panel": "#ffffff",
+        "primary_blue": "#2563eb",
+        "primary_hover": "#1d4ed8",
+        "border": "#d9e1e7",
+        "text": "#111315 / #17202a",
+        "radius": "8px general radius, 6px compact radius"
+      },
+      "non_functional_targets": [
+        "同一筛选条件下，页面显示值必须与批准的源查询结果一致。",
+        "标准数据量下，普通筛选或图表刷新目标为 3 秒，具体受 API 性能约束。",
+        "控件必须支持键盘访问、可见焦点态和足够对比度。",
+        "单个图表失败不得导致整页不可用，应显示图表级错误状态。",
+        "页面在批准的桌面、平板、移动端宽度下保持可读。"
+      ]
+    },
+    "template_meta": {
+      "is_default_example": true,
+      "example_notice": "这是系统内置的默认示例业务，用于填充式开始；后续用户修改意见优先覆盖该示例。"
+    }
+  }
+}

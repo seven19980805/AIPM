@@ -1,0 +1,445 @@
+{
+  "template_id": "business_process_requirement_template_de",
+  "template_key": "business_process_requirement",
+  "template_name": "Vorlage fuer Geschaeftsprozess-Anforderungen",
+  "template_category": "business_requirement",
+  "business_domain": "business_process",
+  "language": "de",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "Eine Vorlage fuer Workflow-Start, Pruefung, Genehmigung, Aufgabenbearbeitung, Berechtigungen, Audit-Historie, Integrationen und UAT-Abnahme.",
+  "tags": [
+    "business-process",
+    "workflow",
+    "approval",
+    "permissions",
+    "audit",
+    "uat"
+  ],
+  "applicable_scenarios": [
+    "Workflow- oder Genehmigungsprozess",
+    "Aufgabenliste und Prozesshistorie",
+    "Rollenbasierte Berechtigungen und Audit-Kontrolle",
+    "Datengetriebene Prozessvalidierung",
+    "UAT und fachlicher Sign-off",
+    "Konfigurationsgetriebene Prozessverwaltung"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/business-process-requirement-template.de.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Grundlegende Dokumentinformationen",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.summary",
+          "label": "Dokumentinformationen",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "background_objectives",
+      "section_title": "Hintergrund und Ziele",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "background_objectives.summary",
+          "label": "Hintergrund und Ziele",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "scope",
+      "section_title": "Umfang",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "scope.items",
+          "label": "Umfang",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "stakeholders",
+      "section_title": "Verantwortliche und Stakeholder",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "stakeholders.roles",
+          "label": "Stakeholder",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "data_description",
+      "section_title": "Datenbeschreibung",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "data_description.items",
+          "label": "Datenquellen und Felder",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "process_description",
+      "section_title": "Prozessbeschreibung",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "process_description.steps",
+          "label": "Workflow-Schritte",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "business_rules",
+      "section_title": "Geschaeftsregeln",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "business_rules.rules",
+          "label": "Geschaeftsregeln",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "pages_functions",
+      "section_title": "Seiten- / Funktionsdarstellung",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "pages_functions.pages",
+          "label": "Seiten und Funktionen",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "permissions_controls",
+      "section_title": "Berechtigungen und Kontrollen",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "permissions_controls.matrix",
+          "label": "Berechtigungsmatrix",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "audit_compliance",
+      "section_title": "Audit- und Compliance-Anforderungen",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "audit_compliance.requirements",
+          "label": "Audit und Compliance",
+          "component": "list",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "development_requirements",
+      "section_title": "Entwicklungsanforderungen",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "development_requirements.specs",
+          "label": "Technische Spezifikation",
+          "component": "textarea",
+          "data_type": "string",
+          "required": false
+        }
+      ]
+    },
+    {
+      "section_key": "integrations",
+      "section_title": "Integrations- und Schnittstellenanforderungen",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "integrations.interfaces",
+          "label": "Schnittstellen",
+          "component": "table",
+          "data_type": "array",
+          "required": false
+        }
+      ]
+    },
+    {
+      "section_key": "non_functional",
+      "section_title": "Nicht-funktionale Anforderungen",
+      "sort_order": 13,
+      "fields": [
+        {
+          "field_key": "non_functional.requirements",
+          "label": "Nicht-funktionale Anforderungen",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "acceptance_testing",
+      "section_title": "Abnahmekriterien und Tests",
+      "sort_order": 14,
+      "fields": [
+        {
+          "field_key": "acceptance_testing.criteria",
+          "label": "Abnahmekriterien",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "risks_open_questions",
+      "section_title": "Risiken, Abhaengigkeiten und offene Fragen",
+      "sort_order": 15,
+      "fields": [
+        {
+          "field_key": "risks_open_questions.items",
+          "label": "Risiken und Fragen",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "completion_checklist",
+      "section_title": "Empfohlene Abschluss-Checkliste",
+      "sort_order": 16,
+      "fields": [
+        {
+          "field_key": "completion_checklist.items",
+          "label": "Checkliste",
+          "component": "table",
+          "data_type": "array",
+          "required": false
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "Digitalisierung des Einkaufsfreigabeprozesses",
+      "requirement_name": "Optimierung des Bestellanforderungsprozesses"
+    },
+    "background": {
+      "summary": "Bestellanforderungen laufen derzeit ueber E-Mail, Tabellen und Offline-Unterschriften. Antragsteller sehen den Status schlecht, Genehmigende haben keine zentrale Aufgabenliste, und Finance kann Nachweise nur mit Aufwand pruefen.",
+      "objective": "Einen standardisierten Online-Freigabeprozess fuer Bestellanforderungen schaffen, Transparenz erhoehen, Durchlaufzeit senken und Audit-Historie sichern."
+    },
+    "scope": {
+      "in_scope": [
+        "Antragserstellung und Validierung",
+        "Mehrstufige Freigabe nach Betrag und Abteilung",
+        "Aufgabenliste und Prozesshistorie",
+        "Rueckgabe, Rueckzug, Ablehnung und erneute Einreichung",
+        "Berechtigungen und Audit Trail"
+      ],
+      "out_of_scope": [
+        "Lieferantenausschreibung",
+        "Vertragsmanagement",
+        "ERP-Zahlungsausfuehrung"
+      ]
+    },
+    "users_and_scenarios": {
+      "target_users": [
+        "Antragsteller: reicht Anforderungen ein und verfolgt Status",
+        "Abteilungsfreigeber: prueft Team-Anforderungen",
+        "Finance Reviewer: prueft Budget und Konto-Regeln",
+        "Einkaufsspezialist: bestaetigt Einkaufskategorie",
+        "Administrator: pflegt Workflow-Konfiguration"
+      ],
+      "core_scenarios": [
+        "Ein Antragsteller erstellt eine Anforderung mit Angebotsanhang.",
+        "Das System routet nach Betrag an Abteilung und Finance.",
+        "Ein Freigeber gibt mit Kommentar zurueck und der Antragsteller reicht erneut ein.",
+        "Finance exportiert die Historie fuer den Monatsabschluss."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "This default example includes Workflow-Start und Validierung, Freigabe-Aufgabenliste, Historie und Audit-Export.",
+      "feature_details": [
+        {
+          "feature_name": "Workflow-Start und Validierung",
+          "description": "Support workflow-start und validierung for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        },
+        {
+          "feature_name": "Freigabe-Aufgabenliste",
+          "description": "Support freigabe-aufgabenliste for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        },
+        {
+          "feature_name": "Historie und Audit-Export",
+          "description": "Support historie und audit-export for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        }
+      ]
+    },
+    "business_rules": [
+      "Only authorized roles can view scoped data and perform sensitive actions.",
+      "Core business actions must keep an audit trail.",
+      "Exported data must follow the same filters and permission scope as the page.",
+      "Data refresh status and calculation definitions must be visible to users."
+    ],
+    "page_and_interaction": {
+      "pages": [
+        {
+          "page_name": "Workflow-Start und Validierung",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        },
+        {
+          "page_name": "Freigabe-Aufgabenliste",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        },
+        {
+          "page_name": "Historie und Audit-Export",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        }
+      ],
+      "interaction_flow": [
+        "Ein Antragsteller erstellt eine Anforderung mit Angebotsanhang.",
+        "Das System routet nach Betrag an Abteilung und Finance.",
+        "Ein Freigeber gibt mit Kommentar zurueck und der Antragsteller reicht erneut ein.",
+        "Finance exportiert die Historie fuer den Monatsabschluss."
+      ]
+    },
+    "copywriting": [],
+    "data_and_dependencies": [
+      "User and organization master data",
+      "Business transaction data",
+      "Permission configuration",
+      "Reporting/export service"
+    ],
+    "risks_and_notes": [
+      "Metric ownership and data definitions must be confirmed.",
+      "Historical data quality may affect acceptance.",
+      "External system readiness may affect rollout scope."
+    ],
+    "acceptance_criteria": [
+      "The example scope can be generated into PRD and design documents.",
+      "Users can revise the seeded requirement through chat messages.",
+      "Main roles, flows, data, permissions, and acceptance criteria are represented."
+    ],
+    "open_questions": [
+      "Which roles need final approval authority?",
+      "Which fields and metrics are mandatory for MVP?",
+      "Which external systems must be integrated in the first release?"
+    ],
+    "template_meta": {
+      "example_note": "AI-generated default example business; replace with real business facts before final delivery."
+    }
+  }
+}

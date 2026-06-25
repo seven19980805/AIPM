@@ -1,0 +1,671 @@
+{
+  "template_id": "forum_community_business_requirement_template_de",
+  "template_key": "forum_community_business_requirement",
+  "template_name": "Vorlage fuer fachliche Anforderungen an ein Forum-Community-System",
+  "template_category": "business_requirement",
+  "business_domain": "forum_community",
+  "language": "de",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "Allgemeine Vorlage fuer fachliche Anforderungen an Forum-Communities aehnlich Tieba, Interessensgemeinschaften, Q&A-Diskussionsbereiche und interne Unternehmensforen.",
+  "tags": [
+    "forum",
+    "community",
+    "thread",
+    "post",
+    "comment",
+    "moderation"
+  ],
+  "applicable_scenarios": [
+    "Board- und Moderatorenverwaltung",
+    "Thread-Erstellung und Bearbeitung",
+    "Antworten, Kommentare und Interaktionen",
+    "Nutzerlevel und Punkte",
+    "Moderation und Meldungsbearbeitung",
+    "Suche, Empfehlung und Analysen"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/forum-community-business-requirement-template.de.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Basisinformationen",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.project_name",
+          "label": "Projekt",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Projektnamen eingeben"
+        },
+        {
+          "field_key": "document_info.requirement_name",
+          "label": "Anforderungsname",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Beispiel: Aufbau eines Interessenforum-Systems"
+        },
+        {
+          "field_key": "template_meta.requirement_type",
+          "label": "Anforderungstyp",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "Neubau",
+            "Optimierung",
+            "Refactoring"
+          ]
+        },
+        {
+          "field_key": "template_meta.priority",
+          "label": "Prioritaet",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "Hoch",
+            "Mittel",
+            "Niedrig"
+          ]
+        },
+        {
+          "field_key": "template_meta.proposing_department",
+          "label": "Anfordernde Abteilung",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Anfordernde Abteilung eingeben"
+        },
+        {
+          "field_key": "template_meta.requester",
+          "label": "Anforderer",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Anforderer eingeben"
+        },
+        {
+          "field_key": "template_meta.request_date",
+          "label": "Anforderungsdatum",
+          "component": "date",
+          "data_type": "date",
+          "required": false,
+          "placeholder": "YYYY-MM-DD"
+        },
+        {
+          "field_key": "template_meta.version",
+          "label": "Version",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "V1.0"
+        }
+      ]
+    },
+    {
+      "section_key": "business_background",
+      "section_title": "Fachlicher Hintergrund",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "business_background.summary",
+          "label": "Hintergrundueberblick",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Beschreiben Sie Community-Hintergrund, aktuelle Kommunikationsweise und Grund fuer den Systemaufbau"
+        },
+        {
+          "field_key": "business_background.pain_points",
+          "label": "Aktuelle Schmerzpunkte",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beschreiben Sie Community-Hintergrund, aktuelle Kommunikationsweise und Grund fuer den Systemaufbau"
+        }
+      ]
+    },
+    {
+      "section_key": "business_objectives",
+      "section_title": "Fachliche Ziele",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "business_objectives.objectives",
+          "label": "Fachliche Ziele",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beschreiben Sie die fachlichen Ziele des Forum-Systems"
+        },
+        {
+          "field_key": "business_objectives.metrics",
+          "label": "Messbare Kennzahlen",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beispiel: Durchschnittliche Moderationszeit um 50% reduzieren"
+        }
+      ]
+    },
+    {
+      "section_key": "business_scope",
+      "section_title": "Fachlicher Umfang",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "business_scope.in_scope",
+          "label": "Im Umfang",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Forum-Systems zusammen"
+        },
+        {
+          "field_key": "business_scope.out_scope",
+          "label": "Nicht im Umfang",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Forum-Systems zusammen"
+        }
+      ]
+    },
+    {
+      "section_key": "roles_and_scenarios",
+      "section_title": "Rollen und Kernszenarien",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "roles_and_scenarios.target_roles",
+          "label": "Zielrollen",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beispiel: Besucher, registrierte Nutzer, Moderatoren, Operatoren, Reviewer"
+        },
+        {
+          "field_key": "roles_and_scenarios.core_scenarios",
+          "label": "Kernszenarien",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beispiel: Besucher, registrierte Nutzer, Moderatoren, Operatoren, Reviewer"
+        }
+      ]
+    },
+    {
+      "section_key": "functional_requirements",
+      "section_title": "Funktionale Anforderungen",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "functional_requirements.overview",
+          "label": "Funktionsueberblick",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Forum-Systems zusammen"
+        },
+        {
+          "field_key": "functional_requirements.features",
+          "label": "Funktionsdetails",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "feature": "Funktion",
+            "description": "Beschreibung",
+            "trigger": "Ausloeser",
+            "logic": "Fachliche Regeln / Logik",
+            "inputs": "Eingaben",
+            "outputs": "Ausgaben",
+            "exceptions": "Ausnahmen"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "page_and_process",
+      "section_title": "Seiten und Prozesse",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "page_and_process.pages",
+          "label": "Seite / Einstieg",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "page": "Seite / Einstieg",
+            "entry": "Einstieg",
+            "elements": "Schluesselinhalte",
+            "actions": "Hauptaktionen",
+            "flow": "Ablauf"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "business_rules_and_data",
+      "section_title": "Fachliche Regeln und Daten",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "business_rules_and_data.rules",
+          "label": "Fachliche Regeln / Logik",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Forum-Systems zusammen"
+        },
+        {
+          "field_key": "business_rules_and_data.key_data",
+          "label": "Wichtige Datenobjekte",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beispiel: Boards, Threads, Antworten, Nutzerbeziehungen, Moderationsdaten"
+        }
+      ]
+    },
+    {
+      "section_key": "nonfunctional_requirements",
+      "section_title": "Nichtfunktionale Anforderungen",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "nonfunctional_requirements.items",
+          "label": "Nichtfunktionale Anforderungen",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Forum-Systems zusammen"
+        }
+      ]
+    },
+    {
+      "section_key": "integration_dependencies",
+      "section_title": "Integrationen und Abhaengigkeiten",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "integration_dependencies.external_systems",
+          "label": "Externe Abhaengigkeiten",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Forum-Systems zusammen"
+        }
+      ]
+    },
+    {
+      "section_key": "risks_and_questions",
+      "section_title": "Risiken und offene Fragen",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "risks_and_questions.risks",
+          "label": "Risiken",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Forum-Systems zusammen"
+        },
+        {
+          "field_key": "risks_and_questions.open_questions",
+          "label": "Offene Fragen",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Offene Frage eingeben"
+        }
+      ]
+    },
+    {
+      "section_key": "milestone_acceptance",
+      "section_title": "Meilensteine und Abnahme",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "milestone_acceptance.milestones",
+          "label": "Meilenstein",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "milestone": "Meilenstein",
+            "target_date": "Zieldatum",
+            "acceptance": "Abnahmekriterien"
+          }
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "Community-Forum-Plattformprojekt",
+      "requirement_name": "Aufbau eines Interessenforum-Systems"
+    },
+    "template_meta": {
+      "template_name": "Vorlage fuer fachliche Anforderungen an ein Forum-Community-System",
+      "requirement_type": "Neubau",
+      "priority": "Hoch",
+      "proposing_department": "Community Operations / Produkt",
+      "requester": "Community Product Manager",
+      "request_date": "2026-05-14",
+      "version": "V1.0"
+    },
+    "business_background": {
+      "summary": "Nutzerdiskussionen, Erfahrungsaustausch und Q&A-Inhalte sind derzeit ueber Chatgruppen, Tabellen und temporaere Dokumente verteilt. Inhalte werden schlecht gesichert, Suche ist schwach, und Regelverstoesse werden hauptsaechlich manuell gefunden. Es wird ein Forum-Community-System aehnlich Tieba benoetigt, um Themen-Diskussionen, Board-Governance, Inhaltsmoderation und Community-Analysen zu unterstuetzen.",
+      "pain_points": [
+        "Diskussionsinhalte sind schwer strukturiert zu sichern und spaeter zu finden",
+        "Boards, Threads, Antworten und Nutzerbeziehungen werden nicht einheitlich verwaltet",
+        "Regelverstoesse werden zu spaet entdeckt und Moderation hat zu wenig Audit Trail",
+        "Trendinhalte, aktive Nutzer und Community-Qualitaet haben keine klaren Dashboards"
+      ]
+    },
+    "business_objectives": {
+      "objectives": [
+        "Eine Board- und Thread-Struktur nach Interessen oder Geschaeftsthemen aufbauen",
+        "Einen geschlossenen Interaktionsablauf fuer Posten, Antworten, Liken, Speichern, Folgen und Benachrichtigung unterstuetzen",
+        "Governance fuer Meldungen, Moderation, Sperren, Einsprueche und Audit aufbauen",
+        "Community-Daten fuer Empfehlungen und operative Entscheidungen sammeln"
+      ],
+      "metrics": [
+        "Durchschnittliche Zeit von Veroeffentlichung bis Sichtbarkeit unter 3 Sekunden",
+        "Durchschnittliche Moderationszeit um 50% reduzieren",
+        "Trefferquote der Community-Suche auf 90% steigern",
+        "Taeglich aktive Nutzer und Beitragsvolumen je Kernboard auswerten"
+      ]
+    },
+    "business_scope": {
+      "in_scope": [
+        "Board-Verwaltung und Berechtigungskonfiguration",
+        "Thread-Erstellung, Bearbeitung, Loeschen, Anheften und Hervorheben",
+        "Antworten, Kommentare, verschachtelte Antworten und Interaktionen",
+        "Nutzerprofil, Folgen, Level, Punkte und Badges",
+        "Meldungen, Moderation, Ausblenden, Sperren und Einsprueche",
+        "Suche, Sortierung, Empfehlung und Analyse-Dashboards"
+      ],
+      "out_scope": [
+        "Instant-Messaging-Gruppenchat",
+        "Komplexe Kurzvideo-Erstellung",
+        "Externes Werbeauslieferungssystem",
+        "Vollautomatische KI-Inhaltsentscheidung"
+      ]
+    },
+    "roles_and_scenarios": {
+      "target_roles": [
+        "Besucher: oeffentliche Boards und Threads lesen, Inhalte suchen",
+        "Registrierter Nutzer: Threads erstellen, antworten, liken, speichern, folgen und melden",
+        "Board-Moderator: Board-Regeln verwalten, Beitraege anheften/hervorheben und Verstoesse behandeln",
+        "Reviewer: neue Beitraege, Meldungen und sensible Inhalte pruefen",
+        "Operator: Empfehlungen, Kampagnen, Tags und Dashboards konfigurieren",
+        "Systemadministrator: Berechtigungen, Woerterbuecher, sensible Woerter und Systemparameter pflegen"
+      ],
+      "core_scenarios": [
+        "Ein Nutzer oeffnet die Forum-Startseite und findet interessante Threads ueber Board, Hotlist oder Suche.",
+        "Ein registrierter Nutzer erstellt in einem Board einen Thread und laedt Bilder oder Anhaenge hoch.",
+        "Andere Nutzer antworten, liken, speichern oder folgen dem Autor, und das System sendet Benachrichtigungen.",
+        "Ein Nutzer meldet regelwidrige Inhalte, und ein Reviewer bearbeitet den Fall mit dokumentiertem Grund.",
+        "Ein Moderator heftet einen hochwertigen Beitrag an oder hebt ihn hervor, waehrend Operatoren Empfehlungsplaetze konfigurieren.",
+        "Das Management sieht Beitragsvolumen, Antwortvolumen, aktive Nutzer, Meldungen und Moderationseffizienz."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "Diese Anforderung umfasst sieben Faehigkeitsgruppen: Board-Governance, Inhaltserstellung, Interaktionen, Nutzerwachstum, Moderation und Risikokontrolle, Suche und Empfehlung sowie Community-Analysen.",
+      "features": [
+        {
+          "feature": "Board- und Moderatorenverwaltung",
+          "description": "Pflegt Board-Kategorien, Board-Profile, Regeln, Moderatoren und Zugriffsrechte.",
+          "trigger": "Ein Operator erstellt oder aendert ein Board.",
+          "logic": [
+            "Unterstuetzt Erstellen, Deaktivieren, Zusammenfuehren, Sortieren und Sichtbarkeit von Boards",
+            "Unterstuetzt Board-Regeln, Ankuendigungen, Tags und Moderatorrechte",
+            "Unterstuetzt Board-Statistiken und Anomaliealarme"
+          ],
+          "inputs": "Boardname, Kategorie, Regeln, Moderatoren, Berechtigungsumfang",
+          "outputs": "Boarddetail, Ankuendigung, Moderatorenliste, Statistiken",
+          "exceptions": "Doppelter Boardname, Loeschen bei vorhandenen Beitraegen blockiert, Berechtigungskonflikt"
+        },
+        {
+          "feature": "Thread-Erstellung und Inhaltsbearbeitung",
+          "description": "Unterstuetzt Thread-Erstellung, Entwuerfe, Rich Text, Bilder, Anhaenge und Tags.",
+          "trigger": "Ein Nutzer klickt auf Verfassen oder Bearbeiten.",
+          "logic": [
+            "Unterstuetzt Titel, Inhalt, Bilder, Anhaenge, Tags und anonyme Optionen",
+            "Unterstuetzt Entwurfsspeicherung, Bearbeitungshistorie, Loeschen und Wiederherstellen",
+            "Unterstuetzt Anheften, Hervorheben, Sperren und Herunterstufen von Beitraegen"
+          ],
+          "inputs": "Titel, Inhalt, Board, Tags, Anhaenge, Autor",
+          "outputs": "Thread, Entwurf, Bearbeitungsdatensatz, Verwaltungsstatus",
+          "exceptions": "Sensibles Wort getroffen, Anhangslimit ueberschritten, Doppelpost, keine Berechtigung"
+        },
+        {
+          "feature": "Antworten, Kommentare und Interaktionen",
+          "description": "Unterstuetzt Antworten, verschachtelte Kommentare, Likes, Speichern, Folgen und Benachrichtigungen.",
+          "trigger": "Ein Nutzer interagiert mit Thread oder Antwort.",
+          "logic": [
+            "Unterstuetzt Sortierung, Zitieren, Einklappen und Loeschen von Antworten",
+            "Unterstuetzt Likes, Speichern, Folgen von Autoren/Threads und Benachrichtigungen",
+            "Unterstuetzt Blockieren von Nutzern und Nicht-interessiert-Feedback"
+          ],
+          "inputs": "Thread, Antwort, Nutzer, Interaktionstyp",
+          "outputs": "Antwortliste, Interaktionsdatensatz, Benachrichtigung",
+          "exceptions": "Aktionslimit, blockierter Nutzer, Inhalt geloescht"
+        },
+        {
+          "feature": "Nutzerwachstum und Community-Werte",
+          "description": "Pflegt Nutzerprofil, Level, Punkte, Badges und Beitragsnachweise.",
+          "trigger": "Ein Nutzer erledigt Posten, Interaktion, Check-in oder Kampagnenaufgaben.",
+          "logic": [
+            "Unterstuetzt Punkteregeln, Levelregeln, Badge-Vergabe und Aufgaben",
+            "Zeigt Beitraege, gespeicherte Inhalte, Follows und Follower im Profil",
+            "Unterstuetzt Punkteabzug bei Verstoessen, Stummschaltung und Credit-Wiederherstellung"
+          ],
+          "inputs": "Nutzerprofil, Verhaltensdatensatz, Punkteregel, Badgeregel",
+          "outputs": "Nutzerprofil, Punktejournal, Levelergebnis, Badgedatensatz",
+          "exceptions": "Punkte-Farming, Punkte-Rollback, Kontoanomalie"
+        },
+        {
+          "feature": "Moderation und Meldungsbearbeitung",
+          "description": "Bearbeitet sensible Inhalte, Meldungen, manuelle Pruefung, Sperren und Einsprueche.",
+          "trigger": "Inhalt wird veroeffentlicht, gemeldet oder trifft eine Regel.",
+          "logic": [
+            "Unterstuetzt Moderation vor/nach Veroeffentlichung, sensible Woerter und Bildpruefung",
+            "Unterstuetzt Meldungsannahme, Ergebnis, Sanktion und Benachrichtigung",
+            "Unterstuetzt Sperren, Stummschalten, Inhaltsblockierung, Einspruch und Audit"
+          ],
+          "inputs": "Inhalt, Meldegrund, Moderationsregel, Bearbeiter",
+          "outputs": "Moderationsergebnis, Sanktionsdatensatz, Einspruchsdatensatz, Auditlog",
+          "exceptions": "Fehlentscheidung, doppelte Meldung, Moderations-Timeout, Ruecknahme von Sanktionen"
+        },
+        {
+          "feature": "Suche, Empfehlung und Analysen",
+          "description": "Bietet Inhaltssuche, Hotlists, Empfehlungsplaetze und Community-Daten.",
+          "trigger": "Ein Nutzer sucht Inhalte oder ein Operator sieht Daten.",
+          "logic": [
+            "Unterstuetzt Suche nach Board, Keyword, Tag, Autor und Zeit",
+            "Unterstuetzt Hot-Thread-Liste, Empfehlungsplaetze, Featured-Bereich und Kampagneneinstieg",
+            "Unterstuetzt Dashboards fuer Beitraege, aktive Nutzer, Meldungen und Moderationseffizienz"
+          ],
+          "inputs": "Threads, Antworten, Tags, Nutzerverhalten, Moderationsdaten",
+          "outputs": "Suchergebnisse, Hotlist, Empfehlungsliste, Analysebericht",
+          "exceptions": "Indexverzug, regelwidriger empfohlener Inhalt, unvollstaendige Berechtigungsfilterung"
+        }
+      ]
+    },
+    "page_and_process": {
+      "pages": [
+        {
+          "page": "Forum-Startseite",
+          "entry": "Nutzereinstieg",
+          "elements": "Empfohlene Boards, Hotlist, Suchfeld, Kampagneneinstieg",
+          "actions": "Suchen, Board oeffnen, Hot Threads ansehen, anmelden",
+          "flow": "Ein Nutzer oeffnet die Startseite und ruft Threads nach Interesse oder Hotlist auf."
+        },
+        {
+          "page": "Board-Detailseite",
+          "entry": "Board-Einstieg",
+          "elements": "Board-Ankuendigung, Regeln, Threadliste, Filter und Sortierung",
+          "actions": "Thread erstellen, Board folgen, filtern, Thread ansehen",
+          "flow": "Ein Nutzer durchsucht Threads in einem Board und startet Diskussionen."
+        },
+        {
+          "page": "Thread-Detailseite",
+          "entry": "Threadliste / Suchergebnis",
+          "elements": "Hauptbeitrag, Antworten, verschachtelte Antworten, Interaktionen, Empfehlungen",
+          "actions": "Antworten, liken, speichern, melden, Autor folgen",
+          "flow": "Ein Nutzer liest und interagiert mit einem Thread; das System zeichnet Beziehungen und Benachrichtigungen auf."
+        },
+        {
+          "page": "Post-Editor",
+          "entry": "Verfassen-Button",
+          "elements": "Titel, Inhalt, Bilder, Anhaenge, Tags, Veroeffentlichungseinstellungen",
+          "actions": "Entwurf speichern, Vorschau, veroeffentlichen, bearbeiten",
+          "flow": "Ein Nutzer bearbeitet Inhalte; das System prueft sensible Woerter und Berechtigungen vor Veroeffentlichung."
+        },
+        {
+          "page": "Moderationskonsole",
+          "entry": "Admin-Backend",
+          "elements": "Ausstehende Inhalte, Meldungsliste, Bearbeitungsdatensaetze, Sanktionen",
+          "actions": "Pruefen, blockieren, sperren, ablehnen, freigeben, benachrichtigen",
+          "flow": "Ein Reviewer bearbeitet Inhalte und hinterlaesst Operationsdaten."
+        },
+        {
+          "page": "Community-Analyse-Dashboard",
+          "entry": "Operations-Backend",
+          "elements": "Beitragsvolumen, aktive Nutzer, Hot Threads, Meldungen, Moderationseffizienz",
+          "actions": "Filtern, Drilldown, Export, Empfehlungen konfigurieren",
+          "flow": "Operatoren pruefen Community-Qualitaet und Wachstum."
+        }
+      ]
+    },
+    "business_rules_and_data": {
+      "rules": [
+        "Posting-Frequenzen koennen je Nutzerlevel und Board konfiguriert werden.",
+        "Veroeffentlichung erfordert Pruefung sensibler Woerter, Bildsicherheit und Berechtigungen.",
+        "Geloeschte oder blockierte Inhalte sind fuer normale Nutzer unsichtbar, bleiben aber im Admin-Audit erhalten.",
+        "Meldungsbearbeitung muss Bearbeiter, Zeit, Ergebnis und Sanktion erfassen.",
+        "Anheften, Hervorheben und Empfehlungsplaetze muessen rollenbasiert berechtigt sein."
+      ],
+      "key_data": [
+        "Board: ID, Name, Kategorie, Regeln, Moderatoren, Status, Sichtbarkeit",
+        "Thread: ID, Board, Titel, Inhalt, Autor, Status, Interaktionszahl, Veroeffentlichungszeit",
+        "Antwort: ID, Thread, Elternantwort, Autor, Inhalt, Status, Etage",
+        "Nutzerbeziehung: Folgen, Blockieren, Speichern, Like, Besuchsdatensatz",
+        "Moderationsdatensatz: Inhalt, Regel, Treffer, Bearbeiter, Ergebnis, Sanktion",
+        "Betriebskonfiguration: Empfehlungsplatz, Hotlist-Regel, Tag, Kampagneneinstieg"
+      ]
+    },
+    "nonfunctional_requirements": {
+      "items": [
+        "Performance: Haeufige Abfragen fuer Startseite und Threaddetails innerhalb von 3 Sekunden; Hotlists koennen gecacht werden.",
+        "Sicherheit: Identitaet, sensible Woerter, Bildinhalte und API-Frequenz schuetzen.",
+        "Benutzbarkeit: Posten, Antworten und Melden brauchen Wiederholung und klare Hinweise.",
+        "Audit: Moderation, Sperren, Loeschen, Wiederherstellen und Empfehlungen muessen protokolliert werden.",
+        "Erweiterbarkeit: Boards, Tags, Punkte und Moderationsregeln muessen konfigurierbar erweiterbar sein."
+      ]
+    },
+    "integration_dependencies": {
+      "external_systems": [
+        "Zentrale Identitaet / SSO",
+        "Objektspeicher oder Anhangsdienst",
+        "Benachrichtigungsdienst",
+        "Content-Safety / Bildpruefung",
+        "Suchmaschinendienst",
+        "Unternehmens-DWH / BI"
+      ]
+    },
+    "risks_and_questions": {
+      "risks": [
+        "Offene Communities koennen Spam, Werbung und Regelverstoesse erzeugen; Governance muss klar sein.",
+        "Zu strenge sensible Woerter und Moderation koennen normale Diskussion beeintraechtigen.",
+        "Unklare Hotlist- und Empfehlungsregeln koennen operative Konflikte ausloesen.",
+        "Historische Inhaltsmigration kann Datenbereinigung und Berechtigungszuordnung erfordern."
+      ],
+      "open_questions": [
+        "Duerfen Besucher posten oder nur registrierte Nutzer?",
+        "Sollen Beitraege vor Veroeffentlichung geprueft oder nachtraeglich kontrolliert werden?",
+        "Welche Berechtigungsgrenzen und Ernennungsprozesse gelten fuer Moderatoren?",
+        "Werden Level, Punkte, Badges und Check-ins benoetigt?",
+        "Wer pflegt Hotlist-, Empfehlungs- und Suchranking-Regeln?"
+      ]
+    },
+    "milestone_acceptance": {
+      "milestones": [
+        {
+          "milestone": "Anforderungsbestaetigung",
+          "target_date": "T+1 Woche",
+          "acceptance": "Rollen, Umfang, Kernablaeufe und Moderationsstrategie bestaetigen"
+        },
+        {
+          "milestone": "Prototyp-Review",
+          "target_date": "T+3 Wochen",
+          "acceptance": "Prototypen fuer Startseite, Board, Thread, Editor und Moderation abschliessen"
+        },
+        {
+          "milestone": "Entwicklung und Integration",
+          "target_date": "T+8 Wochen",
+          "acceptance": "Kernfunktionen sowie Content-Safety- und Suchintegration abschliessen"
+        },
+        {
+          "milestone": "Pilotstart",
+          "target_date": "T+10 Wochen",
+          "acceptance": "Ausgewaehlte Boards pilotieren und Probleme schliessen"
+        },
+        {
+          "milestone": "Produktivstart",
+          "target_date": "T+12 Wochen",
+          "acceptance": "Gesamtrelease, Betriebskonfiguration und Abnahme abschliessen"
+        }
+      ]
+    },
+    "summary": "Nutzerdiskussionen, Erfahrungsaustausch und Q&A-Inhalte sind derzeit ueber Chatgruppen, Tabellen und temporaere Dokumente verteilt. Inhalte werden schlecht gesichert, Suche ist schwach, und Regelverstoesse werden hauptsaechlich manuell gefunden. Es wird ein Forum-Community-System aehnlich Tieba benoetigt, um Themen-Diskussionen, Board-Governance, Inhaltsmoderation und Community-Analysen zu unterstuetzen.",
+    "objective": "Eine Board- und Thread-Struktur nach Interessen oder Geschaeftsthemen aufbauen; Einen geschlossenen Interaktionsablauf fuer Posten, Antworten, Liken, Speichern, Folgen und Benachrichtigung unterstuetzen; Governance fuer Meldungen, Moderation, Sperren, Einsprueche und Audit aufbauen; Community-Daten fuer Empfehlungen und operative Entscheidungen sammeln"
+  },
+  "prompt_hints": [
+    {
+      "hint_key": "forum_hint_1",
+      "content": "Die Vorlage enthaelt typische Rollen, Boards, Threads, Interaktionen und Moderation fuer Forum-Communities."
+    },
+    {
+      "hint_key": "forum_hint_2",
+      "content": "Klaeren Sie zuerst die Content-Governance inklusive Moderationszeitpunkt, Sanktionen und Einspruch."
+    },
+    {
+      "hint_key": "forum_hint_3",
+      "content": "Empfehlung, Hotlist, Level und Punkte brauchen klare Pflegeeinstiege fuer Operations."
+    }
+  ],
+  "prompt_questions": [
+    {
+      "question_key": "forum_question_1",
+      "content": "Duerfen Besucher posten oder nur registrierte Nutzer?"
+    },
+    {
+      "question_key": "forum_question_2",
+      "content": "Sollen Beitraege vor Veroeffentlichung geprueft oder nachtraeglich kontrolliert werden?"
+    },
+    {
+      "question_key": "forum_question_3",
+      "content": "Welche Berechtigungsgrenzen und Ernennungsprozesse gelten fuer Moderatoren?"
+    },
+    {
+      "question_key": "forum_question_4",
+      "content": "Werden Level, Punkte, Badges und Check-ins benoetigt?"
+    },
+    {
+      "question_key": "forum_question_5",
+      "content": "Wer pflegt Hotlist-, Empfehlungs- und Suchranking-Regeln?"
+    }
+  ]
+}

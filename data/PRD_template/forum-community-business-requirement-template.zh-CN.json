@@ -1,0 +1,671 @@
+{
+  "template_id": "forum_community_business_requirement_template_zh_cn",
+  "template_key": "forum_community_business_requirement",
+  "template_name": "贴吧论坛系统业务需求模板",
+  "template_category": "business_requirement",
+  "business_domain": "forum_community",
+  "language": "zh-CN",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "适用于类似贴吧、兴趣社区、问答讨论区、企业内部论坛等场景的通用业务需求模板。",
+  "tags": [
+    "forum",
+    "community",
+    "thread",
+    "post",
+    "comment",
+    "moderation"
+  ],
+  "applicable_scenarios": [
+    "版块与吧务管理",
+    "帖子发布与编辑",
+    "回复评论与互动",
+    "用户等级与积分",
+    "内容审核与举报处置",
+    "搜索推荐与社区数据分析"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/forum-community-business-requirement-template.zh-CN.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "基础信息",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.project_name",
+          "label": "项目",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "请输入项目名称"
+        },
+        {
+          "field_key": "document_info.requirement_name",
+          "label": "需求名称",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "示例：兴趣社区论坛系统建设"
+        },
+        {
+          "field_key": "template_meta.requirement_type",
+          "label": "需求类型",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "新建",
+            "优化",
+            "重构"
+          ]
+        },
+        {
+          "field_key": "template_meta.priority",
+          "label": "优先级",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "高",
+            "中",
+            "低"
+          ]
+        },
+        {
+          "field_key": "template_meta.proposing_department",
+          "label": "提出部门",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "请输入提出部门"
+        },
+        {
+          "field_key": "template_meta.requester",
+          "label": "提出人",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "请输入提出人"
+        },
+        {
+          "field_key": "template_meta.request_date",
+          "label": "提出日期",
+          "component": "date",
+          "data_type": "date",
+          "required": false,
+          "placeholder": "YYYY-MM-DD"
+        },
+        {
+          "field_key": "template_meta.version",
+          "label": "版本",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "V1.0"
+        }
+      ]
+    },
+    {
+      "section_key": "business_background",
+      "section_title": "业务背景",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "business_background.summary",
+          "label": "背景概述",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "描述论坛社区业务背景、现有交流方式和建设原因"
+        },
+        {
+          "field_key": "business_background.pain_points",
+          "label": "现状痛点",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "描述论坛社区业务背景、现有交流方式和建设原因"
+        }
+      ]
+    },
+    {
+      "section_key": "business_objectives",
+      "section_title": "业务目标",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "business_objectives.objectives",
+          "label": "业务目标",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "描述论坛系统需要达成的业务目标"
+        },
+        {
+          "field_key": "business_objectives.metrics",
+          "label": "量化指标",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "示例：帖子审核平均时长降低 50%"
+        }
+      ]
+    },
+    {
+      "section_key": "business_scope",
+      "section_title": "业务范围",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "business_scope.in_scope",
+          "label": "需求范围内",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "概述本次论坛系统需要建设的核心能力"
+        },
+        {
+          "field_key": "business_scope.out_scope",
+          "label": "需求范围外",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "概述本次论坛系统需要建设的核心能力"
+        }
+      ]
+    },
+    {
+      "section_key": "roles_and_scenarios",
+      "section_title": "角色与核心场景",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "roles_and_scenarios.target_roles",
+          "label": "目标角色",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "示例：访客、注册用户、吧主/版主、运营人员、审核员"
+        },
+        {
+          "field_key": "roles_and_scenarios.core_scenarios",
+          "label": "核心业务场景",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "示例：访客、注册用户、吧主/版主、运营人员、审核员"
+        }
+      ]
+    },
+    {
+      "section_key": "functional_requirements",
+      "section_title": "功能需求",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "functional_requirements.overview",
+          "label": "功能概述",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "概述本次论坛系统需要建设的核心能力"
+        },
+        {
+          "field_key": "functional_requirements.features",
+          "label": "功能明细",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "feature": "功能",
+            "description": "说明",
+            "trigger": "触发条件",
+            "logic": "业务规则/处理逻辑",
+            "inputs": "输入",
+            "outputs": "输出",
+            "exceptions": "异常处理"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "page_and_process",
+      "section_title": "页面与流程",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "page_and_process.pages",
+          "label": "页面/入口",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "page": "页面/入口",
+            "entry": "访问入口",
+            "elements": "关键元素",
+            "actions": "主要操作",
+            "flow": "流程说明"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "business_rules_and_data",
+      "section_title": "业务规则与数据",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "business_rules_and_data.rules",
+          "label": "业务规则/处理逻辑",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "概述本次论坛系统需要建设的核心能力"
+        },
+        {
+          "field_key": "business_rules_and_data.key_data",
+          "label": "关键数据对象",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "示例：版块、主题帖、回复、用户关系、审核记录"
+        }
+      ]
+    },
+    {
+      "section_key": "nonfunctional_requirements",
+      "section_title": "非功能要求",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "nonfunctional_requirements.items",
+          "label": "非功能要求",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "概述本次论坛系统需要建设的核心能力"
+        }
+      ]
+    },
+    {
+      "section_key": "integration_dependencies",
+      "section_title": "集成与依赖",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "integration_dependencies.external_systems",
+          "label": "外部依赖",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "概述本次论坛系统需要建设的核心能力"
+        }
+      ]
+    },
+    {
+      "section_key": "risks_and_questions",
+      "section_title": "风险与待确认问题",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "risks_and_questions.risks",
+          "label": "风险项",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "概述本次论坛系统需要建设的核心能力"
+        },
+        {
+          "field_key": "risks_and_questions.open_questions",
+          "label": "待确认问题",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "请输入待确认问题"
+        }
+      ]
+    },
+    {
+      "section_key": "milestone_acceptance",
+      "section_title": "里程碑与验收",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "milestone_acceptance.milestones",
+          "label": "里程碑",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "milestone": "里程碑",
+            "target_date": "计划日期",
+            "acceptance": "验收标准"
+          }
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "社区论坛平台项目",
+      "requirement_name": "兴趣社区论坛系统建设"
+    },
+    "template_meta": {
+      "template_name": "贴吧论坛系统业务需求模板",
+      "requirement_type": "新建",
+      "priority": "高",
+      "proposing_department": "社区运营部 / 产品部",
+      "requester": "社区产品经理",
+      "request_date": "2026-05-14",
+      "version": "V1.0"
+    },
+    "business_background": {
+      "summary": "用户讨论、经验分享和问答内容目前分散在群聊、表格和临时文档中，内容沉淀弱，检索困难，违规内容依赖人工巡查。需要建设一套类似贴吧的论坛社区系统，统一承载主题讨论、吧务管理、内容治理和社区运营分析。",
+      "pain_points": [
+        "用户讨论内容难以结构化沉淀和二次检索",
+        "版块、帖子、回复和用户关系缺少统一管理",
+        "违规内容发现和处置不及时，审核流程缺少留痕",
+        "热门内容、活跃用户和社区质量缺少数据看板"
+      ]
+    },
+    "business_objectives": {
+      "objectives": [
+        "建立按兴趣/业务主题组织的版块和帖子体系",
+        "支持发帖、回帖、点赞、收藏、关注和消息提醒等互动闭环",
+        "构建举报、审核、封禁、申诉和操作审计的内容治理能力",
+        "沉淀社区运营数据，支撑内容推荐和运营决策"
+      ],
+      "metrics": [
+        "发帖到可见的平均处理时长控制在 3 秒内",
+        "帖子审核平均处理时长降低 50%",
+        "社区内容检索命中率提升到 90%",
+        "核心版块日活用户和发帖量可按天统计"
+      ]
+    },
+    "business_scope": {
+      "in_scope": [
+        "版块/吧管理与权限配置",
+        "主题帖发布、编辑、删除和置顶加精",
+        "回帖、评论、楼中楼和互动行为",
+        "用户主页、关注、等级、积分和勋章",
+        "举报、审核、屏蔽、封禁和申诉",
+        "搜索、排序、推荐和运营数据看板"
+      ],
+      "out_scope": [
+        "即时通讯群聊能力",
+        "复杂短视频创作工具",
+        "外部广告投放系统",
+        "完全自动化的 AI 内容裁决"
+      ]
+    },
+    "roles_and_scenarios": {
+      "target_roles": [
+        "访客：浏览公开版块和帖子，搜索内容",
+        "注册用户：发帖、回帖、点赞、收藏、关注和举报",
+        "吧主/版主：管理版块规则、置顶加精、处理违规内容",
+        "审核员：审核新帖、举报和敏感内容",
+        "运营人员：配置推荐位、活动、标签和数据看板",
+        "系统管理员：维护权限、字典、敏感词和系统参数"
+      ],
+      "core_scenarios": [
+        "用户进入论坛首页，按版块、热榜或搜索进入感兴趣的帖子。",
+        "注册用户在指定版块发布主题帖，并上传图片或附件。",
+        "其他用户回帖、点赞、收藏或关注作者，系统发送互动通知。",
+        "用户举报违规内容，审核员在审核台处理并记录原因。",
+        "版主将优质帖子置顶或加精，运营人员配置推荐位。",
+        "管理端查看发帖量、回帖量、活跃用户、举报量和审核效率。"
+      ]
+    },
+    "functional_requirements": {
+      "overview": "本需求围绕版块治理、内容发布、互动关系、用户成长、审核风控、搜索推荐和运营分析七类能力展开，目标是形成可运营、可治理、可沉淀的论坛社区。",
+      "features": [
+        {
+          "feature": "版块与吧务管理",
+          "description": "维护版块分类、版块资料、吧规、吧主/版主和访问权限。",
+          "trigger": "运营人员创建或调整版块。",
+          "logic": [
+            "支持版块创建、停用、合并、排序和可见范围配置",
+            "支持吧规、公告、标签和版主权限维护",
+            "支持版块数据统计和异常预警"
+          ],
+          "inputs": "版块名称、分类、规则、版主、权限范围",
+          "outputs": "版块详情、公告、版主列表、统计数据",
+          "exceptions": "版块重名、已有帖子时限制删除、权限冲突提示"
+        },
+        {
+          "feature": "发帖与内容编辑",
+          "description": "支持主题帖发布、草稿、富文本、图片/附件和标签。",
+          "trigger": "用户点击发帖或编辑帖子。",
+          "logic": [
+            "支持标题、正文、图片、附件、标签和匿名设置",
+            "支持草稿保存、编辑历史、删除和恢复",
+            "支持置顶、加精、锁帖和沉帖等管理操作"
+          ],
+          "inputs": "标题、正文、版块、标签、附件、作者",
+          "outputs": "主题帖、草稿、编辑记录、管理状态",
+          "exceptions": "敏感词命中、附件超限、重复发帖、无权限发帖"
+        },
+        {
+          "feature": "回复评论与互动",
+          "description": "支持回帖、楼中楼、点赞、收藏、关注和消息提醒。",
+          "trigger": "用户对帖子或回复进行互动。",
+          "logic": [
+            "支持回复排序、引用、折叠和删除",
+            "支持点赞、收藏、关注作者/帖子和互动通知",
+            "支持屏蔽用户和不感兴趣反馈"
+          ],
+          "inputs": "帖子、回复、用户、互动类型",
+          "outputs": "回复列表、互动记录、通知消息",
+          "exceptions": "频繁操作限制、被拉黑用户限制、内容已删除"
+        },
+        {
+          "feature": "用户成长与社区资产",
+          "description": "维护用户主页、等级、积分、勋章和社区贡献记录。",
+          "trigger": "用户完成发帖、互动、签到或活动任务。",
+          "logic": [
+            "支持积分规则、等级规则、勋章发放和任务配置",
+            "支持用户主页展示发帖、收藏、关注和粉丝",
+            "支持违规扣分、禁言和信用恢复机制"
+          ],
+          "inputs": "用户资料、行为记录、积分规则、勋章规则",
+          "outputs": "用户主页、积分流水、等级结果、勋章记录",
+          "exceptions": "刷分行为、积分回滚、账号异常"
+        },
+        {
+          "feature": "内容审核与举报处置",
+          "description": "处理敏感内容、用户举报、人工审核、封禁和申诉。",
+          "trigger": "内容发布、被举报或命中规则。",
+          "logic": [
+            "支持发布前/发布后审核、敏感词和图片审核",
+            "支持举报受理、处理结论、处罚动作和通知",
+            "支持封禁、禁言、内容屏蔽、申诉和操作审计"
+          ],
+          "inputs": "内容、举报原因、审核规则、处理人",
+          "outputs": "审核结果、处罚记录、申诉记录、审计日志",
+          "exceptions": "误判申诉、重复举报、审核超时、处罚撤销"
+        },
+        {
+          "feature": "搜索推荐与运营分析",
+          "description": "提供内容搜索、热榜、推荐位和社区运营数据。",
+          "trigger": "用户搜索内容或运营查看数据。",
+          "logic": [
+            "支持按版块、关键词、标签、作者和时间检索",
+            "支持热帖榜、推荐位、精华区和活动入口",
+            "支持发帖量、活跃用户、举报量、审核效率等看板"
+          ],
+          "inputs": "帖子、回复、标签、用户行为、审核记录",
+          "outputs": "搜索结果、热榜、推荐列表、运营报表",
+          "exceptions": "索引延迟、推荐内容违规、权限过滤不完整"
+        }
+      ]
+    },
+    "page_and_process": {
+      "pages": [
+        {
+          "page": "论坛首页",
+          "entry": "用户入口",
+          "elements": "推荐版块、热榜、搜索框、活动入口",
+          "actions": "搜索、进入版块、查看热帖、登录注册",
+          "flow": "用户进入首页后按兴趣或热榜进入帖子。"
+        },
+        {
+          "page": "版块详情页",
+          "entry": "版块入口",
+          "elements": "版块公告、吧规、帖子列表、筛选排序",
+          "actions": "发帖、关注版块、筛选、查看帖子",
+          "flow": "用户进入版块后浏览主题帖并发起讨论。"
+        },
+        {
+          "page": "帖子详情页",
+          "entry": "帖子列表/搜索结果",
+          "elements": "主帖、回复、楼中楼、互动区、相关推荐",
+          "actions": "回帖、点赞、收藏、举报、关注作者",
+          "flow": "用户阅读帖子并进行互动，系统记录关系和通知。"
+        },
+        {
+          "page": "发帖编辑页",
+          "entry": "发帖按钮",
+          "elements": "标题、正文、图片、附件、标签、发布设置",
+          "actions": "保存草稿、预览、发布、编辑",
+          "flow": "用户编辑内容，系统校验敏感词和权限后发布。"
+        },
+        {
+          "page": "审核处置台",
+          "entry": "管理后台",
+          "elements": "待审内容、举报列表、处理记录、处罚动作",
+          "actions": "审核、屏蔽、封禁、驳回、通过、通知",
+          "flow": "审核员处理内容并留下操作记录。"
+        },
+        {
+          "page": "社区数据看板",
+          "entry": "运营后台",
+          "elements": "发帖量、活跃用户、热帖、举报量、审核效率",
+          "actions": "筛选、钻取、导出、配置推荐",
+          "flow": "运营人员查看社区质量和增长情况。"
+        }
+      ]
+    },
+    "business_rules_and_data": {
+      "rules": [
+        "同一用户在同一版块可按等级配置发帖频率限制。",
+        "帖子发布需经过敏感词、图片安全和权限校验。",
+        "被删除或屏蔽的内容对普通用户不可见，但管理后台保留审计记录。",
+        "举报处理必须记录处理人、处理时间、结论和处罚动作。",
+        "置顶、加精、推荐位等运营动作需要按角色授权。"
+      ],
+      "key_data": [
+        "版块：编号、名称、分类、吧规、版主、状态、可见范围",
+        "主题帖：编号、版块、标题、正文、作者、状态、互动数、发布时间",
+        "回复：编号、帖子、父回复、作者、正文、状态、楼层",
+        "用户关系：关注、拉黑、收藏、点赞、浏览记录",
+        "审核记录：内容、规则、命中项、处理人、结论、处罚动作",
+        "运营配置：推荐位、热榜规则、标签、活动入口"
+      ]
+    },
+    "nonfunctional_requirements": {
+      "items": [
+        "性能要求：首页和帖子详情常用查询 3 秒内返回，热榜可缓存。",
+        "安全要求：用户身份、敏感词、图片内容和接口频率需做防护。",
+        "可用性：发帖、回帖、举报等关键链路需有失败重试和明确提示。",
+        "审计要求：审核、封禁、删除、恢复和推荐操作必须留痕。",
+        "扩展性：版块、标签、积分和审核规则需支持配置化扩展。"
+      ]
+    },
+    "integration_dependencies": {
+      "external_systems": [
+        "统一身份认证/单点登录",
+        "对象存储或附件服务",
+        "消息通知服务",
+        "内容安全/图片审核服务",
+        "搜索引擎服务",
+        "数据仓库/BI"
+      ]
+    },
+    "risks_and_questions": {
+      "risks": [
+        "开放社区可能出现垃圾内容、广告和违规内容，需要明确治理策略。",
+        "敏感词和审核规则过严可能影响正常讨论。",
+        "热榜和推荐规则不透明可能引发运营争议。",
+        "历史内容迁移可能存在数据清洗和权限映射成本。"
+      ],
+      "open_questions": [
+        "是否需要游客发帖或仅允许注册用户发帖？",
+        "帖子是否需要先审后发，还是发后巡检？",
+        "吧主/版主的权限边界和任命流程是什么？",
+        "是否需要等级、积分、勋章和签到体系？",
+        "热榜、推荐位和搜索排序的运营规则由谁维护？"
+      ]
+    },
+    "milestone_acceptance": {
+      "milestones": [
+        {
+          "milestone": "需求确认",
+          "target_date": "T+1 周",
+          "acceptance": "确认角色、范围、核心流程和审核策略"
+        },
+        {
+          "milestone": "原型评审",
+          "target_date": "T+3 周",
+          "acceptance": "完成首页、版块、帖子、发帖和审核台原型"
+        },
+        {
+          "milestone": "开发联调",
+          "target_date": "T+8 周",
+          "acceptance": "完成核心功能、内容安全和搜索服务联调"
+        },
+        {
+          "milestone": "试点上线",
+          "target_date": "T+10 周",
+          "acceptance": "选择部分版块试点并闭环问题"
+        },
+        {
+          "milestone": "正式上线",
+          "target_date": "T+12 周",
+          "acceptance": "完成全量开放、运营配置和验收"
+        }
+      ]
+    },
+    "summary": "用户讨论、经验分享和问答内容目前分散在群聊、表格和临时文档中，内容沉淀弱，检索困难，违规内容依赖人工巡查。需要建设一套类似贴吧的论坛社区系统，统一承载主题讨论、吧务管理、内容治理和社区运营分析。",
+    "objective": "建立按兴趣/业务主题组织的版块和帖子体系; 支持发帖、回帖、点赞、收藏、关注和消息提醒等互动闭环; 构建举报、审核、封禁、申诉和操作审计的内容治理能力; 沉淀社区运营数据，支撑内容推荐和运营决策"
+  },
+  "prompt_hints": [
+    {
+      "hint_key": "forum_hint_1",
+      "content": "模板已内置论坛社区常见角色、版块、帖子、互动和审核能力。"
+    },
+    {
+      "hint_key": "forum_hint_2",
+      "content": "请优先确认内容治理策略，包括审核时机、处罚动作和申诉流程。"
+    },
+    {
+      "hint_key": "forum_hint_3",
+      "content": "涉及推荐、热榜和等级积分的规则需要明确运营维护入口。"
+    }
+  ],
+  "prompt_questions": [
+    {
+      "question_key": "forum_question_1",
+      "content": "是否需要游客发帖或仅允许注册用户发帖？"
+    },
+    {
+      "question_key": "forum_question_2",
+      "content": "帖子是否需要先审后发，还是发后巡检？"
+    },
+    {
+      "question_key": "forum_question_3",
+      "content": "吧主/版主的权限边界和任命流程是什么？"
+    },
+    {
+      "question_key": "forum_question_4",
+      "content": "是否需要等级、积分、勋章和签到体系？"
+    },
+    {
+      "question_key": "forum_question_5",
+      "content": "热榜、推荐位和搜索排序的运营规则由谁维护？"
+    }
+  ]
+}

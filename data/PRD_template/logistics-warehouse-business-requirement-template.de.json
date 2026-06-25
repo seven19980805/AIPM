@@ -1,0 +1,672 @@
+{
+  "template_id": "logistics_warehouse_business_requirement_template_de",
+  "template_key": "logistics_warehouse_business_requirement",
+  "template_name": "Vorlage fuer fachliche Anforderungen an Logistik und Lager",
+  "template_category": "business_requirement",
+  "business_domain": "logistics_warehouse",
+  "language": "de",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "Allgemeine Vorlage fuer fachliche Anforderungen an Lagerverwaltung, Inbound/Outbound, Bestand, Kommissionierung, Transport und Logistiktracking.",
+  "tags": [
+    "logistics",
+    "warehouse",
+    "inventory",
+    "inbound",
+    "outbound",
+    "shipment"
+  ],
+  "applicable_scenarios": [
+    "Inbound-Termin und Einlagerung",
+    "Lagerprozesse und Bestand",
+    "Kommissionierung, Pruefung und Outbound",
+    "Transport und Tracking",
+    "Ausnahmen und Reverse Logistics",
+    "Lager- und Lieferanalysen"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/logistics-warehouse-business-requirement-template.de.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Basisinformationen",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.project_name",
+          "label": "Projekt",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Projektnamen eingeben"
+        },
+        {
+          "field_key": "document_info.requirement_name",
+          "label": "Anforderungsname",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Beispiel: Aufbau eines integrierten Logistik- und Lagersystems"
+        },
+        {
+          "field_key": "template_meta.requirement_type",
+          "label": "Anforderungstyp",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "Neubau",
+            "Optimierung",
+            "Refactoring"
+          ]
+        },
+        {
+          "field_key": "template_meta.priority",
+          "label": "Prioritaet",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "Hoch",
+            "Mittel",
+            "Niedrig"
+          ]
+        },
+        {
+          "field_key": "template_meta.proposing_department",
+          "label": "Anfordernde Abteilung",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Anfordernde Abteilung eingeben"
+        },
+        {
+          "field_key": "template_meta.requester",
+          "label": "Anforderer",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Anforderer eingeben"
+        },
+        {
+          "field_key": "template_meta.request_date",
+          "label": "Anforderungsdatum",
+          "component": "date",
+          "data_type": "date",
+          "required": false,
+          "placeholder": "YYYY-MM-DD"
+        },
+        {
+          "field_key": "template_meta.version",
+          "label": "Version",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "V1.0"
+        }
+      ]
+    },
+    {
+      "section_key": "business_background",
+      "section_title": "Fachlicher Hintergrund",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "business_background.summary",
+          "label": "Hintergrundueberblick",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Beschreiben Sie Lagerlogistik-Hintergrund, aktuelle Prozesse und Grund fuer den Systemaufbau"
+        },
+        {
+          "field_key": "business_background.pain_points",
+          "label": "Aktuelle Schmerzpunkte",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beschreiben Sie Lagerlogistik-Hintergrund, aktuelle Prozesse und Grund fuer den Systemaufbau"
+        }
+      ]
+    },
+    {
+      "section_key": "business_objectives",
+      "section_title": "Fachliche Ziele",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "business_objectives.objectives",
+          "label": "Fachliche Ziele",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beschreiben Sie die fachlichen Ziele des Logistik-Lagersystems"
+        },
+        {
+          "field_key": "business_objectives.metrics",
+          "label": "Messbare Kennzahlen",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beispiel: Outbound-Genauigkeit auf 99.5% bringen"
+        }
+      ]
+    },
+    {
+      "section_key": "business_scope",
+      "section_title": "Fachlicher Umfang",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "business_scope.in_scope",
+          "label": "Im Umfang",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Logistik-Lagersystems zusammen"
+        },
+        {
+          "field_key": "business_scope.out_scope",
+          "label": "Nicht im Umfang",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Logistik-Lagersystems zusammen"
+        }
+      ]
+    },
+    {
+      "section_key": "roles_and_scenarios",
+      "section_title": "Rollen und Kernszenarien",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "roles_and_scenarios.target_roles",
+          "label": "Zielrollen",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beispiel: Lagerkraft, Picker, Reviewer, Disponent, Fahrer, Operations-Leiter"
+        },
+        {
+          "field_key": "roles_and_scenarios.core_scenarios",
+          "label": "Kernszenarien",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beispiel: Lagerkraft, Picker, Reviewer, Disponent, Fahrer, Operations-Leiter"
+        }
+      ]
+    },
+    {
+      "section_key": "functional_requirements",
+      "section_title": "Funktionale Anforderungen",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "functional_requirements.overview",
+          "label": "Funktionsueberblick",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Logistik-Lagersystems zusammen"
+        },
+        {
+          "field_key": "functional_requirements.features",
+          "label": "Funktionsdetails",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "feature": "Funktion",
+            "description": "Beschreibung",
+            "trigger": "Ausloeser",
+            "logic": "Fachliche Regeln / Logik",
+            "inputs": "Eingaben",
+            "outputs": "Ausgaben",
+            "exceptions": "Ausnahmen"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "page_and_process",
+      "section_title": "Seiten und Prozesse",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "page_and_process.pages",
+          "label": "Seite / Einstieg",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "page": "Seite / Einstieg",
+            "entry": "Einstieg",
+            "elements": "Schluesselinhalte",
+            "actions": "Hauptaktionen",
+            "flow": "Ablauf"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "business_rules_and_data",
+      "section_title": "Fachliche Regeln und Daten",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "business_rules_and_data.rules",
+          "label": "Fachliche Regeln / Logik",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Logistik-Lagersystems zusammen"
+        },
+        {
+          "field_key": "business_rules_and_data.key_data",
+          "label": "Wichtige Datenobjekte",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Beispiel: Lager, Lagerplatz, Bestand, Inbound-Auftrag, Outbound-Auftrag, Frachtbrief"
+        }
+      ]
+    },
+    {
+      "section_key": "nonfunctional_requirements",
+      "section_title": "Nichtfunktionale Anforderungen",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "nonfunctional_requirements.items",
+          "label": "Nichtfunktionale Anforderungen",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Logistik-Lagersystems zusammen"
+        }
+      ]
+    },
+    {
+      "section_key": "integration_dependencies",
+      "section_title": "Integrationen und Abhaengigkeiten",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "integration_dependencies.external_systems",
+          "label": "Externe Abhaengigkeiten",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Logistik-Lagersystems zusammen"
+        }
+      ]
+    },
+    {
+      "section_key": "risks_and_questions",
+      "section_title": "Risiken und offene Fragen",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "risks_and_questions.risks",
+          "label": "Risiken",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fassen Sie die Kernfaehigkeiten des Logistik-Lagersystems zusammen"
+        },
+        {
+          "field_key": "risks_and_questions.open_questions",
+          "label": "Offene Fragen",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Offene Frage eingeben"
+        }
+      ]
+    },
+    {
+      "section_key": "milestone_acceptance",
+      "section_title": "Meilensteine und Abnahme",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "milestone_acceptance.milestones",
+          "label": "Meilenstein",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "milestone": "Meilenstein",
+            "target_date": "Zieldatum",
+            "acceptance": "Abnahmekriterien"
+          }
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "Warehouse-Delivery-Collaboration-Projekt",
+      "requirement_name": "Aufbau eines integrierten Logistik- und Lagersystems"
+    },
+    "template_meta": {
+      "template_name": "Vorlage fuer fachliche Anforderungen an Logistik und Lager",
+      "requirement_type": "Neubau",
+      "priority": "Hoch",
+      "proposing_department": "Supply Chain / Lagerlogistik",
+      "requester": "Logistik Product Manager",
+      "request_date": "2026-05-14",
+      "version": "V1.0"
+    },
+    "business_background": {
+      "summary": "Inbound, Einlagerung, Bestand, Kommissionierung, Pruefung, Versand und Lieferung stuetzen sich derzeit auf mehrere Systeme und manuelle Tabellen. Bestandsgenauigkeit, Arbeitseffizienz und Logistiktransparenz sind unzureichend. Ein einheitliches Logistik-Lagersystem soll Lagerprozesse, Warehouse-Delivery-Zusammenarbeit, Ausnahmen und Analysen unterstuetzen.",
+      "pain_points": [
+        "Inbound-Termin, Wareneingang und Einlagerung haben keine einheitliche Arbeitsfuehrung",
+        "Bestandsdifferenzen sind schwer rechtzeitig zu erkennen und nachzuverfolgen",
+        "Kommissionierung, Pruefung, Verpackung und Versand beruhen auf manueller Kommunikation",
+        "Liefertracking, Ausnahmen und Zustellnachweis werden nicht einheitlich verfolgt"
+      ]
+    },
+    "business_objectives": {
+      "objectives": [
+        "Einheitliche Verwaltung fuer Lager, Zonen, Plaetze, Bestand und Chargen aufbauen",
+        "Effizienz und Genauigkeit von Inbound, Lager, Outbound und Lieferung verbessern",
+        "Informationsfluss zwischen Bestellung, Lager, Carrier und Kunde verbinden",
+        "Daten zu Umschlag, Arbeitseffizienz, Lieferzeit und Ausnahmen sammeln"
+      ],
+      "metrics": [
+        "Bestandsgenauigkeit auf 99% bringen",
+        "Outbound-Genauigkeit auf 99.5% bringen",
+        "Durchschnittliche Picking-Effizienz um 30% steigern",
+        "Bearbeitungszeit fuer Lieferausnahmen um 40% reduzieren"
+      ]
+    },
+    "business_scope": {
+      "in_scope": [
+        "Inbound-Termin, Wareneingang, Qualitaetspruefung und Einlagerung",
+        "Lagerzonen, Plaetze, Bestand, Chargen, Sperre und Inventur",
+        "Wellen, Picking, Pruefung, Verpackung und Outbound-Uebergabe",
+        "Carrier, Frachtbriefe, Liefertracking und Zustellnachweis",
+        "Retouren-Inbound, Ausnahmen, Schaden/Verlust und Claims",
+        "Lagerlogistik-Dashboards und Operationsberichte"
+      ],
+      "out_scope": [
+        "Eigenentwicklung von Steuerungssystemen fuer automatische Lagertechnik",
+        "Beschaffung von Fahrzeugtracking-Hardware",
+        "Grenzueberschreitende Zollabfertigung und internationale Line-Haul-Transporte",
+        "Umbau komplexer Finanzabrechnungssysteme"
+      ]
+    },
+    "roles_and_scenarios": {
+      "target_roles": [
+        "Lagerkraft: Wareneingang, Einlagerung, Umlagerung, Inventur und Bestandskorrektur",
+        "Picker: Picking-Aufgaben nach Welle oder Auftrag abschliessen",
+        "Reviewer: Produkt, Menge, Charge pruefen und Differenzen behandeln",
+        "Packer: Verpacken, Wiegen, Label drucken und Outbound uebergeben",
+        "Disponent: Carrier zuweisen, Transport verfolgen und Ausnahmen bearbeiten",
+        "Fahrer/Carrier: Frachtbriefe empfangen, abholen, transportieren und Zustellung rueckmelden",
+        "Operations-Leiter: Bestand, Effizienz, Lieferzeit und Ausnahmen einsehen"
+      ],
+      "core_scenarios": [
+        "Lieferant oder Upstream-System erstellt Inbound-Termin, Lager empfaengt nach Termin.",
+        "Lagerkraft prueft Ware, erstellt Einlagerungsaufgabe und legt Ware in Zielplatz.",
+        "System erstellt Wellen und Picking-Aufgaben aus Bestellungen; Picker arbeitet nach Route.",
+        "Reviewer prueft Ware und Menge; Differenzen gehen in Ausnahmeprozess.",
+        "Packer wiegt, druckt Label, uebergibt an Carrier und System synchronisiert Frachtbrief/Tracking.",
+        "Leiter sieht Bestandsgenauigkeit, Outbound-Effizienz, Lieferzeit und Ausnahmen."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "Diese Anforderung umfasst sieben Faehigkeitsgruppen: Inbound, Lagerbestand, Picking und Pruefung, Outbound-Versand, Transportlieferung, Reverse-Ausnahmen und Analysen.",
+      "features": [
+        {
+          "feature": "Inbound-Termin und Einlagerung",
+          "description": "Verwaltet Termine, Ankunft, Wareneingang, Qualitaetspruefung und Einlagerungsaufgaben.",
+          "trigger": "Upstream erstellt Inbound-Auftrag oder Lieferant meldet Lieferung an.",
+          "logic": [
+            "Unterstuetzt Terminzeit, Lieferant, Kartons, SKU und Charge",
+            "Unterstuetzt Wareneingangsdifferenzen, Pruefergebnis und Ausnahmeerfassung",
+            "Erzeugt Einlagerungsaufgaben nach Platzstrategie"
+          ],
+          "inputs": "Inbound-Auftrag, Lieferant, SKU, Charge, Menge, Pruefergebnis",
+          "outputs": "Wareneingang, Einlagerungsaufgabe, Bestandserhoehung",
+          "exceptions": "Ueberlieferung, Minder-/Mehrmenge, Pruefung nicht bestanden, Platzmangel"
+        },
+        {
+          "feature": "Bestand und Lagerprozesse",
+          "description": "Pflegt Lager, Zonen, Plaetze, Bestand, Chargen, Sperre und Inventur.",
+          "trigger": "Bestandsbewegung, Inventurplan oder Umlagerung.",
+          "logic": [
+            "Unterstuetzt verfuegbaren, gesperrten, unterwegs- und Chargenbestand",
+            "Unterstuetzt Umlagerung, Nachschub, Anpassung, Sperre/Entsperrung und Bewegungsjournal",
+            "Unterstuetzt Vollinventur, Bewegungsinventur, Zyklusinventur und Differenzen"
+          ],
+          "inputs": "Lager, Platz, SKU, Charge, Bestandsstatus, Inventurauftrag",
+          "outputs": "Bestandskonto, Bewegungsjournal, Inventurdifferenz",
+          "exceptions": "Bestandsabweichung, Sperre, Charge abgelaufen, Platzkapazitaet unzureichend"
+        },
+        {
+          "feature": "Wellenpicking und Pruefung",
+          "description": "Erzeugt Wellen, Picking-Aufgaben, Pruefaufgaben und Differenzbearbeitung aus Bestellungen.",
+          "trigger": "Bestellung ist versandbereit oder Operator erstellt Welle.",
+          "logic": [
+            "Unterstuetzt Wellen nach Lager, Carrier, SLA und Produktattribut",
+            "Unterstuetzt Pickingroute, Vollkarton/Einzelstueck, Fehlmenge und Ersatz",
+            "Unterstuetzt Scan-Pruefung, Differenz und Zweitpruefung"
+          ],
+          "inputs": "Bestellung, SKU, Platz, Wellenregel, Picking-Aufgabe",
+          "outputs": "Pickliste, Pruefergebnis, Differenzdatensatz",
+          "exceptions": "Fehlmenge, Falschpick, Charge falsch, Pruefung fehlgeschlagen"
+        },
+        {
+          "feature": "Verpackung, Outbound und Uebergabe",
+          "description": "Schliesst Verpackung, Wiegen, Label, Outbound-Bestaetigung und Carrier-Uebergabe ab.",
+          "trigger": "Nach bestandener Pruefung beginnt Verpackung.",
+          "logic": [
+            "Unterstuetzt Paket-Split/Merge, Wiegen, Material und Labeldruck",
+            "Unterstuetzt Outbound-Uebergabe, Abholbestaetigung und Bestandsabzug",
+            "Unterstuetzt Bestellnotiz, Spezialverpackung und Gefahrguthinweis"
+          ],
+          "inputs": "Pruefergebnis, Paket, Gewicht, Label, Carrier",
+          "outputs": "Outbound-Auftrag, Paketnummer, Frachtbrief, Uebergabe",
+          "exceptions": "Labeldruck fehlgeschlagen, Gewicht abnormal, Carrier verweigert, Outbound rueckgaengig"
+        },
+        {
+          "feature": "Transport und Tracking",
+          "description": "Verwaltet Carrier, Frachtbriefe, Tracking-Knoten, Zustellung und Lieferausnahmen.",
+          "trigger": "Nach Outbound wird Frachtbrief erstellt und Carrier uebergeben.",
+          "logic": [
+            "Unterstuetzt Carrier-Routing, Frachttarife und Laufzeitregeln",
+            "Unterstuetzt Tracking-Abo, Knotenrueckmeldung, Zustellbild und elektronischen Beleg",
+            "Unterstuetzt Verzoegerung, Annahmeverweigerung, Verlust und Schaden"
+          ],
+          "inputs": "Frachtbrief, Carrier, Paket, Tracking-Knoten, Zustellung",
+          "outputs": "Tracking, Zustellergebnis, Ausnahme",
+          "exceptions": "Tracking-Verzug, Zustellung fehlgeschlagen, Verlust, Schaden, Adresse unerreichbar"
+        },
+        {
+          "feature": "Reverse Logistics und Ausnahmen",
+          "description": "Behandelt Retouren, Annahmeverweigerung, Umtausch, Ausnahmen, Claims und Bestandsrueckschreibung.",
+          "trigger": "Kunde retourniert, Carrier verweigert oder Lager findet Ausnahme.",
+          "logic": [
+            "Unterstuetzt Retourentermin, Annahme, Pruefung, Wiedereinlagerung oder Verschrottung",
+            "Unterstuetzt Ausnahmeerfassung, Verantwortlichkeit, Claim und Frist",
+            "Verknuepft After-Sales, Frachtbrief, Bestand und Finanzstatus"
+          ],
+          "inputs": "Retourenauftrag, Grund, Pruefergebnis, Verantwortlicher, Ergebnis",
+          "outputs": "Retouren-Inbound, Ausnahmenregister, Claim",
+          "exceptions": "Retour ohne Originalauftrag, Ware beschaedigt, Verantwortung unklar, Frist verpasst"
+        }
+      ]
+    },
+    "page_and_process": {
+      "pages": [
+        {
+          "page": "Lager-Arbeitsplatz",
+          "entry": "Lagerarbeit-Einstieg",
+          "elements": "Wareneingang, Einlagerung, Picking, Pruefung, Ausnahmen",
+          "actions": "Aufgabe nehmen, scannen, Ergebnis senden, Ausnahme ansehen",
+          "flow": "Mitarbeiter nehmen Aufgaben und schliessen Lagerarbeit ab."
+        },
+        {
+          "page": "Inbound-Verwaltung",
+          "entry": "Lager-Backend",
+          "elements": "Termine, Inbound-Auftraege, Wareneingang, Pruefung, Einlagerung",
+          "actions": "Termin erstellen, empfangen, pruefen, Einlagerung erzeugen, schliessen",
+          "flow": "Lagerkraft empfaengt nach Termin und lagert ein."
+        },
+        {
+          "page": "Bestandsverwaltung",
+          "entry": "Lager-Backend",
+          "elements": "Bestandskonto, Plaetze, Chargen, Sperren, Inventur",
+          "actions": "Suchen, umlagern, sperren, inventarisieren, korrigieren",
+          "flow": "Leiter sieht Bestand und behandelt Differenzen."
+        },
+        {
+          "page": "Outbound-Arbeit",
+          "entry": "Lagerarbeit-Einstieg",
+          "elements": "Wellen, Picklisten, Pruefung, Pakete, Labels",
+          "actions": "Welle erzeugen, picken, pruefen, packen, uebergeben",
+          "flow": "System erzeugt Aufgaben und schliesst Outbound-Uebergabe ab."
+        },
+        {
+          "page": "Transporttracking",
+          "entry": "Logistik-Backend",
+          "elements": "Frachtbriefe, Tracking, Zustellung, Ausnahmen, Carrier",
+          "actions": "Carrier zuweisen, Tracking suchen, Ausnahme behandeln, Bericht exportieren",
+          "flow": "Disponent verfolgt Lieferung und behandelt Ausnahmen."
+        },
+        {
+          "page": "Warehouse-Delivery-Dashboard",
+          "entry": "Management-Einstieg",
+          "elements": "Bestandsgenauigkeit, Outbound-Effizienz, Lieferzeit, Ausnahmequote",
+          "actions": "Filtern, Drilldown, Export, Abonnement",
+          "flow": "Management sieht Qualitaet der Lager- und Lieferprozesse."
+        }
+      ]
+    },
+    "business_rules_and_data": {
+      "rules": [
+        "Jede Bestandsbewegung muss einen Bestandseintrag erzeugen und mit dem Quelldokument verknuepft sein.",
+        "Verfuegbarer Bestand darf erst nach bestandener Outbound-Pruefung abgezogen und Paket erzeugt werden.",
+        "Gleiche Chargen werden nach FIFO oder definierten Chargenregeln gepickt.",
+        "Ausnahmen muessen Verantwortlichen, Ergebnis und Frist erfassen.",
+        "Tracking und Zustellnachweis brauchen Retry und manuelle Nachpflege bei Callback-Fehlern."
+      ],
+      "key_data": [
+        "Lager: Code, Name, Zone, Platz, Kapazitaet, Status",
+        "Bestand: SKU, Charge, Platz, verfuegbar, gesperrt, unterwegs, reserviert",
+        "Inbound-Auftrag: Lieferant, SKU, Menge, Termin, Pruefergebnis",
+        "Outbound-Auftrag: Bestellung, Welle, Picking, Pruefung, Paket, Frachtbrief",
+        "Frachtbrief: Carrier, Paket, Tracking, Zustellung, Ausnahme",
+        "Ausnahmefall: Typ, Grund, Verantwortlicher, Bearbeiter, Ergebnis"
+      ]
+    },
+    "nonfunctional_requirements": {
+      "items": [
+        "Performance: Scan-Prozesse und Bestandsabfragen muessen schnell reagieren; haeufige Aktionen innerhalb von 2 Sekunden.",
+        "Genauigkeit: Bestand, Inbound, Outbound und Frachtbriefstatus brauchen Nachverfolgbarkeit und finale Konsistenz.",
+        "Mobile Arbeit: Handheld-Seiten muessen Scannen, schwaches Netz und Offline-Nachsendung unterstuetzen.",
+        "Audit: Bestandsanpassungen, Ausnahmen und manuelle Frachtbriefpflege muessen protokolliert werden.",
+        "Sicherheit: Lager-, Owner- und Carrier-Daten muessen nach Berechtigung getrennt sein."
+      ]
+    },
+    "integration_dependencies": {
+      "external_systems": [
+        "Bestellsystem / ERP",
+        "Shop oder Vertriebskanaele",
+        "Carrier-Schnittstellen",
+        "Barcode-/Label-Druckservice",
+        "Handheld / PDA",
+        "Unternehmens-DWH / BI"
+      ]
+    },
+    "risks_and_questions": {
+      "risks": [
+        "Bestandsdifferenzen beeinflussen Verkaufs- und Fulfillment-Zusagen.",
+        "Instabile Carrier-Callbacks beeintraechtigen Kundenabfragen.",
+        "Zu komplexe Lagerprozesse reduzieren Frontline-Effizienz.",
+        "Unklare Chargen-, MHD- und Sperrregeln erzeugen Falschversand- oder Ablauf-Risiken."
+      ],
+      "open_questions": [
+        "Sollen mehrere Lager, mehrere Eigentuemer und Temperaturzonen unterstuetzt werden?",
+        "Erfolgt Bestandsabzug bei Bestellung, Zahlung oder Outbound?",
+        "Priorisiert Picking Welle, Auftrag, Zone oder Charge?",
+        "Kommt Carrier-Tracking per API-Abo oder manueller Import?",
+        "Sind PDA-Scanning, Offline-Arbeit und elektronischer Zustellnachweis erforderlich?"
+      ]
+    },
+    "milestone_acceptance": {
+      "milestones": [
+        {
+          "milestone": "Anforderungsbestaetigung",
+          "target_date": "T+1 Woche",
+          "acceptance": "Warehouse-Delivery-Umfang, Bestandsregeln, Prozesse und Carrier-Schnittstellen bestaetigen"
+        },
+        {
+          "milestone": "Prototyp-Review",
+          "target_date": "T+3 Wochen",
+          "acceptance": "Inbound-, Bestand-, Outbound-, Transport- und Dashboard-Prototypen abschliessen"
+        },
+        {
+          "milestone": "Entwicklung und Integration",
+          "target_date": "T+8 Wochen",
+          "acceptance": "Bestellung, Lager, Carrier und Druck integrieren"
+        },
+        {
+          "milestone": "Pilotstart",
+          "target_date": "T+10 Wochen",
+          "acceptance": "Ein Lager oder eine Geschaeftslinie pilotieren"
+        },
+        {
+          "milestone": "Produktivstart",
+          "target_date": "T+12 Wochen",
+          "acceptance": "Multi-Lager-Rollout, Schulung und Abnahme abschliessen"
+        }
+      ]
+    },
+    "summary": "Inbound, Einlagerung, Bestand, Kommissionierung, Pruefung, Versand und Lieferung stuetzen sich derzeit auf mehrere Systeme und manuelle Tabellen. Bestandsgenauigkeit, Arbeitseffizienz und Logistiktransparenz sind unzureichend. Ein einheitliches Logistik-Lagersystem soll Lagerprozesse, Warehouse-Delivery-Zusammenarbeit, Ausnahmen und Analysen unterstuetzen.",
+    "objective": "Einheitliche Verwaltung fuer Lager, Zonen, Plaetze, Bestand und Chargen aufbauen; Effizienz und Genauigkeit von Inbound, Lager, Outbound und Lieferung verbessern; Informationsfluss zwischen Bestellung, Lager, Carrier und Kunde verbinden; Daten zu Umschlag, Arbeitseffizienz, Lieferzeit und Ausnahmen sammeln"
+  },
+  "prompt_hints": [
+    {
+      "hint_key": "logistics_hint_1",
+      "content": "Die Vorlage enthaelt typische Logistik-Lager-Faehigkeiten fuer Inbound, Bestand, Outbound, Lieferung und Ausnahmen."
+    },
+    {
+      "hint_key": "logistics_hint_2",
+      "content": "Klaeren Sie zuerst Bestandsabzug, Chargenstrategie, Pruefregeln und Carrier-Tracking."
+    },
+    {
+      "hint_key": "logistics_hint_3",
+      "content": "Frontline-Seiten brauchen besondere Aufmerksamkeit fuer Scan-Effizienz, schwaches Netz und Ausnahmen."
+    }
+  ],
+  "prompt_questions": [
+    {
+      "question_key": "logistics_question_1",
+      "content": "Sollen mehrere Lager, mehrere Eigentuemer und Temperaturzonen unterstuetzt werden?"
+    },
+    {
+      "question_key": "logistics_question_2",
+      "content": "Erfolgt Bestandsabzug bei Bestellung, Zahlung oder Outbound?"
+    },
+    {
+      "question_key": "logistics_question_3",
+      "content": "Priorisiert Picking Welle, Auftrag, Zone oder Charge?"
+    },
+    {
+      "question_key": "logistics_question_4",
+      "content": "Kommt Carrier-Tracking per API-Abo oder manueller Import?"
+    },
+    {
+      "question_key": "logistics_question_5",
+      "content": "Sind PDA-Scanning, Offline-Arbeit und elektronischer Zustellnachweis erforderlich?"
+    }
+  ]
+}

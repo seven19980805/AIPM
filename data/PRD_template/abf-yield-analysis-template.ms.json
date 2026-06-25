@@ -1,0 +1,530 @@
+{
+  "template_id": "abf_yield_analysis_template_ms",
+  "template_key": "abf_yield_analysis",
+  "template_name": "Templat Analisis Yield ABF",
+  "template_category": "business_requirement",
+  "business_domain": "data_visualization",
+  "language": "ms",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "Templat keperluan untuk analisis yield pembuatan substrat ABF, merangkumi definisi yield, langkah proses, dimensi lot/panel/produk, Pareto kecacatan, drill-down punca akar, penutupan amaran, kontrak data dan kriteria penerimaan.",
+  "tags": [
+    "chart",
+    "dashboard",
+    "visualization",
+    "data-contract",
+    "uat"
+  ],
+  "applicable_scenarios": [
+    "Dashboard yield pembuatan ABF",
+    "Penjejakan yield mengikut lot, panel, produk dan langkah proses",
+    "Pareto kecacatan dan analisis kehilangan yield",
+    "Drill-down punca akar untuk langkah proses abnormal",
+    "Kontrak data kualiti pembuatan dan pengesahan UAT"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/abf-yield-analysis-template.ms.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Maklumat Dokumen Asas",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.analysis_name",
+          "label": "Topik analisis / nama halaman",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Contoh: Dashboard Analisis Yield ABF"
+        },
+        {
+          "field_key": "document_info.business_owner",
+          "label": "Pemilik bisnes",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Pasukan atau individu yang bertanggungjawab untuk definisi yield dan penerimaan"
+        }
+      ]
+    },
+    {
+      "section_key": "background_objectives",
+      "section_title": "Latar Belakang dan Objektif",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "background_objectives.background",
+          "label": "Latar belakang bisnes",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Huraikan konteks pengurusan yield ABF, isu semasa, pengguna dan senario keputusan"
+        },
+        {
+          "field_key": "background_objectives.objectives",
+          "label": "Objektif analisis",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Trend yield, sumber kehilangan, pengesanan abnormal, penutupan penambahbaikan, standardisasi data"
+        }
+      ]
+    },
+    {
+      "section_key": "scope",
+      "section_title": "Skop Analisis",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "scope.items",
+          "label": "Definisi skop",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Skop produk, skop proses, skop data, skop carta, perkara di luar skop"
+        }
+      ]
+    },
+    {
+      "section_key": "stakeholders",
+      "section_title": "Pihak Bertanggungjawab dan Pemegang Taruh",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "stakeholders.roles",
+          "label": "Peranan pemegang taruh",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Pembuatan, kualiti, proses, peralatan, data, produk, pembangunan, QA, pengurusan"
+        }
+      ]
+    },
+    {
+      "section_key": "yield_definition",
+      "section_title": "Definisi Yield dan Peraturan Bisnes",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "yield_definition.formulas",
+          "label": "Formula yield",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Yield keseluruhan, yield langkah, first-pass yield, kadar scrap, kadar rework, kadar kehilangan"
+        },
+        {
+          "field_key": "yield_definition.rules",
+          "label": "Peraturan definisi",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Pengangka, penyebut, pengecualian, pengendalian retest/rework, atribusi masa, unit, pembundaran"
+        }
+      ]
+    },
+    {
+      "section_key": "data_contract",
+      "section_title": "Penerangan Data dan Kontrak Data",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "data_contract.sources",
+          "label": "Sumber data",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "MES, QMS, sistem ujian, log peralatan, pemeriksaan kecacatan, data induk work-order/lot"
+        },
+        {
+          "field_key": "data_contract.fields",
+          "label": "Medan utama",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "lot_id, panel_id, product_code, process_step, defect_code, pass_qty, fail_qty"
+        },
+        {
+          "field_key": "data_contract.quality_rules",
+          "label": "Peraturan kualiti data",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Kunci unik, nilai hilang, data lewat, rekod duplikasi, padanan silang sistem, SLA refresh"
+        }
+      ]
+    },
+    {
+      "section_key": "dimensions_filters",
+      "section_title": "Dimensi Analisis dan Penapis",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "dimensions_filters.dimensions",
+          "label": "Dimensi analisis",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Tarikh, plant, line, produk, material, lot, panel, langkah proses, peralatan, kategori kecacatan"
+        },
+        {
+          "field_key": "dimensions_filters.filters",
+          "label": "Penapis",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Nilai lalai, wajib/tidak, skop kebenaran, peraturan linkage, julat pertanyaan maksimum"
+        }
+      ]
+    },
+    {
+      "section_key": "metrics",
+      "section_title": "Sistem Metrik",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "metrics.kpis",
+          "label": "Metrik teras",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Kuantiti input, kuantiti good, kuantiti defect, yield, target yield, sumbangan kehilangan, lot abnormal"
+        },
+        {
+          "field_key": "metrics.thresholds",
+          "label": "Sasaran dan ambang",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Nilai sasaran, garis amaran, peraturan merah/kuning/hijau, perbandingan tempoh, pemilik"
+        }
+      ]
+    },
+    {
+      "section_key": "page_presentation",
+      "section_title": "Paparan Halaman dan Carta",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "page_presentation.layout",
+          "label": "Susun atur halaman",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Kawasan penapis atas, kawasan KPI, kawasan trend, kawasan Pareto, matriks langkah, kawasan perincian"
+        },
+        {
+          "field_key": "page_presentation.charts",
+          "label": "Inventori carta",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Trend yield, pencapaian sasaran, kehilangan langkah, Pareto kecacatan, perincian lot, heatmap"
+        }
+      ]
+    },
+    {
+      "section_key": "drilldown_root_cause",
+      "section_title": "Drill-down dan Analisis Punca Akar",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "drilldown_root_cause.paths",
+          "label": "Laluan drill-down",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Produk -> lot -> panel -> langkah proses -> kecacatan -> peralatan/parameter"
+        },
+        {
+          "field_key": "drilldown_root_cause.rules",
+          "label": "Peraturan sokongan punca akar",
+          "component": "list",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "Ranking sumbangan abnormal, perbandingan langkah sama, korelasi peralatan-lot, perubahan parameter proses, catatan"
+        }
+      ]
+    },
+    {
+      "section_key": "alerts_workflow",
+      "section_title": "Amaran dan Penutupan Penambahbaikan",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "alerts_workflow.alerts",
+          "label": "Peraturan amaran",
+          "component": "table",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "Syarat pencetus, tahap serius, penerima, SLA respons, peraturan eskalasi"
+        },
+        {
+          "field_key": "alerts_workflow.actions",
+          "label": "Tindakan penambahbaikan",
+          "component": "table",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "Jabatan bertanggungjawab, kategori punca, tindakan sementara, tindakan jangka panjang, syarat tutup"
+        }
+      ]
+    },
+    {
+      "section_key": "interactions_permissions",
+      "section_title": "Interaksi, Kebenaran dan Eksport",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "interactions_permissions.requirements",
+          "label": "Keperluan interaksi dan kebenaran",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Penapis berkait, tooltip, drill-down perincian, skop eksport, masking data, kebenaran peranan"
+        }
+      ]
+    },
+    {
+      "section_key": "technical_specs",
+      "section_title": "Spesifikasi Teknikal dan Keperluan Bukan Fungsi",
+      "sort_order": 13,
+      "fields": [
+        {
+          "field_key": "technical_specs.requirements",
+          "label": "Spesifikasi teknikal",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "API, lapisan agregasi, cache, prestasi, strategi refresh, pengendalian ralat, sokongan pelayar"
+        },
+        {
+          "field_key": "technical_specs.non_functional",
+          "label": "Keperluan bukan fungsi",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ketepatan, ketepatan masa, kebolehpercayaan, aksesibiliti, keselamatan, audit, kebolehselenggaraan"
+        }
+      ]
+    },
+    {
+      "section_key": "acceptance",
+      "section_title": "Kriteria Penerimaan",
+      "sort_order": 14,
+      "fields": [
+        {
+          "field_key": "acceptance.criteria",
+          "label": "Kriteria penerimaan",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Definisi yield, rendering carta, linkage penapis, konsistensi perincian, eksport kebenaran, prestasi, keadaan pengecualian"
+        }
+      ]
+    },
+    {
+      "section_key": "open_questions",
+      "section_title": "Soalan Terbuka dan Log Perubahan",
+      "sort_order": 15,
+      "fields": [
+        {
+          "field_key": "open_questions.questions",
+          "label": "Soalan terbuka",
+          "component": "table",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "Definisi yield, sasaran, jadual sumber, kekerapan refresh, skop kebenaran, pemilik amaran"
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "Projek contoh: ABF Yield Analysis Dashboard",
+      "requirement_name": "Keperluan contoh: ABF manufacturing yield loss analysis"
+    },
+    "background": {
+      "summary": "Ini ialah contoh perniagaan terbina dalam untuk memulakan templat berisi dengan pantas. ABF yield data is split across MES, QMS, inspection, and equipment systems. Quality and process teams need a unified view to identify yield loss by lot, panel, product, process step, equipment, and defect reason.",
+      "objective": "Jana dokumen PRD dan reka bentuk berdasarkan contoh; perubahan pengguna kemudian mengatasi contoh."
+    },
+    "scope": {
+      "in_scope": [
+        "Yield KPI dashboard",
+        "Lot, panel, product, and process-step analysis",
+        "Defect Pareto and root-cause drill-down",
+        "Abnormal yield alerts and closure tracking",
+        "Data contract and UAT reconciliation"
+      ],
+      "out_of_scope": [
+        "Equipment maintenance execution",
+        "Recipe optimization automation",
+        "Advanced statistical modeling"
+      ]
+    },
+    "users_and_scenarios": {
+      "target_users": [
+        "Quality engineer",
+        "Process engineer",
+        "Manufacturing supervisor",
+        "Product owner",
+        "Data engineer"
+      ],
+      "core_scenarios": [
+        "Engineer reviews yield trend by product and process step.",
+        "User drills into a low-yield lot and checks defect Pareto.",
+        "Process owner creates an abnormal closure action."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "This default example includes Yield KPI and trend, Defect Pareto drill-down, Abnormal closure tracking.",
+      "feature_details": [
+        {
+          "feature_name": "Yield KPI and trend",
+          "description": "Support yield kpi and trend for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        },
+        {
+          "feature_name": "Defect Pareto drill-down",
+          "description": "Support defect pareto drill-down for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        },
+        {
+          "feature_name": "Abnormal closure tracking",
+          "description": "Support abnormal closure tracking for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        }
+      ]
+    },
+    "business_rules": [
+      "Only authorized roles can view scoped data and perform sensitive actions.",
+      "Core business actions must keep an audit trail.",
+      "Exported data must follow the same filters and permission scope as the page.",
+      "Data refresh status and calculation definitions must be visible to users."
+    ],
+    "page_and_interaction": {
+      "pages": [
+        {
+          "page_name": "Yield KPI and trend",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        },
+        {
+          "page_name": "Defect Pareto drill-down",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        },
+        {
+          "page_name": "Abnormal closure tracking",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        }
+      ],
+      "interaction_flow": [
+        "Engineer reviews yield trend by product and process step.",
+        "User drills into a low-yield lot and checks defect Pareto.",
+        "Process owner creates an abnormal closure action."
+      ]
+    },
+    "copywriting": [],
+    "data_and_dependencies": [
+      "User and organization master data",
+      "Business transaction data",
+      "Permission configuration",
+      "Reporting/export service"
+    ],
+    "risks_and_notes": [
+      "Metric ownership and data definitions must be confirmed.",
+      "Historical data quality may affect acceptance.",
+      "External system readiness may affect rollout scope."
+    ],
+    "acceptance_criteria": [
+      "The example scope can be generated into PRD and design documents.",
+      "Users can revise the seeded requirement through chat messages.",
+      "Main roles, flows, data, permissions, and acceptance criteria are represented."
+    ],
+    "open_questions": [
+      "Which roles need final approval authority?",
+      "Which fields and metrics are mandatory for MVP?",
+      "Which external systems must be integrated in the first release?"
+    ],
+    "template_meta": {
+      "example_note": "AI-generated default example business; replace with real business facts before final delivery."
+    }
+  }
+}

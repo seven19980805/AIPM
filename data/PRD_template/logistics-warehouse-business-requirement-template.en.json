@@ -1,0 +1,672 @@
+{
+  "template_id": "logistics_warehouse_business_requirement_template_en",
+  "template_key": "logistics_warehouse_business_requirement",
+  "template_name": "Logistics and Warehouse Business Requirement Template",
+  "template_category": "business_requirement",
+  "business_domain": "logistics_warehouse",
+  "language": "en",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "A general business requirement template for warehouse management, inbound/outbound operations, inventory counting, picking review, transportation delivery, and logistics tracking.",
+  "tags": [
+    "logistics",
+    "warehouse",
+    "inventory",
+    "inbound",
+    "outbound",
+    "shipment"
+  ],
+  "applicable_scenarios": [
+    "Inbound appointment and putaway",
+    "Warehouse operations and inventory",
+    "Picking, review, and outbound",
+    "Transportation and tracking",
+    "Exceptions and reverse logistics",
+    "Warehouse and delivery analytics"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/logistics-warehouse-business-requirement-template.en.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Basic Information",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.project_name",
+          "label": "Project",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Enter the project name"
+        },
+        {
+          "field_key": "document_info.requirement_name",
+          "label": "Requirement name",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Example: Integrated logistics and warehouse system build"
+        },
+        {
+          "field_key": "template_meta.requirement_type",
+          "label": "Requirement type",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "New build",
+            "Optimization",
+            "Refactor"
+          ]
+        },
+        {
+          "field_key": "template_meta.priority",
+          "label": "Priority",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "High",
+            "Medium",
+            "Low"
+          ]
+        },
+        {
+          "field_key": "template_meta.proposing_department",
+          "label": "Proposing department",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Enter the proposing department"
+        },
+        {
+          "field_key": "template_meta.requester",
+          "label": "Requester",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Enter the requester"
+        },
+        {
+          "field_key": "template_meta.request_date",
+          "label": "Request date",
+          "component": "date",
+          "data_type": "date",
+          "required": false,
+          "placeholder": "YYYY-MM-DD"
+        },
+        {
+          "field_key": "template_meta.version",
+          "label": "Version",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "V1.0"
+        }
+      ]
+    },
+    {
+      "section_key": "business_background",
+      "section_title": "Business Background",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "business_background.summary",
+          "label": "Background summary",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Describe the warehouse logistics background, current process, and reason for building the system"
+        },
+        {
+          "field_key": "business_background.pain_points",
+          "label": "Current pain points",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Describe the warehouse logistics background, current process, and reason for building the system"
+        }
+      ]
+    },
+    {
+      "section_key": "business_objectives",
+      "section_title": "Business Objectives",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "business_objectives.objectives",
+          "label": "Business objectives",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Describe the business goals this logistics warehouse system should achieve"
+        },
+        {
+          "field_key": "business_objectives.metrics",
+          "label": "Quantified metrics",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Example: Reach 99.5% outbound accuracy"
+        }
+      ]
+    },
+    {
+      "section_key": "business_scope",
+      "section_title": "Business Scope",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "business_scope.in_scope",
+          "label": "In scope",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the logistics warehouse system"
+        },
+        {
+          "field_key": "business_scope.out_scope",
+          "label": "Out of scope",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the logistics warehouse system"
+        }
+      ]
+    },
+    {
+      "section_key": "roles_and_scenarios",
+      "section_title": "Roles and Core Scenarios",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "roles_and_scenarios.target_roles",
+          "label": "Target roles",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Example: warehouse clerk, picker, reviewer, dispatcher, driver, operations supervisor"
+        },
+        {
+          "field_key": "roles_and_scenarios.core_scenarios",
+          "label": "Core business scenarios",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Example: warehouse clerk, picker, reviewer, dispatcher, driver, operations supervisor"
+        }
+      ]
+    },
+    {
+      "section_key": "functional_requirements",
+      "section_title": "Functional Requirements",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "functional_requirements.overview",
+          "label": "Feature overview",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the logistics warehouse system"
+        },
+        {
+          "field_key": "functional_requirements.features",
+          "label": "Feature details",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "feature": "Feature",
+            "description": "Description",
+            "trigger": "Trigger",
+            "logic": "Business rules / logic",
+            "inputs": "Inputs",
+            "outputs": "Outputs",
+            "exceptions": "Exceptions"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "page_and_process",
+      "section_title": "Pages and Processes",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "page_and_process.pages",
+          "label": "Page / entry",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "page": "Page / entry",
+            "entry": "Entry",
+            "elements": "Key elements",
+            "actions": "Main actions",
+            "flow": "Flow"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "business_rules_and_data",
+      "section_title": "Business Rules and Data",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "business_rules_and_data.rules",
+          "label": "Business rules / logic",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the logistics warehouse system"
+        },
+        {
+          "field_key": "business_rules_and_data.key_data",
+          "label": "Key data objects",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Example: warehouse, bin, inventory, inbound order, outbound order, waybill"
+        }
+      ]
+    },
+    {
+      "section_key": "nonfunctional_requirements",
+      "section_title": "Non-functional Requirements",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "nonfunctional_requirements.items",
+          "label": "Non-functional requirements",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the logistics warehouse system"
+        }
+      ]
+    },
+    {
+      "section_key": "integration_dependencies",
+      "section_title": "Integrations and Dependencies",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "integration_dependencies.external_systems",
+          "label": "External dependencies",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the logistics warehouse system"
+        }
+      ]
+    },
+    {
+      "section_key": "risks_and_questions",
+      "section_title": "Risks and Open Questions",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "risks_and_questions.risks",
+          "label": "Risks",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the logistics warehouse system"
+        },
+        {
+          "field_key": "risks_and_questions.open_questions",
+          "label": "Open questions",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Enter an open question"
+        }
+      ]
+    },
+    {
+      "section_key": "milestone_acceptance",
+      "section_title": "Milestones and Acceptance",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "milestone_acceptance.milestones",
+          "label": "Milestone",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "milestone": "Milestone",
+            "target_date": "Target date",
+            "acceptance": "Acceptance criteria"
+          }
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "Warehouse-delivery collaboration platform project",
+      "requirement_name": "Integrated logistics and warehouse system build"
+    },
+    "template_meta": {
+      "template_name": "Logistics and Warehouse Business Requirement Template",
+      "requirement_type": "New build",
+      "priority": "High",
+      "proposing_department": "Supply Chain / Warehouse Logistics",
+      "requester": "Logistics product manager",
+      "request_date": "2026-05-14",
+      "version": "V1.0"
+    },
+    "business_background": {
+      "summary": "Inbound, putaway, inventory, picking, review, shipping, and delivery currently rely on multiple systems and manual spreadsheets. Inventory accuracy, operation efficiency, and logistics visibility are insufficient. A unified logistics warehouse system is needed to support warehouse operations, warehouse-delivery collaboration, exception handling, and analytics.",
+      "pain_points": [
+        "Inbound appointment, receiving, and putaway lack unified work guidance",
+        "Inventory discrepancies are hard to detect and trace in time",
+        "Picking, review, packing, and shipping rely on manual communication and unstable efficiency",
+        "Delivery tracking, exceptions, and proof of receipt cannot be tracked consistently"
+      ]
+    },
+    "business_objectives": {
+      "objectives": [
+        "Build unified management for warehouses, zones, bins, inventory, and batches",
+        "Improve efficiency and accuracy of inbound, warehouse, outbound, and delivery operations",
+        "Connect information flow among orders, warehouse, carriers, and customers",
+        "Accumulate data on turnover, operation efficiency, delivery timeliness, and exceptions"
+      ],
+      "metrics": [
+        "Reach 99% inventory accuracy",
+        "Reach 99.5% outbound accuracy",
+        "Improve average picking efficiency by 30%",
+        "Reduce delivery exception handling time by 40%"
+      ]
+    },
+    "business_scope": {
+      "in_scope": [
+        "Inbound appointment, receiving, quality inspection, and putaway",
+        "Warehouse zones/bins, inventory, batches, freeze, and counting",
+        "Waves, picking, review, packing, and outbound handover",
+        "Carriers, waybills, delivery tracking, and proof of receipt",
+        "Returns inbound, exceptions, damage/loss, and claims",
+        "Warehouse logistics dashboards and operations reports"
+      ],
+      "out_scope": [
+        "Building automated storage equipment control system from scratch",
+        "Procurement of vehicle tracking terminals",
+        "Cross-border customs and international line-haul transportation",
+        "Complex financial settlement reconstruction"
+      ]
+    },
+    "roles_and_scenarios": {
+      "target_roles": [
+        "Warehouse clerk: receiving, putaway, transfer, counting, and inventory adjustment",
+        "Picker: complete picking tasks by wave or order",
+        "Reviewer: review product, quantity, batch, and handle differences",
+        "Packer: pack, weigh, print labels, and hand over outbound parcels",
+        "Dispatcher: assign carriers, track transportation, and handle exceptions",
+        "Driver/carrier: receive waybills, pick up, transport, and return receipt",
+        "Operations supervisor: view inventory, efficiency, timeliness, and exception data"
+      ],
+      "core_scenarios": [
+        "Supplier or upstream system creates inbound appointment, and warehouse receives by appointment.",
+        "Warehouse clerk completes inspection, creates putaway task, and places goods into target bin.",
+        "System creates waves and picking tasks from orders; picker picks by route.",
+        "Reviewer checks goods and quantities; differences enter exception workflow.",
+        "Packer weighs, prints labels, hands over to carrier, and system syncs waybill/tracking.",
+        "Supervisor views inventory accuracy, outbound efficiency, delivery timeliness, and exceptions."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "This requirement covers seven capability groups: inbound, warehouse inventory, picking and review, outbound shipping, transportation delivery, reverse exceptions, and analytics.",
+      "features": [
+        {
+          "feature": "Inbound appointment and putaway",
+          "description": "Manage appointments, arrival, receiving, quality inspection, and putaway tasks.",
+          "trigger": "An upstream system creates an inbound order or a supplier schedules arrival.",
+          "logic": [
+            "Support appointment time, supplier, carton count, SKU, and batch information",
+            "Support receiving differences, inspection results, and exception registration",
+            "Generate putaway tasks by bin strategy"
+          ],
+          "inputs": "Inbound order, supplier, SKU, batch, quantity, inspection result",
+          "outputs": "Receiving record, putaway task, inventory increase record",
+          "exceptions": "Over-appointment arrival, shortage/overage, inspection failure, insufficient bin capacity"
+        },
+        {
+          "feature": "Inventory and warehouse operations",
+          "description": "Maintain warehouses, zones, bins, inventory, batches, freezes, and stock counting.",
+          "trigger": "Inventory movement, counting plan, or internal transfer.",
+          "logic": [
+            "Support available, frozen, in-transit, and batch inventory",
+            "Support transfer, replenishment, adjustment, freeze/unfreeze, and inventory ledger",
+            "Support full count, movement count, cycle count, and difference handling"
+          ],
+          "inputs": "Warehouse, bin, SKU, batch, inventory status, count order",
+          "outputs": "Inventory ledger, inventory movement, count difference",
+          "exceptions": "Book/physical mismatch, inventory frozen, expired batch, insufficient bin capacity"
+        },
+        {
+          "feature": "Wave picking and review",
+          "description": "Generate waves, picking tasks, review tasks, and difference handling from orders.",
+          "trigger": "Orders enter pending outbound or an operator creates a wave.",
+          "logic": [
+            "Support waves by warehouse, carrier, SLA, and product attributes",
+            "Support picking route, full-case/broken-case picking, shortage, and substitution handling",
+            "Support scan review, difference registration, and second review"
+          ],
+          "inputs": "Order, SKU, bin, wave rule, picking task",
+          "outputs": "Picking list, review result, difference record",
+          "exceptions": "Shortage, wrong pick, batch mismatch, review failure"
+        },
+        {
+          "feature": "Packing, outbound, and handover",
+          "description": "Complete packing, weighing, label printing, outbound confirmation, and carrier handover.",
+          "trigger": "After review passes, the order enters packing and outbound.",
+          "logic": [
+            "Support parcel split/merge, weighing, material records, and label printing",
+            "Support outbound handover, pickup confirmation, and inventory deduction",
+            "Support order remarks, special packaging, and dangerous-goods warnings"
+          ],
+          "inputs": "Review result, parcel, weight, label, carrier",
+          "outputs": "Outbound order, parcel number, waybill number, handover record",
+          "exceptions": "Label printing failure, abnormal weight, carrier rejection, outbound reversal"
+        },
+        {
+          "feature": "Transportation and tracking",
+          "description": "Manage carriers, waybills, tracking nodes, proof of receipt, and delivery exceptions.",
+          "trigger": "After outbound, a waybill is created and handed to the carrier.",
+          "logic": [
+            "Support carrier routing, freight templates, and delivery SLA rules",
+            "Support tracking subscription, node callbacks, receipt images, and electronic proof of delivery",
+            "Support delay, rejection, loss, damage, and other exception handling"
+          ],
+          "inputs": "Waybill, carrier, parcel, tracking node, receipt information",
+          "outputs": "Logistics tracking, receipt result, exception record",
+          "exceptions": "Tracking delay, delivery failure, lost parcel, damage, unreachable address"
+        },
+        {
+          "feature": "Reverse logistics and exceptions",
+          "description": "Handle returns, rejection, exchange, exception parcels, claims, and inventory write-back.",
+          "trigger": "A customer returns goods, carrier rejects delivery, or warehouse finds an exception.",
+          "logic": [
+            "Support return appointment, acceptance, inspection, re-putaway, or scrapping",
+            "Support exception registration, responsibility attribution, claims, and handling deadlines",
+            "Link after-sales cases, waybills, inventory, and financial status"
+          ],
+          "inputs": "Return order, exception reason, inspection result, responsible party, handling result",
+          "outputs": "Return inbound, exception ledger, claim record",
+          "exceptions": "Return without original order, damaged goods, unclear responsibility, overdue handling"
+        }
+      ]
+    },
+    "page_and_process": {
+      "pages": [
+        {
+          "page": "Warehouse workbench",
+          "entry": "Warehouse operation entry",
+          "elements": "Pending receiving, putaway, picking, review, exception alerts",
+          "actions": "Claim task, scan, submit result, view exception",
+          "flow": "Warehouse staff enter the workbench to claim and complete warehouse tasks."
+        },
+        {
+          "page": "Inbound management",
+          "entry": "Warehouse backend",
+          "elements": "Appointments, inbound orders, receiving records, inspection results, putaway tasks",
+          "actions": "Create appointment, receive, inspect, generate putaway, close inbound",
+          "flow": "Warehouse clerk receives by appointment and completes putaway."
+        },
+        {
+          "page": "Inventory management",
+          "entry": "Warehouse backend",
+          "elements": "Inventory ledger, bins, batches, freezes, count orders",
+          "actions": "Search, transfer, freeze, count, adjust",
+          "flow": "Supervisor views inventory and handles differences."
+        },
+        {
+          "page": "Outbound operations",
+          "entry": "Warehouse operation entry",
+          "elements": "Waves, picking lists, review tasks, parcels, labels",
+          "actions": "Generate wave, pick, review, pack, hand over",
+          "flow": "System creates tasks by order and completes outbound handover."
+        },
+        {
+          "page": "Transportation tracking",
+          "entry": "Logistics backend",
+          "elements": "Waybills, tracking, proof of receipt, exceptions, carriers",
+          "actions": "Assign carrier, query tracking, handle exception, export report",
+          "flow": "Dispatcher tracks delivery and handles exception parcels."
+        },
+        {
+          "page": "Warehouse-delivery dashboard",
+          "entry": "Management entry",
+          "elements": "Inventory accuracy, outbound efficiency, delivery timeliness, exception rate",
+          "actions": "Filter, drill down, export, subscribe",
+          "flow": "Management reviews warehouse and delivery operation quality."
+        }
+      ]
+    },
+    "business_rules_and_data": {
+      "rules": [
+        "Every inventory movement must create an inventory ledger entry and link to a source document.",
+        "Available inventory can be deducted and parcels generated only after outbound review passes.",
+        "The same batch should be picked by FIFO or specified batch rules.",
+        "Exceptions must record responsible party, conclusion, and handling deadline.",
+        "Waybill tracking and proof of receipt need retry and manual completion support when callbacks fail."
+      ],
+      "key_data": [
+        "Warehouse: code, name, zone, bin, capacity, status",
+        "Inventory: SKU, batch, bin, available, frozen, in-transit, reserved quantity",
+        "Inbound order: supplier, SKU, quantity, appointment time, inspection result",
+        "Outbound order: order, wave, picking, review, parcel, waybill",
+        "Waybill: carrier, parcel, tracking, receipt, exception status",
+        "Exception case: type, reason, responsible party, handler, result"
+      ]
+    },
+    "nonfunctional_requirements": {
+      "items": [
+        "Performance: scanning operations and inventory queries need fast response; common actions complete within 2 seconds.",
+        "Accuracy: inventory, inbound, outbound, and waybill states need traceability and eventual consistency.",
+        "Mobile operations: handheld pages need to support scanning, weak network, and offline resubmission.",
+        "Audit: inventory adjustments, exception handling, and waybill manual completion must be logged.",
+        "Security: warehouse, owner, and carrier data must be isolated by permissions."
+      ]
+    },
+    "integration_dependencies": {
+      "external_systems": [
+        "Order system / ERP",
+        "Mall or sales channels",
+        "Carrier APIs",
+        "Barcode / label printing service",
+        "Handheld terminal / PDA",
+        "Data warehouse / BI"
+      ]
+    },
+    "risks_and_questions": {
+      "risks": [
+        "Inventory discrepancies affect sales and fulfillment promises.",
+        "Unstable carrier tracking callbacks affect customer inquiry experience.",
+        "Overly complex warehouse workflows reduce frontline operation efficiency.",
+        "Unclear batch, expiry, and freeze rules can cause wrong shipment or expiry risk."
+      ],
+      "open_questions": [
+        "Should multi-warehouse, multi-owner, and multi-temperature zones be supported?",
+        "Does inventory deduction happen at order, payment, or outbound stage?",
+        "Should picking strategy prioritize wave, order, zone, or batch?",
+        "Is carrier tracking subscribed by API or imported manually?",
+        "Are PDA scanning, offline operations, and electronic proof of receipt required?"
+      ]
+    },
+    "milestone_acceptance": {
+      "milestones": [
+        {
+          "milestone": "Requirement confirmation",
+          "target_date": "T+1 week",
+          "acceptance": "Confirm warehouse-delivery scope, inventory rules, workflows, and carrier APIs"
+        },
+        {
+          "milestone": "Prototype review",
+          "target_date": "T+3 weeks",
+          "acceptance": "Complete inbound, inventory, outbound, transportation, and dashboard prototypes"
+        },
+        {
+          "milestone": "Development and integration",
+          "target_date": "T+8 weeks",
+          "acceptance": "Complete integrations with orders, warehouse, carriers, and printing"
+        },
+        {
+          "milestone": "Pilot launch",
+          "target_date": "T+10 weeks",
+          "acceptance": "Pilot one warehouse or business line"
+        },
+        {
+          "milestone": "Production launch",
+          "target_date": "T+12 weeks",
+          "acceptance": "Complete multi-warehouse rollout, training, and acceptance"
+        }
+      ]
+    },
+    "summary": "Inbound, putaway, inventory, picking, review, shipping, and delivery currently rely on multiple systems and manual spreadsheets. Inventory accuracy, operation efficiency, and logistics visibility are insufficient. A unified logistics warehouse system is needed to support warehouse operations, warehouse-delivery collaboration, exception handling, and analytics.",
+    "objective": "Build unified management for warehouses, zones, bins, inventory, and batches; Improve efficiency and accuracy of inbound, warehouse, outbound, and delivery operations; Connect information flow among orders, warehouse, carriers, and customers; Accumulate data on turnover, operation efficiency, delivery timeliness, and exceptions"
+  },
+  "prompt_hints": [
+    {
+      "hint_key": "logistics_hint_1",
+      "content": "The template includes common logistics warehouse capabilities for inbound, inventory, outbound, delivery, and exceptions."
+    },
+    {
+      "hint_key": "logistics_hint_2",
+      "content": "Confirm inventory deduction, batch strategy, review rules, and carrier tracking callback mechanism first."
+    },
+    {
+      "hint_key": "logistics_hint_3",
+      "content": "Frontline pages should pay special attention to scanning efficiency, weak network, and exception manual completion experience."
+    }
+  ],
+  "prompt_questions": [
+    {
+      "question_key": "logistics_question_1",
+      "content": "Should multi-warehouse, multi-owner, and multi-temperature zones be supported?"
+    },
+    {
+      "question_key": "logistics_question_2",
+      "content": "Does inventory deduction happen at order, payment, or outbound stage?"
+    },
+    {
+      "question_key": "logistics_question_3",
+      "content": "Should picking strategy prioritize wave, order, zone, or batch?"
+    },
+    {
+      "question_key": "logistics_question_4",
+      "content": "Is carrier tracking subscribed by API or imported manually?"
+    },
+    {
+      "question_key": "logistics_question_5",
+      "content": "Are PDA scanning, offline operations, and electronic proof of receipt required?"
+    }
+  ]
+}

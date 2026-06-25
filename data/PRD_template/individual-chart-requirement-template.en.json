@@ -1,0 +1,453 @@
+{
+  "template_id": "individual_chart_requirement_template_en",
+  "template_key": "individual_chart_requirement",
+  "template_name": "Individual Chart Requirement Template",
+  "template_category": "business_requirement",
+  "business_domain": "data_visualization",
+  "language": "en",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "A requirement template for one chart or dashboard component, covering business purpose, data contract, chart specification, filters, detail table, interactions, permissions, development requirements, and UAT.",
+  "tags": [
+    "chart",
+    "dashboard",
+    "visualization",
+    "data-contract",
+    "uat"
+  ],
+  "applicable_scenarios": [
+    "Single chart or dashboard component",
+    "Metric visualization with filters",
+    "Chart data contract confirmation",
+    "Chart drill-down and detail table",
+    "Chart export and permission rules"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/individual-chart-requirement-template.en.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Basic Document Information",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.chart_name",
+          "label": "Chart / page name",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Enter chart or page name"
+        },
+        {
+          "field_key": "document_info.business_owner",
+          "label": "Business owner",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Name or team responsible for approval"
+        }
+      ]
+    },
+    {
+      "section_key": "background_objectives",
+      "section_title": "Background and Objectives",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "background_objectives.background",
+          "label": "Background",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Describe the business context, pain point, and decision scenario"
+        },
+        {
+          "field_key": "background_objectives.objectives",
+          "label": "Objectives",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Describe the chart objective and success criteria"
+        }
+      ]
+    },
+    {
+      "section_key": "scope",
+      "section_title": "Scope",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "scope.items",
+          "label": "Scope",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "In scope, out of scope, assumptions, dependencies, constraints"
+        }
+      ]
+    },
+    {
+      "section_key": "stakeholders",
+      "section_title": "Responsible Parties and Stakeholders",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "stakeholders.roles",
+          "label": "Stakeholder roles",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Business owner, data owner, BA, UI/UX, developers, QA, approver"
+        }
+      ]
+    },
+    {
+      "section_key": "data_description",
+      "section_title": "Data Description",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "data_description.sources",
+          "label": "Data source",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Source/table/API, owner, refresh frequency, data grain"
+        },
+        {
+          "field_key": "data_description.fields",
+          "label": "Key fields and business definitions",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Field name, business definition, type, required, source logic"
+        },
+        {
+          "field_key": "data_description.logic_rules",
+          "label": "Calculation and logic rules",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Metric formula, filtering, date logic, null handling, deduplication"
+        }
+      ]
+    },
+    {
+      "section_key": "chart_presentation",
+      "section_title": "Page and Chart Presentation",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "chart_presentation.layout",
+          "label": "Page layout",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Query area, chart display area, detail area"
+        },
+        {
+          "field_key": "chart_presentation.chart_spec",
+          "label": "Chart specification",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Chart type, metric, axes, legend, tooltip, drill-down, states"
+        }
+      ]
+    },
+    {
+      "section_key": "filters_detail",
+      "section_title": "Query Conditions and Detail Table",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "filters_detail.filters",
+          "label": "Query conditions and filters",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Filter field, control type, default, required, dependency"
+        },
+        {
+          "field_key": "filters_detail.detail_columns",
+          "label": "Detail table fields",
+          "component": "table",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "Column, source field, format, sortable, notes"
+        }
+      ]
+    },
+    {
+      "section_key": "interactions_permissions",
+      "section_title": "Interaction, Permission, and Export Requirements",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "interactions_permissions.requirements",
+          "label": "Interaction and permission requirements",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Responsive layout, hover/click, export, permissions, audit, accessibility"
+        }
+      ]
+    },
+    {
+      "section_key": "development",
+      "section_title": "Development Requirements",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "development.technical_specs",
+          "label": "Technical specifications",
+          "component": "list",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "HTML, Bootstrap, JavaScript, jQuery, API contract, response schema"
+        },
+        {
+          "field_key": "development.performance_security",
+          "label": "Performance and security",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Performance, security, compatibility, error handling"
+        }
+      ]
+    },
+    {
+      "section_key": "color_system",
+      "section_title": "Color System",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "color_system.tokens",
+          "label": "Color tokens",
+          "component": "table",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "Approved color token and value"
+        }
+      ]
+    },
+    {
+      "section_key": "acceptance",
+      "section_title": "Acceptance Criteria and UAT Checklist",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "acceptance.criteria",
+          "label": "Acceptance criteria",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Chart values, filters, states, detail table, export, responsiveness, permissions"
+        }
+      ]
+    },
+    {
+      "section_key": "open_questions",
+      "section_title": "Open Questions and Change Log",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "open_questions.questions",
+          "label": "Open questions",
+          "component": "table",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "Question, owner, due date, resolution"
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "Monthly Defect Rate Chart",
+      "requirement_name": "Single chart for monthly defect-rate monitoring"
+    },
+    "background": {
+      "summary": "Quality managers need one trusted chart to monitor monthly defect rate by plant, product family, and defect category. Current reports are manually prepared and definitions are inconsistent.",
+      "objective": "Deliver a single interactive chart with confirmed data contract, filters, detail table, export, and permission rules."
+    },
+    "scope": {
+      "in_scope": [
+        "One defect-rate trend chart",
+        "Plant/product/date filters",
+        "Detail table and export",
+        "Tooltip and drill-down interaction",
+        "Data refresh and permission rules"
+      ],
+      "out_of_scope": [
+        "Full dashboard suite",
+        "Predictive defect modeling",
+        "Data warehouse redesign"
+      ]
+    },
+    "users_and_scenarios": {
+      "target_users": [
+        "Quality manager",
+        "Process engineer",
+        "Data owner",
+        "Dashboard developer",
+        "QA tester"
+      ],
+      "core_scenarios": [
+        "User filters by plant and month.",
+        "User hovers over a point to see numerator and denominator.",
+        "User clicks a month to inspect detail records."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "This default example includes Chart rendering, Filter and detail table, Export and permission control.",
+      "feature_details": [
+        {
+          "feature_name": "Chart rendering",
+          "description": "Support chart rendering for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        },
+        {
+          "feature_name": "Filter and detail table",
+          "description": "Support filter and detail table for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        },
+        {
+          "feature_name": "Export and permission control",
+          "description": "Support export and permission control for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        }
+      ]
+    },
+    "business_rules": [
+      "Only authorized roles can view scoped data and perform sensitive actions.",
+      "Core business actions must keep an audit trail.",
+      "Exported data must follow the same filters and permission scope as the page.",
+      "Data refresh status and calculation definitions must be visible to users."
+    ],
+    "page_and_interaction": {
+      "pages": [
+        {
+          "page_name": "Chart rendering",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        },
+        {
+          "page_name": "Filter and detail table",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        },
+        {
+          "page_name": "Export and permission control",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        }
+      ],
+      "interaction_flow": [
+        "User filters by plant and month.",
+        "User hovers over a point to see numerator and denominator.",
+        "User clicks a month to inspect detail records."
+      ]
+    },
+    "copywriting": [],
+    "data_and_dependencies": [
+      "User and organization master data",
+      "Business transaction data",
+      "Permission configuration",
+      "Reporting/export service"
+    ],
+    "risks_and_notes": [
+      "Metric ownership and data definitions must be confirmed.",
+      "Historical data quality may affect acceptance.",
+      "External system readiness may affect rollout scope."
+    ],
+    "acceptance_criteria": [
+      "The example scope can be generated into PRD and design documents.",
+      "Users can revise the seeded requirement through chat messages.",
+      "Main roles, flows, data, permissions, and acceptance criteria are represented."
+    ],
+    "open_questions": [
+      "Which roles need final approval authority?",
+      "Which fields and metrics are mandatory for MVP?",
+      "Which external systems must be integrated in the first release?"
+    ],
+    "template_meta": {
+      "example_note": "AI-generated default example business; replace with real business facts before final delivery."
+    }
+  }
+}

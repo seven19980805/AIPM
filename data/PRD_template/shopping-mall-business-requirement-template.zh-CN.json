@@ -1,0 +1,665 @@
+{
+  "template_id": "shopping_mall_business_requirement_template_zh_cn",
+  "template_key": "shopping_mall_business_requirement",
+  "template_name": "购物商城业务需求模板",
+  "template_category": "business_requirement",
+  "business_domain": "shopping_mall",
+  "language": "zh-CN",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "适用于 B2C 购物商城、品牌直营商城、会员商城和多端电商交易系统的通用业务需求模板。",
+  "tags": [
+    "ecommerce",
+    "product",
+    "order",
+    "cart",
+    "promotion",
+    "customer"
+  ],
+  "applicable_scenarios": [
+    "商品与类目管理",
+    "购物车与结算",
+    "订单与支付",
+    "促销与优惠券",
+    "会员与客户运营",
+    "售后与商城数据分析"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/shopping-mall-business-requirement-template.zh-CN.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "基础信息",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.project_name",
+          "label": "项目",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "请输入项目名称"
+        },
+        {
+          "field_key": "document_info.requirement_name",
+          "label": "需求名称",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "示例：品牌购物商城建设"
+        },
+        {
+          "field_key": "template_meta.requirement_type",
+          "label": "需求类型",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "新建",
+            "优化",
+            "重构"
+          ]
+        },
+        {
+          "field_key": "template_meta.priority",
+          "label": "优先级",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "高",
+            "中",
+            "低"
+          ]
+        },
+        {
+          "field_key": "template_meta.proposing_department",
+          "label": "提出部门",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "请输入提出部门"
+        },
+        {
+          "field_key": "template_meta.requester",
+          "label": "提出人",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "请输入提出人"
+        },
+        {
+          "field_key": "template_meta.request_date",
+          "label": "提出日期",
+          "component": "date",
+          "data_type": "date",
+          "required": false,
+          "placeholder": "YYYY-MM-DD"
+        },
+        {
+          "field_key": "template_meta.version",
+          "label": "版本",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "V1.0"
+        }
+      ]
+    },
+    {
+      "section_key": "business_background",
+      "section_title": "业务背景",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "business_background.summary",
+          "label": "背景概述",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "描述商城业务背景、销售渠道和建设原因"
+        },
+        {
+          "field_key": "business_background.pain_points",
+          "label": "现状痛点",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "描述商城业务背景、销售渠道和建设原因"
+        }
+      ]
+    },
+    {
+      "section_key": "business_objectives",
+      "section_title": "业务目标",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "business_objectives.objectives",
+          "label": "业务目标",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "描述购物商城需要达成的业务目标"
+        },
+        {
+          "field_key": "business_objectives.metrics",
+          "label": "量化指标",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "示例：下单转化率提升 15%"
+        }
+      ]
+    },
+    {
+      "section_key": "business_scope",
+      "section_title": "业务范围",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "business_scope.in_scope",
+          "label": "需求范围内",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "概述本次商城系统需要建设的核心能力"
+        },
+        {
+          "field_key": "business_scope.out_scope",
+          "label": "需求范围外",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "概述本次商城系统需要建设的核心能力"
+        }
+      ]
+    },
+    {
+      "section_key": "roles_and_scenarios",
+      "section_title": "角色与核心场景",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "roles_and_scenarios.target_roles",
+          "label": "目标角色",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "示例：访客、会员、运营、客服、仓储、财务"
+        },
+        {
+          "field_key": "roles_and_scenarios.core_scenarios",
+          "label": "核心业务场景",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "示例：访客、会员、运营、客服、仓储、财务"
+        }
+      ]
+    },
+    {
+      "section_key": "functional_requirements",
+      "section_title": "功能需求",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "functional_requirements.overview",
+          "label": "功能概述",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "概述本次商城系统需要建设的核心能力"
+        },
+        {
+          "field_key": "functional_requirements.features",
+          "label": "功能明细",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "feature": "功能",
+            "description": "说明",
+            "trigger": "触发条件",
+            "logic": "业务规则/处理逻辑",
+            "inputs": "输入",
+            "outputs": "输出",
+            "exceptions": "异常处理"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "page_and_process",
+      "section_title": "页面与流程",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "page_and_process.pages",
+          "label": "页面/入口",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "page": "页面/入口",
+            "entry": "访问入口",
+            "elements": "关键元素",
+            "actions": "主要操作",
+            "flow": "流程说明"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "business_rules_and_data",
+      "section_title": "业务规则与数据",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "business_rules_and_data.rules",
+          "label": "业务规则/处理逻辑",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "概述本次商城系统需要建设的核心能力"
+        },
+        {
+          "field_key": "business_rules_and_data.key_data",
+          "label": "关键数据对象",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "示例：商品、SKU、购物车、订单、支付单、售后单"
+        }
+      ]
+    },
+    {
+      "section_key": "nonfunctional_requirements",
+      "section_title": "非功能要求",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "nonfunctional_requirements.items",
+          "label": "非功能要求",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "概述本次商城系统需要建设的核心能力"
+        }
+      ]
+    },
+    {
+      "section_key": "integration_dependencies",
+      "section_title": "集成与依赖",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "integration_dependencies.external_systems",
+          "label": "外部依赖",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "概述本次商城系统需要建设的核心能力"
+        }
+      ]
+    },
+    {
+      "section_key": "risks_and_questions",
+      "section_title": "风险与待确认问题",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "risks_and_questions.risks",
+          "label": "风险项",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "概述本次商城系统需要建设的核心能力"
+        },
+        {
+          "field_key": "risks_and_questions.open_questions",
+          "label": "待确认问题",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "请输入待确认问题"
+        }
+      ]
+    },
+    {
+      "section_key": "milestone_acceptance",
+      "section_title": "里程碑与验收",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "milestone_acceptance.milestones",
+          "label": "里程碑",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "milestone": "里程碑",
+            "target_date": "计划日期",
+            "acceptance": "验收标准"
+          }
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "电商商城平台项目",
+      "requirement_name": "品牌购物商城建设"
+    },
+    "template_meta": {
+      "template_name": "购物商城业务需求模板",
+      "requirement_type": "新建",
+      "priority": "高",
+      "proposing_department": "电商运营部 / 产品部",
+      "requester": "商城产品经理",
+      "request_date": "2026-05-14",
+      "version": "V1.0"
+    },
+    "business_background": {
+      "summary": "当前商品销售依赖线下门店、社群和人工下单，商品信息、库存、优惠、订单和售后分散管理。需要建设统一购物商城，支撑商品展示、会员购买、在线支付、订单履约、售后服务和运营数据分析。",
+      "pain_points": [
+        "商品信息和价格维护分散，前后端展示不一致",
+        "下单、收款、库存扣减和发货缺少闭环",
+        "促销活动依赖人工配置和核算，容易出错",
+        "售后退款、客服处理和运营数据缺少统一追踪"
+      ]
+    },
+    "business_objectives": {
+      "objectives": [
+        "建立统一商品、SKU、价格和库存展示体系",
+        "打通购物车、下单、支付、发货、售后的交易闭环",
+        "支持优惠券、满减、秒杀、会员价等营销玩法",
+        "沉淀客户、订单、转化和复购数据，支撑运营决策"
+      ],
+      "metrics": [
+        "下单转化率提升 15%",
+        "订单支付成功率达到 98%",
+        "售后平均处理时长降低 40%",
+        "促销活动配置时长降低 60%"
+      ]
+    },
+    "business_scope": {
+      "in_scope": [
+        "商品类目、SPU/SKU、价格和上下架管理",
+        "搜索、筛选、详情页、购物车和结算",
+        "订单创建、支付、取消、发货和收货",
+        "优惠券、满减、秒杀、会员价和活动页",
+        "会员资料、地址、收藏、浏览和客户运营",
+        "退款退货、客服协同和商城经营看板"
+      ],
+      "out_scope": [
+        "跨境清关和国际税务计算",
+        "复杂平台招商和商家入驻结算",
+        "线下 POS 收银系统重构",
+        "直播带货底层能力自研"
+      ]
+    },
+    "roles_and_scenarios": {
+      "target_roles": [
+        "访客：浏览商品、搜索、查看活动和注册登录",
+        "会员：加购、下单、支付、查看订单和申请售后",
+        "运营人员：维护商品、活动、推荐位和内容页面",
+        "客服人员：处理咨询、订单异常、退款退货和投诉",
+        "仓储人员：接收订单、拣货、发货和同步物流",
+        "财务人员：查看支付、退款、对账和发票数据",
+        "系统管理员：维护权限、字典、支付和商城参数"
+      ],
+      "core_scenarios": [
+        "运营上架商品并配置库存、价格和活动标签。",
+        "用户搜索商品、进入详情页、加入购物车并提交订单。",
+        "系统计算优惠、运费和应付金额，用户完成在线支付。",
+        "仓储接收待发货订单，完成拣货、发货并回传物流单号。",
+        "用户申请退款退货，客服审核并联动支付退款。",
+        "运营查看转化、客单价、复购、库存和活动效果数据。"
+      ]
+    },
+    "functional_requirements": {
+      "overview": "本需求围绕商品、购物车、订单支付、促销、会员客户、售后和运营分析七类能力展开，目标是形成可销售、可履约、可运营的商城交易闭环。",
+      "features": [
+        {
+          "feature": "商品与 SKU 管理",
+          "description": "维护类目、品牌、SPU/SKU、图片、规格、价格、库存和上下架状态。",
+          "trigger": "运营创建或更新商品。",
+          "logic": [
+            "支持多级类目、品牌、规格属性和 SKU 组合",
+            "支持商品草稿、预览、上下架、排序和推荐标签",
+            "支持价格、库存、限购和销售区域配置"
+          ],
+          "inputs": "商品资料、SKU、价格、库存、图片、标签",
+          "outputs": "商品详情、SKU 列表、上下架状态",
+          "exceptions": "SKU 冲突、库存不足、价格异常、商品被订单引用"
+        },
+        {
+          "feature": "购物车与结算",
+          "description": "支持用户加购、选中商品、修改数量、计算优惠和提交订单。",
+          "trigger": "用户点击加入购物车或去结算。",
+          "logic": [
+            "支持购物车数量、选中状态和失效商品提示",
+            "支持优惠券、满减、会员价、积分抵扣和运费计算",
+            "支持地址、发票、备注和配送方式选择"
+          ],
+          "inputs": "用户、SKU、数量、优惠、地址、配送方式",
+          "outputs": "购物车、结算单、应付金额",
+          "exceptions": "库存不足、价格变更、优惠不可用、地址不可配送"
+        },
+        {
+          "feature": "订单与支付",
+          "description": "管理订单创建、支付、取消、超时关闭、发货和确认收货。",
+          "trigger": "用户提交订单或支付回调。",
+          "logic": [
+            "支持订单状态机、支付单、退款单和操作日志",
+            "支持多支付方式、支付回调校验和支付超时关闭",
+            "支持拆单、部分发货和订单备注"
+          ],
+          "inputs": "订单、支付单、用户、商品、金额、状态",
+          "outputs": "订单详情、支付结果、待发货任务",
+          "exceptions": "重复支付、支付失败、订单超时、金额不一致"
+        },
+        {
+          "feature": "促销与会员运营",
+          "description": "配置优惠券、满减、秒杀、会员价、推荐位和活动页面。",
+          "trigger": "运营创建活动或用户参与活动。",
+          "logic": [
+            "支持活动时间、商品范围、用户范围和叠加规则",
+            "支持优惠券领取、核销、过期和使用门槛",
+            "支持活动效果统计和人群运营标签"
+          ],
+          "inputs": "活动、优惠券、会员等级、人群、商品范围",
+          "outputs": "优惠结果、活动页面、营销报表",
+          "exceptions": "活动冲突、优惠叠加错误、库存被抢占"
+        },
+        {
+          "feature": "售后与客服协同",
+          "description": "处理退款、退货、换货、投诉和订单异常。",
+          "trigger": "用户提交售后申请或客服创建工单。",
+          "logic": [
+            "支持售后原因、凭证、审核、退货物流和退款",
+            "支持客服备注、协商记录和超时提醒",
+            "支持售后状态流转和责任归因"
+          ],
+          "inputs": "售后单、订单、支付单、凭证、客服记录",
+          "outputs": "审核结果、退款结果、售后进度",
+          "exceptions": "超过售后期、商品不可退、退款失败、物流丢失"
+        },
+        {
+          "feature": "商城数据与运营分析",
+          "description": "提供销售、转化、库存、客户和活动效果看板。",
+          "trigger": "运营或管理者查看数据。",
+          "logic": [
+            "支持订单金额、客单价、转化率、复购率统计",
+            "支持商品销量、库存周转、活动 ROI 和渠道分析",
+            "支持报表导出和指标口径说明"
+          ],
+          "inputs": "订单、支付、商品、用户行为、活动数据",
+          "outputs": "经营看板、商品报表、客户分析",
+          "exceptions": "数据延迟、权限不足、指标口径变更"
+        }
+      ]
+    },
+    "page_and_process": {
+      "pages": [
+        {
+          "page": "商城首页",
+          "entry": "用户端入口",
+          "elements": "搜索框、轮播、类目、推荐商品、活动入口",
+          "actions": "搜索、浏览、进入商品、登录注册",
+          "flow": "用户进入首页后通过类目、搜索或活动进入商品。"
+        },
+        {
+          "page": "商品详情页",
+          "entry": "商品列表/搜索结果",
+          "elements": "图片、价格、规格、库存、评价、推荐",
+          "actions": "选规格、加购、立即购买、收藏",
+          "flow": "用户确认商品信息后加入购物车或直接购买。"
+        },
+        {
+          "page": "购物车与结算页",
+          "entry": "购物车入口",
+          "elements": "商品列表、优惠、地址、配送、发票、金额明细",
+          "actions": "改数量、选优惠、提交订单",
+          "flow": "系统校验库存和价格后生成待支付订单。"
+        },
+        {
+          "page": "订单中心",
+          "entry": "会员中心",
+          "elements": "订单列表、状态、物流、支付和售后入口",
+          "actions": "支付、取消、确认收货、申请售后",
+          "flow": "用户查看订单进度并处理支付或售后。"
+        },
+        {
+          "page": "商城运营后台",
+          "entry": "管理端入口",
+          "elements": "商品、活动、订单、售后、客户和报表",
+          "actions": "上架商品、配置活动、处理异常、导出报表",
+          "flow": "运营人员维护商城业务并跟踪经营效果。"
+        }
+      ]
+    },
+    "business_rules_and_data": {
+      "rules": [
+        "订单提交时需锁定价格、优惠和库存快照。",
+        "支付成功后才允许进入待发货状态，支付超时订单自动关闭并释放库存。",
+        "优惠活动需校验适用商品、用户范围、时间和叠加规则。",
+        "退款金额不得超过订单实付金额，退款需保留支付通道流水。",
+        "商品价格、库存、订单金额和售后处理必须保留操作日志。"
+      ],
+      "key_data": [
+        "商品/SPU：编号、名称、类目、品牌、状态、主图",
+        "SKU：规格、价格、库存、限购、销售区域",
+        "购物车：用户、SKU、数量、选中状态、失效状态",
+        "订单：订单号、用户、商品明细、金额、状态、收货地址",
+        "支付单：支付单号、渠道、金额、状态、回调流水",
+        "售后单：订单、原因、凭证、审核状态、退款状态"
+      ]
+    },
+    "nonfunctional_requirements": {
+      "items": [
+        "性能要求：首页和商品详情常用查询 3 秒内返回。",
+        "一致性：订单、支付、库存和退款状态需最终一致并可追踪。",
+        "安全要求：支付回调、用户地址和订单金额需做签名和权限校验。",
+        "可用性：下单、支付、退款关键链路需有失败重试和清晰提示。",
+        "审计要求：价格、库存、订单和售后变更需记录操作人和时间。"
+      ]
+    },
+    "integration_dependencies": {
+      "external_systems": [
+        "支付网关",
+        "物流查询服务",
+        "库存/仓储系统",
+        "短信或消息通知服务",
+        "发票/税务服务",
+        "数据仓库/BI"
+      ]
+    },
+    "risks_and_questions": {
+      "risks": [
+        "促销叠加规则复杂可能导致价格计算错误。",
+        "支付和库存状态不一致会影响履约和客服体验。",
+        "高峰活动可能造成库存抢占和下单性能压力。",
+        "售后政策不清会导致客服处理分歧。"
+      ],
+      "open_questions": [
+        "是否支持多仓库存和拆单发货？",
+        "优惠券、满减、会员价是否允许叠加？",
+        "订单超时关闭和库存释放时间如何配置？",
+        "售后退款是否需要原路退回和人工复核？",
+        "是否需要发票、积分、会员等级和评价体系？"
+      ]
+    },
+    "milestone_acceptance": {
+      "milestones": [
+        {
+          "milestone": "需求确认",
+          "target_date": "T+1 周",
+          "acceptance": "确认交易闭环、促销规则、库存和售后政策"
+        },
+        {
+          "milestone": "原型评审",
+          "target_date": "T+3 周",
+          "acceptance": "完成首页、详情、结算、订单和后台原型"
+        },
+        {
+          "milestone": "开发联调",
+          "target_date": "T+8 周",
+          "acceptance": "完成支付、库存、物流和通知联调"
+        },
+        {
+          "milestone": "试点上线",
+          "target_date": "T+10 周",
+          "acceptance": "选择部分商品和用户灰度上线"
+        },
+        {
+          "milestone": "正式上线",
+          "target_date": "T+12 周",
+          "acceptance": "完成全量发布、运营配置和验收"
+        }
+      ]
+    },
+    "summary": "当前商品销售依赖线下门店、社群和人工下单，商品信息、库存、优惠、订单和售后分散管理。需要建设统一购物商城，支撑商品展示、会员购买、在线支付、订单履约、售后服务和运营数据分析。",
+    "objective": "建立统一商品、SKU、价格和库存展示体系; 打通购物车、下单、支付、发货、售后的交易闭环; 支持优惠券、满减、秒杀、会员价等营销玩法; 沉淀客户、订单、转化和复购数据，支撑运营决策"
+  },
+  "prompt_hints": [
+    {
+      "hint_key": "shopping_hint_1",
+      "content": "模板已内置商城交易常见的商品、订单、支付、促销和售后能力。"
+    },
+    {
+      "hint_key": "shopping_hint_2",
+      "content": "请优先确认价格、库存、优惠和支付之间的一致性规则。"
+    },
+    {
+      "hint_key": "shopping_hint_3",
+      "content": "高峰促销场景需要提前确认限流、库存锁定和异常补偿方案。"
+    }
+  ],
+  "prompt_questions": [
+    {
+      "question_key": "shopping_question_1",
+      "content": "是否支持多仓库存和拆单发货？"
+    },
+    {
+      "question_key": "shopping_question_2",
+      "content": "优惠券、满减、会员价是否允许叠加？"
+    },
+    {
+      "question_key": "shopping_question_3",
+      "content": "订单超时关闭和库存释放时间如何配置？"
+    },
+    {
+      "question_key": "shopping_question_4",
+      "content": "售后退款是否需要原路退回和人工复核？"
+    },
+    {
+      "question_key": "shopping_question_5",
+      "content": "是否需要发票、积分、会员等级和评价体系？"
+    }
+  ]
+}

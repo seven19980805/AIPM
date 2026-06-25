@@ -1,0 +1,1013 @@
+{
+  "template_id": "finance_management_business_requirement_template_zh_cn",
+  "template_key": "finance_management_business_requirement",
+  "template_name": "财务管理业务需求模板",
+  "template_category": "business_requirement",
+  "business_domain": "finance_management",
+  "language": "zh-CN",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "适用于费用报销、预算管控、付款申请、发票管理、应收应付和财务分析等场景的通用业务需求模板。",
+  "tags": [
+    "finance",
+    "budget",
+    "expense",
+    "payment",
+    "invoice",
+    "reporting"
+  ],
+  "applicable_scenarios": [
+    "费用报销管理",
+    "预算控制",
+    "付款申请",
+    "发票管理",
+    "应收应付管理",
+    "财务统计分析"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/finance-management-business-requirement-template.zh-CN.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "基本信息",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.project_name",
+          "label": "所属项目",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "请输入项目名称"
+        },
+        {
+          "field_key": "document_info.requirement_name",
+          "label": "需求名称",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "例如：费用报销管理优化"
+        },
+        {
+          "field_key": "template_meta.requirement_type",
+          "label": "需求类型",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "新建",
+            "优化",
+            "重构"
+          ]
+        },
+        {
+          "field_key": "template_meta.priority",
+          "label": "优先级",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "高",
+            "中",
+            "低"
+          ]
+        },
+        {
+          "field_key": "template_meta.proposing_department",
+          "label": "提出部门",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "请输入提出部门"
+        },
+        {
+          "field_key": "template_meta.requester",
+          "label": "需求提出人",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "请输入需求提出人"
+        },
+        {
+          "field_key": "template_meta.request_date",
+          "label": "提出日期",
+          "component": "date",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "YYYY-MM-DD"
+        }
+      ]
+    },
+    {
+      "section_key": "background",
+      "section_title": "业务背景",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "background.summary",
+          "label": "背景说明",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "说明当前财务管理业务的运行背景、现有流程和建设原因"
+        },
+        {
+          "field_key": "template_meta.current_pain_points",
+          "label": "当前痛点",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "每行填写一个痛点"
+        },
+        {
+          "field_key": "background.objective",
+          "label": "建设目标",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "说明本次需求希望达成的业务目标"
+        },
+        {
+          "field_key": "template_meta.goal_metrics",
+          "label": "量化指标",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "例如：审批平均时长缩短 50%"
+        }
+      ]
+    },
+    {
+      "section_key": "scope",
+      "section_title": "业务范围",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "scope.in_scope",
+          "label": "本次范围",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "每行填写一个本次范围项"
+        },
+        {
+          "field_key": "scope.out_of_scope",
+          "label": "非本次范围",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "每行填写一个非本次范围项"
+        }
+      ]
+    },
+    {
+      "section_key": "users_and_scenarios",
+      "section_title": "角色与核心场景",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "users_and_scenarios.target_users",
+          "label": "目标角色",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "例如：员工、部门负责人、财务专员"
+        },
+        {
+          "field_key": "users_and_scenarios.core_scenarios",
+          "label": "核心业务场景",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "每行填写一个核心业务场景"
+        }
+      ]
+    },
+    {
+      "section_key": "functional_requirements",
+      "section_title": "功能需求",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "functional_requirements.overview",
+          "label": "功能概述",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "概述本次财务管理需求要建设的核心能力"
+        },
+        {
+          "field_key": "functional_requirements.feature_details",
+          "label": "功能明细",
+          "component": "object_array",
+          "data_type": "array<object>",
+          "required": true,
+          "item_schema": [
+            {
+              "field_key": "feature_name",
+              "label": "功能名称",
+              "component": "input",
+              "data_type": "string",
+              "required": true
+            },
+            {
+              "field_key": "description",
+              "label": "功能描述",
+              "component": "textarea",
+              "data_type": "string",
+              "required": true
+            },
+            {
+              "field_key": "trigger",
+              "label": "触发方式",
+              "component": "input",
+              "data_type": "string",
+              "required": false
+            },
+            {
+              "field_key": "processing_logic",
+              "label": "处理逻辑",
+              "component": "textarea",
+              "data_type": "string",
+              "required": true
+            },
+            {
+              "field_key": "inputs",
+              "label": "输入项",
+              "component": "string_array",
+              "data_type": "array<string>",
+              "required": false
+            },
+            {
+              "field_key": "outputs",
+              "label": "输出结果",
+              "component": "string_array",
+              "data_type": "array<string>",
+              "required": false
+            },
+            {
+              "field_key": "exception_cases",
+              "label": "异常情况",
+              "component": "string_array",
+              "data_type": "array<string>",
+              "required": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "section_key": "business_rules",
+      "section_title": "业务规则",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "business_rules",
+          "label": "业务规则清单",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "每行填写一条业务规则"
+        }
+      ]
+    },
+    {
+      "section_key": "page_and_interaction",
+      "section_title": "页面与交互",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "page_and_interaction.pages",
+          "label": "页面清单",
+          "component": "object_array",
+          "data_type": "array<object>",
+          "required": false,
+          "item_schema": [
+            {
+              "field_key": "page_name",
+              "label": "页面名称",
+              "component": "input",
+              "data_type": "string",
+              "required": true
+            },
+            {
+              "field_key": "entry_point",
+              "label": "入口位置",
+              "component": "input",
+              "data_type": "string",
+              "required": false
+            },
+            {
+              "field_key": "page_elements",
+              "label": "页面元素",
+              "component": "string_array",
+              "data_type": "array<string>",
+              "required": false
+            },
+            {
+              "field_key": "button_actions",
+              "label": "按钮动作",
+              "component": "string_array",
+              "data_type": "array<string>",
+              "required": false
+            }
+          ]
+        },
+        {
+          "field_key": "page_and_interaction.interaction_flow",
+          "label": "交互流程",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "每行填写一个流程步骤"
+        }
+      ]
+    },
+    {
+      "section_key": "data_and_dependencies",
+      "section_title": "数据与依赖",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "data_and_dependencies",
+          "label": "关键数据与外部依赖",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "例如：预算主数据、供应商主数据、ERP 接口"
+        }
+      ]
+    },
+    {
+      "section_key": "risks_and_notes",
+      "section_title": "风险与备注",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "risks_and_notes",
+          "label": "风险与注意事项",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "每行填写一个风险或注意事项"
+        },
+        {
+          "field_key": "open_questions",
+          "label": "待确认问题",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "每行填写一个待确认问题"
+        }
+      ]
+    },
+    {
+      "section_key": "acceptance_criteria",
+      "section_title": "验收标准",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "acceptance_criteria",
+          "label": "验收标准",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "每行填写一条可验证的验收标准"
+        }
+      ]
+    }
+  ],
+  "default_structured_requirement_model": {
+    "document_info": {
+      "project_name": "",
+      "requirement_name": ""
+    },
+    "background": {
+      "summary": "",
+      "objective": ""
+    },
+    "scope": {
+      "in_scope": [],
+      "out_of_scope": []
+    },
+    "users_and_scenarios": {
+      "target_users": [],
+      "core_scenarios": []
+    },
+    "functional_requirements": {
+      "overview": "",
+      "feature_details": []
+    },
+    "business_rules": [],
+    "page_and_interaction": {
+      "pages": [],
+      "interaction_flow": []
+    },
+    "copywriting": [],
+    "data_and_dependencies": [],
+    "risks_and_notes": [],
+    "acceptance_criteria": [],
+    "open_questions": [],
+    "collection_status": {
+      "objective": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "scope": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "users": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "scenarios": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "features": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "pages": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "rules": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "integrations": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "acceptance": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      }
+    }
+  },
+  "example_structured_requirement_model": {
+    "document_info": {
+      "project_name": "财务管理平台",
+      "requirement_name": "财务管理业务需求模板"
+    },
+    "background": {
+      "summary": "当前公司财务流程分散在 Excel、邮件、ERP 和人工审批中，存在数据不统一、审批效率低和预算控制滞后等问题，需要建设统一的财务管理能力。",
+      "objective": "建立统一的财务业务入口，提升审批和付款效率，实现预算全过程控制，并满足审计留痕要求。"
+    },
+    "scope": {
+      "in_scope": [
+        "费用申请",
+        "报销审批",
+        "发票上传与校验",
+        "预算占用与控制",
+        "付款申请与跟踪",
+        "财务台账与统计报表"
+      ],
+      "out_of_scope": [
+        "总账核算",
+        "税务申报",
+        "银行直联",
+        "合并报表"
+      ]
+    },
+    "users_and_scenarios": {
+      "target_users": [
+        "员工",
+        "部门负责人",
+        "财务专员",
+        "财务主管",
+        "管理层",
+        "系统管理员"
+      ],
+      "core_scenarios": [
+        "员工发起费用或付款申请并查看处理进度",
+        "负责人执行业务审批并确认预算合理性",
+        "财务审核单据、发票和合同附件",
+        "审核通过后进入付款流程并记录付款结果",
+        "业务数据进入台账和报表供分析与审计使用"
+      ]
+    },
+    "functional_requirements": {
+      "overview": "本次需求围绕申请、审批、预算控制、票据管理、付款管理和报表分析六大能力展开，目标是打通财务业务处理链路。",
+      "feature_details": [
+        {
+          "feature_name": "申请管理",
+          "description": "支持费用申请、报销申请和付款申请的发起、保存草稿、提交、撤回与复制。",
+          "trigger": "用户点击新建申请并提交。",
+          "processing_logic": "系统校验必填字段、金额格式和附件完整性，生成申请单编号并进入后续流程。",
+          "inputs": [
+            "申请类型",
+            "所属部门",
+            "费用类别",
+            "金额",
+            "项目/合同/供应商信息",
+            "附件"
+          ],
+          "outputs": [
+            "申请单据",
+            "申请状态",
+            "操作记录"
+          ],
+          "exception_cases": [
+            "必填项缺失",
+            "金额格式错误",
+            "附件未上传"
+          ]
+        },
+        {
+          "feature_name": "审批管理",
+          "description": "支持多级审批、会签、加签、驳回和超时提醒。",
+          "trigger": "申请单提交后自动进入审批流。",
+          "processing_logic": "按照组织架构和审批规则流转，审批结果驱动单据状态变化。",
+          "inputs": [
+            "审批节点配置",
+            "审批意见",
+            "审批结果"
+          ],
+          "outputs": [
+            "审批记录",
+            "流程状态",
+            "消息提醒"
+          ],
+          "exception_cases": [
+            "审批人缺失",
+            "审批超时",
+            "流程配置异常"
+          ]
+        },
+        {
+          "feature_name": "预算控制",
+          "description": "在申请和审核阶段进行预算校验、占用、释放和预警。",
+          "trigger": "提交申请或财务审核时触发。",
+          "processing_logic": "系统按部门、项目和费用类别校验预算余额，超预算时进入特殊审批或预警流程。",
+          "inputs": [
+            "预算维度",
+            "预算金额",
+            "当前申请金额"
+          ],
+          "outputs": [
+            "预算校验结果",
+            "预算占用记录",
+            "预算预警信息"
+          ],
+          "exception_cases": [
+            "预算未配置",
+            "预算余额不足",
+            "预算维度不匹配"
+          ]
+        },
+        {
+          "feature_name": "发票与单据管理",
+          "description": "支持发票信息录入、附件上传、查重和单据关联。",
+          "trigger": "用户上传票据或财务审核单据时触发。",
+          "processing_logic": "系统校验票据完整性和一致性，维护票据状态并与申请单据关联。",
+          "inputs": [
+            "发票号码",
+            "发票金额",
+            "开票日期",
+            "附件文件",
+            "关联合同编号"
+          ],
+          "outputs": [
+            "票据记录",
+            "查重结果",
+            "审核状态"
+          ],
+          "exception_cases": [
+            "重复发票",
+            "发票信息与申请金额不一致",
+            "票据附件损坏或缺失"
+          ]
+        },
+        {
+          "feature_name": "付款管理",
+          "description": "支持付款审核、付款执行、状态回写和凭证留档。",
+          "trigger": "财务审核通过后进入付款处理。",
+          "processing_logic": "系统校验收款方信息和付款条件，记录付款状态并归档付款凭证。",
+          "inputs": [
+            "收款方信息",
+            "付款金额",
+            "付款账户",
+            "付款备注"
+          ],
+          "outputs": [
+            "付款单",
+            "付款状态",
+            "付款凭证"
+          ],
+          "exception_cases": [
+            "收款方信息缺失",
+            "付款失败",
+            "重复付款风险"
+          ]
+        },
+        {
+          "feature_name": "报表与统计",
+          "description": "提供费用、预算和付款等维度的报表查询与导出。",
+          "trigger": "用户查询报表或系统定时汇总时触发。",
+          "processing_logic": "支持多维度筛选、汇总展示和导出，服务于财务分析与管理决策。",
+          "inputs": [
+            "查询条件",
+            "统计维度",
+            "时间范围"
+          ],
+          "outputs": [
+            "费用统计报表",
+            "预算执行报表",
+            "付款进度报表"
+          ],
+          "exception_cases": [
+            "数据缺失",
+            "口径不一致",
+            "导出失败"
+          ]
+        }
+      ]
+    },
+    "business_rules": [
+      "每笔申请必须关联费用类别、所属部门和发生日期等基础信息。",
+      "超预算申请不可直接通过，需进入特殊审批或强提醒流程。",
+      "发票、合同和付款凭证需与申请单据关联存档。",
+      "审批通过后方可进入财务审核，财务审核通过后方可进入付款。",
+      "同一业务申请不可重复提交付款。",
+      "付款完成后单据状态需自动更新为已付款。"
+    ],
+    "page_and_interaction": {
+      "pages": [
+        {
+          "page_name": "申请单列表",
+          "entry_point": "财务管理首页 / 我的申请",
+          "page_elements": [
+            "筛选区",
+            "申请列表",
+            "状态标签",
+            "导出按钮"
+          ],
+          "button_actions": [
+            "新建申请",
+            "查看详情",
+            "撤回",
+            "导出"
+          ]
+        },
+        {
+          "page_name": "申请单详情",
+          "entry_point": "申请单列表点击进入",
+          "page_elements": [
+            "基础信息",
+            "费用明细",
+            "附件区",
+            "审批记录",
+            "预算校验结果"
+          ],
+          "button_actions": [
+            "提交",
+            "保存草稿",
+            "编辑",
+            "上传附件"
+          ]
+        },
+        {
+          "page_name": "审批处理页",
+          "entry_point": "待办中心 / 审批任务",
+          "page_elements": [
+            "申请信息",
+            "附件信息",
+            "审批意见框",
+            "预算提示",
+            "流程节点"
+          ],
+          "button_actions": [
+            "通过",
+            "驳回",
+            "转交",
+            "加签"
+          ]
+        },
+        {
+          "page_name": "付款处理页",
+          "entry_point": "财务工作台 / 待付款",
+          "page_elements": [
+            "付款信息",
+            "收款方信息",
+            "凭证上传区",
+            "付款状态"
+          ],
+          "button_actions": [
+            "确认付款",
+            "上传凭证",
+            "标记失败"
+          ]
+        },
+        {
+          "page_name": "财务报表页",
+          "entry_point": "财务分析 / 报表中心",
+          "page_elements": [
+            "筛选条件",
+            "指标卡片",
+            "图表",
+            "明细表格"
+          ],
+          "button_actions": [
+            "查询",
+            "导出",
+            "切换统计维度"
+          ]
+        }
+      ],
+      "interaction_flow": [
+        "用户新建并提交申请。",
+        "系统进行必填项、预算和附件完整性校验。",
+        "审批人完成审批，财务进行复核。",
+        "审核通过后进入付款处理，并回写最终结果。",
+        "数据同步进入报表与台账。"
+      ]
+    },
+    "copywriting": [],
+    "data_and_dependencies": [
+      "组织架构数据",
+      "员工信息数据",
+      "预算主数据",
+      "供应商/收款方主数据",
+      "ERP / OA / HR 等外围系统"
+    ],
+    "risks_and_notes": [
+      "历史财务数据质量不一致，可能影响迁移和对账。",
+      "审批规则复杂，若前期梳理不足会影响上线进度。",
+      "外部系统接口不稳定，可能影响预算或付款结果同步。"
+    ],
+    "acceptance_criteria": [
+      "能完整跑通申请、审批、审核、付款、归档流程。",
+      "预算校验逻辑符合业务预期。",
+      "发票查重和附件校验规则生效。",
+      "报表数据与业务单据数据一致。",
+      "权限隔离正确，越权访问被拦截。",
+      "所有关键节点均有日志记录。"
+    ],
+    "open_questions": [
+      "是否需要与 ERP 做实时双向同步？",
+      "超预算场景的处理方式是拦截还是走特批流程？",
+      "发票校验是否需要对接外部验真能力？",
+      "报表统计口径以财务口径还是业务口径为准？"
+    ],
+    "collection_status": {
+      "objective": {
+        "status": "confirmed",
+        "reason": "模板已明确该类需求通常关注的建设目标。",
+        "pending_questions": []
+      },
+      "scope": {
+        "status": "confirmed",
+        "reason": "模板给出了典型的范围与非范围示例。",
+        "pending_questions": []
+      },
+      "users": {
+        "status": "confirmed",
+        "reason": "模板中已包含典型财务管理相关角色。",
+        "pending_questions": []
+      },
+      "scenarios": {
+        "status": "confirmed",
+        "reason": "模板中已给出完整的典型业务流转场景。",
+        "pending_questions": []
+      },
+      "features": {
+        "status": "confirmed",
+        "reason": "模板中已提供功能概述和功能明细样例。",
+        "pending_questions": []
+      },
+      "pages": {
+        "status": "captured",
+        "reason": "模板提供了建议页面，但实际页面仍需结合具体产品形态调整。",
+        "pending_questions": [
+          "最终是否需要独立的报表中心和付款处理页？"
+        ]
+      },
+      "rules": {
+        "status": "confirmed",
+        "reason": "模板中已覆盖典型财务管理业务规则。",
+        "pending_questions": []
+      },
+      "integrations": {
+        "status": "captured",
+        "reason": "模板给出了典型外围系统依赖，但具体接口边界仍需项目确认。",
+        "pending_questions": [
+          "是否需要接入 ERP、OA、HR 或银行系统？"
+        ]
+      },
+      "acceptance": {
+        "status": "confirmed",
+        "reason": "模板中已提供可验证的通用验收标准。",
+        "pending_questions": []
+      }
+    }
+  },
+  "template_meta": {
+    "requirement_type": "",
+    "priority": "",
+    "proposing_department": "",
+    "requester": "",
+    "request_date": "",
+    "current_pain_points": [],
+    "goal_metrics": []
+  },
+  "example_model": {
+    "document_info": {
+      "project_name": "财务管理门户",
+      "requirement_name": "预算、费用与结算管理"
+    },
+    "background": {
+      "summary": "预算执行、费用报销、结算记录和财务报表分散在多个工具中，导致对账滞后、流程追踪弱、月结准备耗时。",
+      "objective": "统一预算管控、费用审批、结算跟踪和财务报表，提升合规性和月结效率。"
+    },
+    "scope": {
+      "in_scope": [
+        "预算编制与执行监控",
+        "费用报销审批",
+        "结算状态跟踪",
+        "财务报表汇总",
+        "对账明细导出"
+      ],
+      "out_of_scope": [
+        "不替代总账系统",
+        "不在首版支持复杂税务筹划"
+      ]
+    },
+    "users_and_scenarios": {
+      "target_users": [
+        "财务专员",
+        "部门预算负责人",
+        "审批主管",
+        "财务经理",
+        "审计人员"
+      ],
+      "core_scenarios": [
+        "预算负责人查看本月预算占用与剩余额度。",
+        "财务专员处理费用单据并跟踪审批状态。",
+        "财务经理导出月结对账报表。"
+      ]
+    },
+    "functional_requirements": {
+      "overview": "该默认示例覆盖：预算控制、费用审批、结算跟踪。",
+      "feature_details": [
+        {
+          "feature_name": "预算控制",
+          "description": "支持预算控制，用于满足示例业务场景的核心诉求。",
+          "trigger": "用户进入相关页面、执行查询或提交业务动作时触发。",
+          "processing_logic": "校验必填字段，应用权限规则，读取或保存业务数据，并更新相关状态、指标或明细结果。",
+          "inputs": [
+            "业务主数据",
+            "用户筛选条件或业务单据数据"
+          ],
+          "outputs": [
+            "更新后的业务记录",
+            "可查看的状态、图表或明细结果"
+          ],
+          "exception_cases": [
+            "必填数据缺失",
+            "权限不足",
+            "数据刷新延迟"
+          ]
+        },
+        {
+          "feature_name": "费用审批",
+          "description": "支持费用审批，用于满足示例业务场景的核心诉求。",
+          "trigger": "用户进入相关页面、执行查询或提交业务动作时触发。",
+          "processing_logic": "校验必填字段，应用权限规则，读取或保存业务数据，并更新相关状态、指标或明细结果。",
+          "inputs": [
+            "业务主数据",
+            "用户筛选条件或业务单据数据"
+          ],
+          "outputs": [
+            "更新后的业务记录",
+            "可查看的状态、图表或明细结果"
+          ],
+          "exception_cases": [
+            "必填数据缺失",
+            "权限不足",
+            "数据刷新延迟"
+          ]
+        },
+        {
+          "feature_name": "结算跟踪",
+          "description": "支持结算跟踪，用于满足示例业务场景的核心诉求。",
+          "trigger": "用户进入相关页面、执行查询或提交业务动作时触发。",
+          "processing_logic": "校验必填字段，应用权限规则，读取或保存业务数据，并更新相关状态、指标或明细结果。",
+          "inputs": [
+            "业务主数据",
+            "用户筛选条件或业务单据数据"
+          ],
+          "outputs": [
+            "更新后的业务记录",
+            "可查看的状态、图表或明细结果"
+          ],
+          "exception_cases": [
+            "必填数据缺失",
+            "权限不足",
+            "数据刷新延迟"
+          ]
+        }
+      ]
+    },
+    "business_rules": [
+      "只有授权角色可以查看权限范围内的数据并执行敏感操作。",
+      "核心业务操作必须保留操作人、操作时间、输入条件和结果状态，便于审计追溯。",
+      "导出数据必须遵循页面筛选条件、字段权限和数据权限范围。",
+      "页面必须展示数据刷新时间、指标口径说明和异常状态提示。"
+    ],
+    "page_and_interaction": {
+      "pages": [
+        {
+          "page_name": "预算控制",
+          "entry_point": "业务工作台",
+          "page_elements": [
+            "筛选区",
+            "主内容区",
+            "明细区"
+          ],
+          "button_actions": [
+            "查询",
+            "重置",
+            "导出",
+            "查看详情"
+          ]
+        },
+        {
+          "page_name": "费用审批",
+          "entry_point": "业务工作台",
+          "page_elements": [
+            "筛选区",
+            "主内容区",
+            "明细区"
+          ],
+          "button_actions": [
+            "查询",
+            "重置",
+            "导出",
+            "查看详情"
+          ]
+        },
+        {
+          "page_name": "结算跟踪",
+          "entry_point": "业务工作台",
+          "page_elements": [
+            "筛选区",
+            "主内容区",
+            "明细区"
+          ],
+          "button_actions": [
+            "查询",
+            "重置",
+            "导出",
+            "查看详情"
+          ]
+        }
+      ],
+      "interaction_flow": [
+        "预算负责人查看本月预算占用与剩余额度。",
+        "财务专员处理费用单据并跟踪审批状态。",
+        "财务经理导出月结对账报表。"
+      ]
+    },
+    "copywriting": [],
+    "data_and_dependencies": [
+      "预算科目与成本中心",
+      "费用单据与附件",
+      "结算记录",
+      "ERP 或财务系统接口",
+      "用户与审批权限"
+    ],
+    "risks_and_notes": [
+      "指标口径和业务归属需要在项目启动时确认。",
+      "历史数据质量可能影响看板或流程上线后的验收结果。",
+      "外部系统接口准备情况可能影响首版范围。"
+    ],
+    "acceptance_criteria": [
+      "可以基于该示例直接生成完整的需求文档和设计文档。",
+      "用户可以通过后续对话修改示例业务内容，并覆盖对应需求事实。",
+      "主要角色、流程、数据、权限、业务规则和验收标准均有明确描述。"
+    ],
+    "open_questions": [
+      "是否存在必须优先支持的组织、工厂、客户或业务范围？",
+      "首版是否需要限制在 MVP 范围内上线？"
+    ],
+    "template_meta": {
+      "is_default_example": true,
+      "example_notice": "这是系统内置的默认示例业务，仅用于填充式开始，可被用户后续修改意见覆盖。"
+    }
+  }
+}
