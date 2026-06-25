@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+import logging
+import threading
 import zipfile
 from io import BytesIO
 import json
@@ -16,6 +18,9 @@ from .services.requirement_collector import RequirementCollectorService
 from .services.asr_client import ASRError
 
 api = Blueprint("api", __name__, url_prefix="/api")
+logger = logging.getLogger(__name__)
+_structured_requirement_refresh_lock = threading.Lock()
+_structured_requirement_refresh_jobs: set[tuple[str, str]] = set()
 MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024
 MAX_EXTRACTED_ATTACHMENT_CHARS = 12000
 MAX_MULTIMODAL_INLINE_BYTES = 7 * 1024 * 1024
@@ -78,6 +83,37 @@ def _get_asr_client():
     if asr_client is None:
         raise RuntimeError("ASR client not initialized.")
     return asr_client
+
+
+def _is_truthy_request_arg(name: str) -> bool:
+    return str(request.args.get(name, "")).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _start_structured_requirement_refresh(
+    service: RequirementCollectorService,
+    session_id: str,
+    language: str,
+) -> None:
+    job_key = (session_id, language.strip().lower() or "zh")
+    with _structured_requirement_refresh_lock:
+        if job_key in _structured_requirement_refresh_jobs:
+            return
+        _structured_requirement_refresh_jobs.add(job_key)
+
+    def refresh() -> None:
+        try:
+            service.build_structured_requirement_model(session_id, language, force_refresh=True)
+        except Exception:
+            logger.exception("Background structured requirement refresh failed for session %s", session_id)
+        finally:
+            with _structured_requirement_refresh_lock:
+                _structured_requirement_refresh_jobs.discard(job_key)
+
+    threading.Thread(
+        target=refresh,
+        name=f"structured-requirement-refresh-{session_id[:8]}",
+        daemon=True,
+    ).start()
 
 
 def _request_language(default: str = "zh") -> str:
@@ -660,8 +696,24 @@ def get_summary(session_id: str):
 @api.get("/sessions/<session_id>/structured-requirement")
 def get_structured_requirement(session_id: str):
     language = _request_language()
+    background = _is_truthy_request_arg("background")
     service = _get_service()
     try:
+        if background:
+            snapshot = service.get_structured_requirement_snapshot(session_id, language)
+            if snapshot["structured_requirement_sync_status"] in {"missing", "stale"}:
+                _start_structured_requirement_refresh(service, session_id, language)
+            return jsonify(
+                _structured_requirement_response(
+                    session_id,
+                    snapshot["structured_requirement_model"],
+                    snapshot["structured_requirement_sync_status"],
+                    snapshot["conversation_chain_state"],
+                    snapshot["pm_methodology_state"],
+                    snapshot["ic_substrate_evidence_state"],
+                )
+            )
+
         structured_requirement_model = service.build_structured_requirement_model(session_id, language)
         session = service.get_session(session_id)
         if session is None:
@@ -902,12 +954,27 @@ def create_coding_handoff(session_id: str):
             HTTPStatus.NOT_FOUND,
         )
 
+    payload = result.get("payload") if isinstance(result.get("payload"), dict) else result
+    if not payload.get("handoff_ready", True):
+        methodology_gaps = payload.get("methodology_gaps", [])
+        gap_summary = ", ".join(str(item) for item in methodology_gaps) or "PM methodology gaps"
+        return (
+            jsonify(
+                {
+                    "error": f"PM Methodology is not ready for Go Coding handoff: {gap_summary}.",
+                    **payload,
+                }
+            ),
+            HTTPStatus.CONFLICT,
+        )
+
     open_url = request.args.get("open_url", "").strip()
-    payload = result.get("payload") if isinstance(result.get("payload"), dict) else {}
     response_payload = {
         "handoff_token": result["handoff_token"],
         "expires_at": result["expires_at"],
         "documents_ready": payload.get("documents_ready", True),
+        "handoff_ready": payload.get("handoff_ready", True),
+        "methodology_ready": payload.get("methodology_ready", True),
         "implementation_prompt": payload.get("implementation_prompt", ""),
         "documents": payload.get("documents", []),
         "ic_substrate_evidence": payload.get("ic_substrate_evidence", {}),

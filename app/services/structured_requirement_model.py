@@ -32,6 +32,12 @@ Important rules:
 23) Assistant suggestions, assistant summaries, assistant-generated draft PRDs, and generated document text are not user confirmation. They may explain candidate assumptions, but they must not upgrade collection_status to "confirmed".
 24) A/B/C user replies confirm only the specific option text immediately offered by the assistant, not later assistant elaborations or inferred document content.
 25) If any item still has pending_questions, or if open_questions contains delivery-relevant gaps, that item is not fully ready for document generation / Go Coding.
+26) When the user selects Option A (by replying "A", "A.", "选A", "我选A", "Confirm...", or "按建议口径确认...") to confirm a blocker label, this constitutes explicit user confirmation of that requirement item or methodology gap using version-one assumptions. You MUST:
+  a) Identify which blocker label is being confirmed (e.g., "Priority and scope trade-offs" / "优先级与范围取舍" / "scope", "Success metric" / "成功指标" / "success_metric", "Validation plan" / "验证计划" / "validation_plan", "Integration systems" / "集成系统" / "integrations", etc.).
+  b) Formulate a reasonable, concrete version-one assumption for that blocker/item based on the project context (for example, if the label is "Priority and scope trade-offs", populate "scope.in_scope" with the core features mentioned and "scope.out_of_scope" with standard exclusions; if the label is "Success metric" or "Validation plan", write a verifiable acceptance criterion).
+  c) Write this formulated assumption into the corresponding JSON fields.
+  d) Upgrade the status of the corresponding key(s) in "collection_status" to "confirmed" (e.g., "scope", "acceptance", "integrations", etc.), clear its "pending_questions", and write a brief reason like "Confirmed via Option A assumption."
+
 
 Output JSON schema:
 {

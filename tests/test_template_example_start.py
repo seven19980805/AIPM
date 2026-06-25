@@ -11,6 +11,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.services.business_template_library import BusinessTemplateLibrary
 from app.services.requirement_collector import (
+    PRD_MESSAGE_KIND,
     STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
     RequirementCollectorService,
 )
@@ -52,8 +53,18 @@ class TemplateExampleStartTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmpdir.cleanup()
 
-    def _cache_ready_requirement_model(self, session_id: str) -> None:
+    def _cache_requirement_model(self, session_id: str, model: dict, language: str = "en") -> None:
         session = self.service._require_session(session_id)
+        message_count = self.service._message_count(session.messages)
+        for cache_key in {STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY, language}:
+            self.service._save_structured_requirement_model_cache(
+                session_id,
+                cache_key,
+                message_count,
+                model,
+            )
+
+    def _cache_ready_requirement_model(self, session_id: str) -> None:
         collection_status = {
             key: {
                 "status": "confirmed",
@@ -66,8 +77,8 @@ class TemplateExampleStartTest(unittest.TestCase):
             {
                 "document_info": {"project_name": "Lot yield dashboard"},
                 "background": {
-                    "objective": "Track lot yield losses for Quality review.",
-                    "summary": "Quality needs a lot yield dashboard.",
+                    "objective": "Track lot yield losses for Quality review with a target to cut review time by 20%.",
+                    "summary": "Quality needs a v1 lot yield dashboard, with production writeback deferred to a later phase.",
                 },
                 "product_context": {
                     "requesting_department": "Quality",
@@ -78,8 +89,8 @@ class TemplateExampleStartTest(unittest.TestCase):
                     "acceptance_owner": "Quality manager",
                 },
                 "scope": {
-                    "in_scope": ["Lot yield loss dashboard"],
-                    "out_of_scope": ["Production writeback"],
+                    "in_scope": ["P0 first release: lot yield loss dashboard"],
+                    "out_of_scope": ["Later phase: production writeback"],
                 },
                 "users_and_scenarios": {
                     "target_users": ["Quality manager"],
@@ -105,18 +116,51 @@ class TemplateExampleStartTest(unittest.TestCase):
                         }
                     ],
                 },
-                "business_rules": ["No production writeback before approval."],
+                "business_rules": [
+                    "P0 must show lot yield losses before export or production writeback.",
+                    "No production writeback before approval.",
+                ],
                 "data_and_dependencies": ["QIS/MES export"],
-                "acceptance_criteria": ["Quality manager can verify loss by lot."],
+                "risks_and_notes": ["Risk: QIS/MES export freshness may delay daily review."],
+                "acceptance_criteria": [
+                    "Success metric: Quality manager verifies loss by lot within 10 minutes.",
+                ],
                 "collection_status": collection_status,
             }
         )
-        self.service._save_structured_requirement_model_cache(
-            session_id,
-            STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
-            self.service._message_count(session.messages),
-            model,
+        self._cache_requirement_model(session_id, model)
+
+    def _pm_chat_calls(self) -> list[list[dict[str, str]]]:
+        return [
+            call
+            for call in self.llm_client.calls
+            if call
+            and (
+                "principal Product Manager" in call[0].get("content", "")
+                or "方法论扎实的产品经理" in call[0].get("content", "")
+            )
+        ]
+
+    def _cache_methodology_incomplete_requirement_model(self, session_id: str) -> None:
+        collection_status = {
+            key: {
+                "status": "confirmed",
+                "reason": "Confirmed for document generation.",
+                "pending_questions": [],
+            }
+            for key in REQUIREMENT_ITEM_KEYS
+        }
+        model = normalize_structured_requirement_model(
+            {
+                "document_info": {"project_name": "Thin dashboard"},
+                "background": {
+                    "objective": "Track a quality signal.",
+                    "summary": "A thin dashboard requirement.",
+                },
+                "collection_status": collection_status,
+            }
         )
+        self._cache_requirement_model(session_id, model)
 
     def test_guided_template_session_stays_empty(self) -> None:
         session = self.service.create_session(
@@ -152,17 +196,79 @@ class TemplateExampleStartTest(unittest.TestCase):
         self.assertIn("每个问题必须带一个可快速确认的推荐答案或选项示例", prompt)
         self.assertIn("建立共享领域语言", prompt)
         self.assertIn("PRD 质量门", prompt)
-        self.assertIn("如果这些关键块已经足够生成文档，不要继续开新坑", prompt)
+        self.assertIn("PM Methodology gate 都 ready", prompt)
         self.assertIn("最后一段必须使用 A/B/C 选项格式", prompt)
+
+    def test_pm_prompt_treats_methodology_gaps_as_generation_gate(self) -> None:
+        session = self.service.create_session(language="en", starter_department="quality")
+        self.service._append_message(session.id, "user", "Build a thin quality dashboard.")
+        self._cache_methodology_incomplete_requirement_model(session.id)
+
+        prompt = self.service._pm_prompt(self.service._require_session(session.id), "en")
+
+        self.assertIn("PM methodology state", prompt)
+        self.assertIn("Hard gate: while PM Methodology is not ready_for_pm_review", prompt)
+        self.assertIn("do NOT tell the user to generate documents", prompt)
+
+    def test_false_ready_assistant_reply_is_replaced_when_gate_is_not_ready(self) -> None:
+        self.llm_client.chat_response = (
+            "We now have enough detail to generate the requirements document. "
+            "Click Generate Document to produce the full PRD/URD."
+        )
+        session = self.service.create_session(template_id=self.template_id, language="en")
+
+        result = self.service.send_user_message(session.id, "Build a thin dashboard.", language="en")
+
+        self.assertIn("Not ready to generate the formal document yet", result["assistant_message"])
+        self.assertIn("Next, close one highest-value gap", result["assistant_message"])
+        self.assertIn("A. Confirm", result["assistant_message"])
+        self.assertIn("B. I will provide the real", result["assistant_message"])
+        self.assertIn("C. Keep this point pending for now", result["assistant_message"])
+        self.assertNotIn("suggested interpretation above", result["assistant_message"])
+        self.assertNotIn("Click Generate Document", result["assistant_message"])
+
+    def test_handoff_finalization_prompt_is_treated_as_generation_ready_claim(self) -> None:
+        text = (
+            "To confirm handoff readiness, would you like to finalize the documented "
+            "requirements for the v1 Availability Dashboard? "
+            "A. Yes — generate the requirements document and proceed to handoff."
+        )
+
+        self.assertTrue(self.service._assistant_claims_document_generation_ready(text))
+
+    def test_stream_false_ready_reply_emits_replacement_when_gate_is_not_ready(self) -> None:
+        self.llm_client.chat_response = "# Not structured JSON"
+        self.llm_client.stream_response_parts = [
+            {
+                "type": "content",
+                "text": (
+                    "We now have enough detail to generate the requirements document. "
+                    "Click Generate Document to produce the full PRD/URD."
+                ),
+            }
+        ]
+        session = self.service.create_session(template_id=self.template_id, language="en")
+
+        events = list(self.service.stream_user_message(session.id, "Build a thin dashboard.", language="en"))
+        replacement_events = [event for event in events if event.get("event") == "replace_content"]
+        saved_session = self.service._require_session(session.id)
+
+        self.assertTrue(replacement_events)
+        self.assertIn("Not ready to generate the formal document yet", str(replacement_events[-1].get("content")))
+        self.assertIn("Not ready to generate the formal document yet", saved_session.messages[-1]["content"])
+        self.assertNotIn("suggested interpretation above", saved_session.messages[-1]["content"])
+        self.assertNotIn("Click Generate Document", saved_session.messages[-1]["content"])
 
     def test_open_clarification_question_gets_choice_fallback(self) -> None:
         text = "我理解你想做排产预测系统。首版主要服务哪个部门？"
 
         formatted = self.service._ensure_choice_question_format(text, "zh")
 
-        self.assertIn("A. 同意按上面的建议口径作为首版假设继续推进", formatted)
-        self.assertIn("B. 不同意，我补充实际业务口径或例外情况", formatted)
-        self.assertIn("C. 这个点先记为待确认", formatted)
+        self.assertIn("A. 按一个明确的首版假设确认这个点", formatted)
+        self.assertIn("B. 我补充真实业务口径或例外情况", formatted)
+        self.assertIn("C. 这个点先保持待确认", formatted)
+        self.assertNotIn("按上面的建议口径", formatted)
+        self.assertNotIn("建议回复 A、B、C", formatted)
 
     def test_existing_choice_question_is_not_duplicated(self) -> None:
         text = "请选择首版入口：\nA. Production\nB. Quality\nC. TDI"
@@ -196,14 +302,17 @@ class TemplateExampleStartTest(unittest.TestCase):
         self.assertIsNotNone(refreshed)
 
         self.assertIn("Which department owns this first-version requirement?", streamed_text)
-        self.assertIn("A. Use the suggested interpretation above as the version-one assumption", streamed_text)
-        self.assertIn("Reply with A, B, C", streamed_text)
+        self.assertIn("A. Confirm this point with a clear version-one assumption", streamed_text)
+        self.assertIn("B. I will provide the real business wording or exception", streamed_text)
+        self.assertIn("C. Keep this point pending for now", streamed_text)
+        self.assertNotIn("suggested interpretation above", streamed_text)
+        self.assertNotIn("Reply with A, B, C", streamed_text)
         self.assertNotIn("同意按上面的建议口径", streamed_text)
         self.assertEqual(refreshed.messages[-1]["content"], streamed_text)
 
-    def test_streamed_reply_does_not_wait_for_structured_summary_generation(self) -> None:
+    def test_streamed_reply_returns_fresh_structured_summary_before_done(self) -> None:
         self.llm_client.stream_response_parts = [
-            {"type": "content", "text": "请确认是否生成需求文档？\n\nA. 确认，生成需求文档\nB. 继续补充"}
+            {"type": "content", "text": "请确认首版数据源。\n\nA. MES mock data\nB. 手工 CSV"}
         ]
         session = self.service.create_session(language="zh")
 
@@ -217,10 +326,123 @@ class TemplateExampleStartTest(unittest.TestCase):
         event_names = [str(event.get("event")) for event in events]
 
         self.assertIn("assistant_done", event_names)
+        self.assertIn("summary", event_names)
+        self.assertLess(event_names.index("assistant_done"), event_names.index("summary"))
+        self.assertLess(event_names.index("summary"), event_names.index("done"))
         self.assertEqual(event_names[-1], "done")
-        self.assertNotIn("summary", event_names)
+        summary_event = next(event for event in events if event.get("event") == "summary")
+        self.assertEqual(summary_event.get("structured_requirement_sync_status"), "ready")
+        self.assertIn("structured_requirement_model", summary_event)
+        self.assertIn("pm_methodology_state", summary_event)
         self.assertEqual(len(self.llm_client.stream_calls), 1)
-        self.assertEqual(len(self.llm_client.calls), 0)
+        self.assertEqual(len(self.llm_client.calls), 1)
+
+    def test_streamed_reply_promotes_cache_without_redundant_extraction(self) -> None:
+        """After the assistant reply, the structured requirement model should be
+        promoted from the pre-reply cache to the post-reply message_count
+        without making a second LLM extraction call."""
+        self.llm_client.stream_response_parts = [
+            {"type": "content", "text": "Next question about data sources.\n\nA. MES\nB. CSV"}
+        ]
+        session = self.service.create_session(language="zh")
+
+        events = list(
+            self.service.stream_user_message(
+                session.id,
+                "我想做一个 IC Substrate Quality dashboard",
+                language="zh",
+            )
+        )
+
+        # Exactly 1 regular chat call for the pre-reply structured extraction, and 1 stream
+        # call for the LLM-driven reply. There must NOT be a second extraction after the
+        # reply - the post-reply summary uses cache promotion, not a new LLM call.
+        extraction_calls = len(self.llm_client.calls)
+        self.assertEqual(extraction_calls, 1, (
+            f"Expected exactly 1 extraction LLM call, got {extraction_calls}. "
+            "The post-reply extraction should use cache promotion, not a new LLM call."
+        ))
+        self.assertEqual(len(self.llm_client.stream_calls), 1)
+
+        # The summary event should carry the promoted model.
+        summary_event = next(event for event in events if event.get("event") == "summary")
+        self.assertEqual(summary_event.get("structured_requirement_sync_status"), "ready")
+        self.assertIn("structured_requirement_model", summary_event)
+        self.assertIn("pm_methodology_state", summary_event)
+        self.assertIn("ic_substrate_evidence_state", summary_event)
+
+        # The post-reply snapshot should also see sync_status=ready (not stale),
+        # because the cache was promoted to the current message_count.
+        snapshot = self.service.get_structured_requirement_snapshot(session.id, "zh")
+        self.assertEqual(snapshot["structured_requirement_sync_status"], "ready")
+
+    def test_streamed_reply_is_llm_driven_with_fresh_structured_state(self) -> None:
+        # The reply is LLM-streamed (no deterministic planner). Structured extraction
+        # runs once BEFORE the reply so the readiness directive in the prompt reflects the
+        # latest turn, and the post-reply summary is promoted from cache (no extra call).
+        self.llm_client.chat_response = json.dumps(
+            normalize_structured_requirement_model(
+                {
+                    "document_info": {"project_name": "Equipment availability dashboard"},
+                    "background": {
+                        "objective": "Reduce downtime through supervisor intervention.",
+                        "summary": "Production supervisor needs an availability dashboard.",
+                    },
+                }
+            )
+        )
+        self.llm_client.stream_response_parts = [
+            {"type": "content", "text": "What machine states should the first version show?\n\nA. Up/Down only\nB. Up/Down/Idle"}
+        ]
+        session = self.service.create_session(language="en")
+
+        events = list(
+            self.service.stream_user_message(
+                session.id,
+                "Production first action: equipment downtime dashboard for supervisors.",
+                language="en",
+            )
+        )
+        streamed_text = "".join(
+            str(event.get("delta", ""))
+            for event in events
+            if event.get("event") == "content"
+        )
+
+        self.assertEqual(len(self.llm_client.stream_calls), 1)
+        self.assertEqual(len(self.llm_client.calls), 1)
+        self.assertIn("What machine states", streamed_text)
+
+    def test_methodology_priority_recognizes_v1_first_release_scope_boundary(self) -> None:
+        model = normalize_structured_requirement_model(
+            {
+                "document_info": {"project_name": "Equipment availability dashboard"},
+                "background": {
+                    "objective": "Reduce overall equipment downtime by 10% through real-time monitoring.",
+                    "summary": "v1 availability dashboard for production supervisor intervention.",
+                },
+                "product_context": {
+                    "primary_user": "Production supervisor",
+                    "decision_or_action": "Dispatch technician when a machine is down for more than 5 minutes.",
+                },
+                "scope": {
+                    "in_scope": ["First release is Availability only dashboard for downtime monitoring."],
+                    "out_of_scope": [
+                        "Performance speed-loss and Quality yield-loss are excluded from v1.",
+                        "No MES/SAP writeback, scheduling changes, or maintenance ticket creation.",
+                    ],
+                },
+                "functional_requirements": {
+                    "overview": "Machine cards, downtime reason chart, affected lot drill-down.",
+                },
+                "business_rules": ["Visual alert when downtime exceeds 5 minutes."],
+            }
+        )
+
+        state = self.service.build_pm_methodology_state(model, "en")
+        priority_check = next(check for check in state["checks"] if check["key"] == "prioritization")
+
+        self.assertEqual(priority_check["status"], "ready")
 
     def test_non_question_summary_does_not_get_choice_fallback(self) -> None:
         text = "已确认：首版聚焦 Production 的排产预测，目标用户是 planner。"
@@ -263,7 +485,7 @@ class TemplateExampleStartTest(unittest.TestCase):
 
         self.service.send_user_message(session.id, "我想做一个排产预测系统", language="en")
 
-        first_system_prompt = self.llm_client.calls[0][0]["content"]
+        first_system_prompt = self._pm_chat_calls()[0][0]["content"]
         self.assertIn("Respond entirely in English", first_system_prompt)
         self.assertNotIn("输出语言要求", first_system_prompt)
 
@@ -283,7 +505,7 @@ class TemplateExampleStartTest(unittest.TestCase):
         self.assertIsNotNone(refreshed)
         self.assertEqual(refreshed.messages[0]["content"], full_message)
         self.assertEqual(refreshed.messages[0]["display_content"], display_message)
-        self.assertEqual(self.llm_client.calls[0][-1]["content"], full_message)
+        self.assertEqual(self._pm_chat_calls()[0][-1]["content"], full_message)
 
     def test_collection_status_does_not_regress_after_confirmation(self) -> None:
         previous_status = {
@@ -323,10 +545,9 @@ class TemplateExampleStartTest(unittest.TestCase):
         self.assertEqual(merged["collection_status"]["rules"]["status"], "confirmed")
         self.assertEqual(merged["collection_status"]["integrations"]["status"], "captured")
 
-    def test_generation_readiness_allows_assumptions_with_open_questions(self) -> None:
-        # Reachable gate: no conflict + coverage >= 75% + confirmation >= 40%.
-        # Open/pending questions become assumptions and do NOT block generation,
-        # though they keep fully_confirmed False.
+    def test_generation_readiness_requires_full_structured_confirmation(self) -> None:
+        # Formal documents are only generated once every structured requirement
+        # item is confirmed and no open/pending questions remain.
         collection_status = {
             key: {"status": "confirmed", "reason": "Confirmed.", "pending_questions": []}
             for key in REQUIREMENT_ITEM_KEYS
@@ -358,8 +579,8 @@ class TemplateExampleStartTest(unittest.TestCase):
         self.assertFalse(with_assumptions_progress["fully_confirmed"])
         self.assertEqual(with_assumptions_progress["pending_question_count"], 1)
         self.assertEqual(with_assumptions_progress["open_question_count"], 1)
-        # ... but generation is still unlocked (unknowns become assumptions).
-        self.assertTrue(with_assumptions_progress["ready_to_generate"])
+        # ... and generation stays locked; unknowns must be resolved in chat.
+        self.assertFalse(with_assumptions_progress["ready_to_generate"])
 
     def test_generation_readiness_blocks_on_conflict_or_low_coverage(self) -> None:
         # Conflict blocks readiness even at full coverage.
@@ -373,7 +594,7 @@ class TemplateExampleStartTest(unittest.TestCase):
         )
         self.assertFalse(conflict_progress["ready_to_generate"])
 
-        # One missing field is tolerated (8/9 = 89% coverage) -> still ready.
+        # One missing field still blocks the formal document gate.
         one_missing = {
             key: {"status": "confirmed", "reason": "Confirmed.", "pending_questions": []}
             for key in REQUIREMENT_ITEM_KEYS
@@ -382,7 +603,7 @@ class TemplateExampleStartTest(unittest.TestCase):
         one_missing_progress = self.service._structured_requirement_progress(
             normalize_structured_requirement_model({"collection_status": one_missing})
         )
-        self.assertTrue(one_missing_progress["ready_to_generate"])
+        self.assertFalse(one_missing_progress["ready_to_generate"])
 
         # Too many missing fields (low coverage) blocks readiness.
         low_coverage = {
@@ -395,6 +616,68 @@ class TemplateExampleStartTest(unittest.TestCase):
             normalize_structured_requirement_model({"collection_status": low_coverage})
         )
         self.assertFalse(low_coverage_progress["ready_to_generate"])
+
+    def test_coding_handoff_requires_saved_prd_document(self) -> None:
+        session = self.service.create_session(language="en", starter_department="quality")
+        self.service._append_message(session.id, "user", "Build a lot yield dashboard.")
+        self._cache_ready_requirement_model(session.id)
+        calls_before = len(self.llm_client.calls)
+
+        payload = self.service.build_browser_handoff_payload(session.id, "en")
+
+        self.assertFalse(payload["documents_ready"])
+        self.assertEqual(payload["missing_documents"], ["prd"])
+        self.assertEqual(len(self.llm_client.calls), calls_before)
+        self.assertIsNone(self.service.get_saved_prd_document(session.id))
+
+    def test_coding_handoff_uses_saved_prd_document(self) -> None:
+        session = self.service.create_session(language="en", starter_department="quality")
+        self.service._append_message(session.id, "user", "Build a lot yield dashboard.")
+        self._cache_ready_requirement_model(session.id)
+        self.llm_client.chat_response = "# Lot Yield Dashboard PRD\n\nReady for Vibe Coding handoff."
+
+        document_result = self.service.build_prd_document(session.id, "en", save_history=True)
+        handoff_result = self.service.create_coding_handoff(session.id, "en")
+
+        self.assertIn(document_result["status"], {"ok", "draft_with_assumptions"})
+        self.assertIn("handoff_token", handoff_result)
+        self.assertTrue(handoff_result["payload"]["documents_ready"])
+        self.assertEqual(handoff_result["payload"]["documents"][0]["kind"], "prd")
+        self.assertIn("Lot Yield Dashboard PRD", self.service.get_saved_prd_document(session.id)[0].read_text())
+
+    def test_prd_generation_blocks_when_pm_methodology_is_not_ready(self) -> None:
+        session = self.service.create_session(language="en", starter_department="quality")
+        self.service._append_message(session.id, "user", "Build a thin dashboard.")
+        self._cache_methodology_incomplete_requirement_model(session.id)
+        self.llm_client.chat_response = "# Thin Dashboard PRD\n\nGenerated before PM methodology is ready."
+
+        document_result = self.service.build_prd_document(session.id, "en", save_history=True)
+
+        self.assertEqual(document_result["status"], "quality_gate_blocked")
+        self.assertIn("PM Methodology Gaps", document_result["document_markdown"])
+        self.assertEqual(self.service.get_saved_prd_document(session.id), None)
+
+    def test_coding_handoff_blocks_legacy_prd_when_pm_methodology_is_not_ready(self) -> None:
+        session = self.service.create_session(language="en", starter_department="quality")
+        self.service._append_message(session.id, "user", "Build a thin dashboard.")
+        self._cache_methodology_incomplete_requirement_model(session.id)
+        self.service._build_generated_document_result(
+            session_id=session.id,
+            document_kind=PRD_MESSAGE_KIND,
+            language="en",
+            doc_markdown="# Thin Dashboard PRD\n\nLegacy saved PRD.",
+            structured_requirement_model=self.service.build_structured_requirement_model(session.id, "en"),
+            status="ok",
+            save_history=True,
+        )
+
+        handoff_result = self.service.create_coding_handoff(session.id, "en")
+
+        self.assertNotIn("handoff_token", handoff_result)
+        self.assertTrue(handoff_result["documents_ready"])
+        self.assertFalse(handoff_result["handoff_ready"])
+        self.assertFalse(handoff_result["methodology_ready"])
+        self.assertGreater(len(handoff_result["methodology_gaps"]), 0)
 
     def test_convergence_guidance_stops_open_ended_questions_when_collection_complete(self) -> None:
         collection_status = {
@@ -753,3 +1036,11 @@ class TemplateExampleStartTest(unittest.TestCase):
         self.assertIn("Do not present captured or pending_confirmation items as confirmed facts", prd_payload)
         self.assertIn("Document quality gate", design_payload)
         self.assertIn("Confirm the cost formula.", design_payload)
+
+    def test_structured_requirement_prompt_contains_option_a_extraction_rules(self) -> None:
+        session = self.service.create_session(language="zh")
+        prompt = self.service._structured_requirement_model_prompt(session, "zh")
+        self.assertIn("When the user selects Option A", prompt)
+        self.assertIn("Identify which blocker label is being confirmed", prompt)
+        self.assertIn("Formulate a reasonable, concrete version-one assumption", prompt)
+        self.assertIn("Upgrade the status of the corresponding key(s)", prompt)

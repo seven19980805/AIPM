@@ -145,9 +145,15 @@ const generationActionLabel = computed(() => {
   return copy.value.generateDocuments
 })
 
-const canGenerateDocuments = computed(() => progress.value.readyToGenerate)
+const methodologyReadyForHandoff = computed(
+  () => !props.pmMethodologyState.checks.length || props.pmMethodologyState.ready_for_pm_review,
+)
 
-const canOpenPanelGoCoding = computed(() => progress.value.readyToGenerate && props.hasPrdDocument)
+const canGenerateDocuments = computed(() => progress.value.readyToGenerate && methodologyReadyForHandoff.value)
+
+const canOpenPanelGoCoding = computed(
+  () => progress.value.readyToGenerate && props.hasPrdDocument && methodologyReadyForHandoff.value,
+)
 
 const methodologyVisible = computed(() => props.pmMethodologyState.checks.length > 0)
 
@@ -402,7 +408,7 @@ function summarizeText(value: string): string {
         </button>
         <button
           class="generate-prd-btn"
-          :class="{ ready: progress.readyToGenerate, secondary: hasPrdDocument }"
+          :class="{ ready: canGenerateDocuments, secondary: hasPrdDocument }"
           type="button"
           :disabled="loading || generatingDocuments || generationDisabled || openingGoCoding || !canGenerateDocuments"
           @click="emit('generate-documents')"

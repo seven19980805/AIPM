@@ -112,6 +112,11 @@ function renderBlocks(lines: string[]): string {
       paragraphLines.push(lines[index] ?? '')
       index += 1
     }
+    if (!paragraphLines.length) {
+      blocks.push(`<p>${renderInline(line)}</p>`)
+      index += 1
+      continue
+    }
     blocks.push(`<p>${renderInline(paragraphLines.join(' '))}</p>`)
   }
 

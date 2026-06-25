@@ -86,7 +86,6 @@ type ChoiceReplyOption = {
   value: string
 }
 type GenerateDocumentsOptions = {
-  skipReadinessConfirm?: boolean
   refreshBeforeGate?: boolean
 }
 type ThemeMode = 'light' | 'dark'
@@ -133,6 +132,7 @@ const icSubstrateEvidenceState = ref<ICSubstrateEvidenceState>(createEmptyICSubs
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 const GO_CODING_URL = resolveExternalUrl(import.meta.env.VITE_GO_CODING_URL, 'http://localhost:8888')
 let structuredRequirementRequestToken = 0
+let structuredRequirementRefreshTimer: ReturnType<typeof window.setTimeout> | null = null
 const activeReplyCount = ref(0)
 const activeMessagePipelineCount = ref(0)
 const activeStructuredRequirementSyncCount = ref(0)
@@ -595,10 +595,10 @@ const shellCopy = {
     heroQuestion: 'Tell me what you need and I will help you turn it into a complete requirement document.',
     appSummary: 'Structured requirement discovery for IC Substrate and operational systems.',
     topbarTagline: 'Structured requirements for IC Substrate, operations, and build-ready delivery.',
-    assistantIntro: 'Hello, I am AIPM. I will use the expert chain, ask one focused question at a time, and unlock Go Coding once the requirement is complete enough.',
-    assistantIntroProduction: 'Production first. I will use the expert chain and ask one focused question at a time; Go Coding unlocks once the requirement is complete enough. Pick v1\'s first decision/action; type owner, source, or KPI if known. A. Scheduling / forecast simulation B. OEE / downtime C. Material shortage',
-    assistantIntroQuality: 'Quality first. I will use the expert chain and ask one focused question at a time; Go Coding unlocks once the requirement is complete enough. Pick v1\'s first improvement; type owner, evidence, or defect source if known. A. Yield / Finished Lot B. SPC / Cpk C. IQC supplier lot',
-    assistantIntroTdi: 'TDI first. I will use the expert chain and ask one focused question at a time; Go Coding unlocks once the requirement is complete enough. Pick v1\'s first control point; type owner, SLA, or handoff source if known. A. Request intake / SLA B. Trial lot issue C. NPI handoff',
+    assistantIntro: 'Hello, I am AIPM. I will use the expert chain, ask one focused question at a time, generate documents when ready, then hand them off to Vibe Coding.',
+    assistantIntroProduction: 'Production first. I will use the expert chain and ask one focused question at a time; once the requirement is complete enough, generate documents first, then send them to Vibe Coding. Pick v1\'s first decision/action; type owner, source, or KPI if known. A. Scheduling / forecast simulation B. OEE / downtime C. Material shortage',
+    assistantIntroQuality: 'Quality first. I will use the expert chain and ask one focused question at a time; once the requirement is complete enough, generate documents first, then send them to Vibe Coding. Pick v1\'s first improvement; type owner, evidence, or defect source if known. A. Yield / Finished Lot B. SPC / Cpk C. IQC supplier lot',
+    assistantIntroTdi: 'TDI first. I will use the expert chain and ask one focused question at a time; once the requirement is complete enough, generate documents first, then send them to Vibe Coding. Pick v1\'s first control point; type owner, SLA, or handoff source if known. A. Request intake / SLA B. Trial lot issue C. NPI handoff',
     composerPlaceholder: 'Ask AIPM anything',
     composerPlaceholderProduction: 'One sentence is enough: WIP dashboard for planners; source MES/SAP; KPI output/yield.',
     composerPlaceholderQuality: 'One sentence is enough: defect disposition dashboard for QE; source QIS/MES; owner later.',
@@ -609,7 +609,7 @@ const shellCopy = {
     fastSeedAlert: 'Alert',
     fastSeedDataQuery: 'Data query',
     fastIntakeHint: 'Type your own one sentence or pick a first scope. Try to cover: business action, primary user, source of truth, integration/writeback boundary, acceptance evidence.',
-    fastStartHint: 'Send a seed to start the expert chain. Go Coding unlocks after the requirement is complete enough.',
+    fastStartHint: 'Send a seed to start the expert chain. Generate documents when ready; Go Coding sends the finished document handoff to Vibe Coding.',
     fastStartSendLabel: 'Send seed',
     fastStartGenerateLabel: 'Send & continue',
     welcomeDirectPrdV0Label: 'Start expert chain',
@@ -630,10 +630,10 @@ const shellCopy = {
     heroQuestion: 'Erzaehle mir deine Anforderungen und ich helfe dir, ein vollstaendiges Anforderungsdokument zu erstellen.',
     appSummary: 'Strukturierte Anforderungsklaerung fuer IC Substrate und operative Systeme.',
     topbarTagline: 'Strukturierte Anforderungen fuer IC Substrate, Operations und build-ready Delivery.',
-    assistantIntro: 'Hallo, ich bin AIPM. Ich nutze die Expertenkette, stelle je Runde eine fokussierte Frage und oeffne Go Coding erst, wenn die Anforderung vollstaendig genug ist.',
-    assistantIntroProduction: 'Production zuerst. Ich nutze die Expertenkette und stelle je Runde eine fokussierte Frage; Go Coding wird geoeffnet, sobald die Anforderung vollstaendig genug ist. Waehle die erste v1 Entscheidung/Aktion; Owner, Quelle oder KPI kannst du direkt ergaenzen. A. Scheduling / Forecast Simulation B. OEE / Downtime C. Material Shortage',
-    assistantIntroQuality: 'Quality zuerst. Ich nutze die Expertenkette und stelle je Runde eine fokussierte Frage; Go Coding wird geoeffnet, sobald die Anforderung vollstaendig genug ist. Waehle die erste v1 Verbesserung; Owner, Evidence oder Defect-Quelle kannst du direkt ergaenzen. A. Yield / Finished Lot B. SPC / Cpk C. IQC Supplier Lot',
-    assistantIntroTdi: 'TDI zuerst. Ich nutze die Expertenkette und stelle je Runde eine fokussierte Frage; Go Coding wird geoeffnet, sobald die Anforderung vollstaendig genug ist. Waehle den ersten v1 Kontrollpunkt; Owner, SLA oder Handoff-Quelle kannst du direkt ergaenzen. A. Request Intake / SLA B. Trial Lot Issue C. NPI Handoff',
+    assistantIntro: 'Hallo, ich bin AIPM. Ich nutze die Expertenkette, stelle je Runde eine fokussierte Frage, erzeuge Dokumente bei Reife und uebergebe sie danach an Vibe Coding.',
+    assistantIntroProduction: 'Production zuerst. Ich nutze die Expertenkette und stelle je Runde eine fokussierte Frage; bei ausreichender Anforderung zuerst Dokumente erzeugen, dann an Vibe Coding uebergeben. Waehle die erste v1 Entscheidung/Aktion; Owner, Quelle oder KPI kannst du direkt ergaenzen. A. Scheduling / Forecast Simulation B. OEE / Downtime C. Material Shortage',
+    assistantIntroQuality: 'Quality zuerst. Ich nutze die Expertenkette und stelle je Runde eine fokussierte Frage; bei ausreichender Anforderung zuerst Dokumente erzeugen, dann an Vibe Coding uebergeben. Waehle die erste v1 Verbesserung; Owner, Evidence oder Defect-Quelle kannst du direkt ergaenzen. A. Yield / Finished Lot B. SPC / Cpk C. IQC Supplier Lot',
+    assistantIntroTdi: 'TDI zuerst. Ich nutze die Expertenkette und stelle je Runde eine fokussierte Frage; bei ausreichender Anforderung zuerst Dokumente erzeugen, dann an Vibe Coding uebergeben. Waehle den ersten v1 Kontrollpunkt; Owner, SLA oder Handoff-Quelle kannst du direkt ergaenzen. A. Request Intake / SLA B. Trial Lot Issue C. NPI Handoff',
     composerPlaceholder: 'Stelle AIPM eine Frage',
     composerPlaceholderProduction: 'Ein Satz reicht: WIP-Dashboard fuer Planner; Quelle MES/SAP; KPI Output/Yield.',
     composerPlaceholderQuality: 'Ein Satz reicht: Defect-Disposition-Dashboard fuer QE; Quelle QIS/MES; Owner spaeter.',
@@ -644,7 +644,7 @@ const shellCopy = {
     fastSeedAlert: 'Alert',
     fastSeedDataQuery: 'Datenabfrage',
     fastIntakeHint: 'Schreibe einen eigenen Satz oder waehle einen ersten Scope. Decke moeglichst ab: Business Action, Primary User, Source of Truth, Integration/Writeback-Grenze, Acceptance Evidence.',
-    fastStartHint: 'Sende einen Seed, um die Expertenkette zu starten. Go Coding wird erst freigeschaltet, wenn die Anforderung vollstaendig genug ist.',
+    fastStartHint: 'Sende einen Seed, um die Expertenkette zu starten. Erst Dokumente erzeugen, danach an Vibe Coding uebergeben.',
     fastStartSendLabel: 'Seed senden',
     fastStartGenerateLabel: 'Senden & fortsetzen',
     welcomeDirectPrdV0Label: 'Expertenkette starten',
@@ -665,10 +665,10 @@ const shellCopy = {
     heroQuestion: '',
     appSummary: '面向 IC Substrate 与运营系统的结构化需求工作台。',
     topbarTagline: '面向 IC Substrate、运营场景和开发交付的结构化需求工作台。',
-    assistantIntro: '你好，我是 AIPM。我会走专家链路，每轮只问一个最关键问题；信息足够后才开放 Go Coding。',
-    assistantIntroProduction: 'Production 先走专家链路，每轮只问一个最关键问题；信息足够后才开放 Go Coding。先选首版业务动作；如果知道 owner、数据源或 KPI，也可以一行补充。A. 排产/预测 B. OEE/停机 C. 缺料风险',
-    assistantIntroQuality: 'Quality 先走专家链路，每轮只问一个最关键问题；信息足够后才开放 Go Coding。先选首版改善点；如果知道 owner、证据或缺陷来源，也可以一行补充。A. 良率/Finished Lot B. SPC/Cpk C. IQC 供应商批次',
-    assistantIntroTdi: 'TDI 先走专家链路，每轮只问一个最关键问题；信息足够后才开放 Go Coding。先选首版管控点；如果知道 owner、SLA 或交接来源，也可以一行补充。A. 需求受理/SLA B. Trial lot 异常 C. NPI 交接',
+    assistantIntro: '你好，我是 AIPM。我会走专家链路，每轮只问一个最关键问题；信息足够后先生成文档，文档 OK 后再交接到 Vibe Coding。',
+    assistantIntroProduction: 'Production 先走专家链路，每轮只问一个最关键问题；信息足够后先生成文档，文档 OK 后再交接到 Vibe Coding。先选首版业务动作；如果知道 owner、数据源或 KPI，也可以一行补充。A. 排产/预测 B. OEE/停机 C. 缺料风险',
+    assistantIntroQuality: 'Quality 先走专家链路，每轮只问一个最关键问题；信息足够后先生成文档，文档 OK 后再交接到 Vibe Coding。先选首版改善点；如果知道 owner、证据或缺陷来源，也可以一行补充。A. 良率/Finished Lot B. SPC/Cpk C. IQC 供应商批次',
+    assistantIntroTdi: 'TDI 先走专家链路，每轮只问一个最关键问题；信息足够后先生成文档，文档 OK 后再交接到 Vibe Coding。先选首版管控点；如果知道 owner、SLA 或交接来源，也可以一行补充。A. 需求受理/SLA B. Trial lot 异常 C. NPI 交接',
     composerPlaceholder: '问AIPM任何问题',
     composerPlaceholderProduction: '一句话即可：WIP/lot 状态看板；给生产 planner 用；数据源 MES/SAP。',
     composerPlaceholderQuality: '一句话即可：缺陷处置看板；给质量工程师用；数据源 QIS/MES。',
@@ -679,7 +679,7 @@ const shellCopy = {
     fastSeedAlert: '提醒',
     fastSeedDataQuery: '数据查询',
     fastIntakeHint: '可以自己写一句，也可以选首版形态；尽量覆盖：业务动作、主要用户、数据源、集成/写回边界、验收证据。',
-    fastStartHint: '发送种子后进入专家链路；系统判断信息足够后才开放 Go Coding。',
+    fastStartHint: '发送种子后进入专家链路；信息足够后先生成文档，文档 OK 后再交接到 Vibe Coding。',
     fastStartSendLabel: '发送种子',
     fastStartGenerateLabel: '发送并继续',
     welcomeDirectPrdV0Label: '开始专家链路',
@@ -699,10 +699,10 @@ const shellCopy = {
     heroQuestion: 'Beritahu keperluan anda dan saya akan bantu melengkapkan dokumen keperluan.',
     appSummary: 'Penemuan keperluan berstruktur untuk IC Substrate dan sistem operasi.',
     topbarTagline: 'Keperluan berstruktur untuk IC Substrate, operasi dan build-ready delivery.',
-    assistantIntro: 'Halo, saya AIPM. Saya guna expert chain, tanya satu soalan fokus setiap pusingan, dan buka Go Coding hanya apabila requirement cukup lengkap.',
-    assistantIntroProduction: 'Production dahulu. Saya guna expert chain dan tanya satu soalan fokus setiap pusingan; Go Coding dibuka apabila requirement cukup lengkap. Pilih keputusan/tindakan v1; tambah owner, sumber atau KPI jika tahu. A. Scheduling / forecast simulation B. OEE / downtime C. Material shortage',
-    assistantIntroQuality: 'Quality dahulu. Saya guna expert chain dan tanya satu soalan fokus setiap pusingan; Go Coding dibuka apabila requirement cukup lengkap. Pilih penambahbaikan v1; tambah owner, evidence atau sumber defect jika tahu. A. Yield / Finished Lot B. SPC / Cpk C. IQC supplier lot',
-    assistantIntroTdi: 'TDI dahulu. Saya guna expert chain dan tanya satu soalan fokus setiap pusingan; Go Coding dibuka apabila requirement cukup lengkap. Pilih titik kawalan v1; tambah owner, SLA atau sumber handoff jika tahu. A. Request intake / SLA B. Trial lot issue C. NPI handoff',
+    assistantIntro: 'Halo, saya AIPM. Saya guna expert chain, tanya satu soalan fokus setiap pusingan, jana dokumen apabila ready, kemudian handoff ke Vibe Coding.',
+    assistantIntroProduction: 'Production dahulu. Saya guna expert chain dan tanya satu soalan fokus setiap pusingan; apabila requirement cukup, jana dokumen dahulu, kemudian handoff ke Vibe Coding. Pilih keputusan/tindakan v1; tambah owner, sumber atau KPI jika tahu. A. Scheduling / forecast simulation B. OEE / downtime C. Material shortage',
+    assistantIntroQuality: 'Quality dahulu. Saya guna expert chain dan tanya satu soalan fokus setiap pusingan; apabila requirement cukup, jana dokumen dahulu, kemudian handoff ke Vibe Coding. Pilih penambahbaikan v1; tambah owner, evidence atau sumber defect jika tahu. A. Yield / Finished Lot B. SPC / Cpk C. IQC supplier lot',
+    assistantIntroTdi: 'TDI dahulu. Saya guna expert chain dan tanya satu soalan fokus setiap pusingan; apabila requirement cukup, jana dokumen dahulu, kemudian handoff ke Vibe Coding. Pilih titik kawalan v1; tambah owner, SLA atau sumber handoff jika tahu. A. Request intake / SLA B. Trial lot issue C. NPI handoff',
     composerPlaceholder: 'Tanya apa sahaja kepada AIPM',
     composerPlaceholderProduction: 'Satu ayat cukup: dashboard WIP/lot untuk planner; sumber MES/SAP; KPI output/yield.',
     composerPlaceholderQuality: 'Satu ayat cukup: dashboard defect disposition untuk QE; sumber QIS/MES; owner kemudian.',
@@ -713,7 +713,7 @@ const shellCopy = {
     fastSeedAlert: 'Alert',
     fastSeedDataQuery: 'Query data',
     fastIntakeHint: 'Tulis satu ayat sendiri atau pilih scope pertama. Cuba rangkum: business action, primary user, source of truth, integration/writeback boundary, acceptance evidence.',
-    fastStartHint: 'Hantar seed untuk mula expert chain. Go Coding dibuka selepas requirement cukup lengkap.',
+    fastStartHint: 'Hantar seed untuk mula expert chain. Jana dokumen dahulu, kemudian handoff ke Vibe Coding.',
     fastStartSendLabel: 'Hantar seed',
     fastStartGenerateLabel: 'Hantar & teruskan',
     welcomeDirectPrdV0Label: 'Mula expert chain',
@@ -829,15 +829,15 @@ function icSubstrateDepartmentRouteLabel(department: string): string {
 function fastStartHintForDepartment(department: string): string {
   const label = icSubstrateDepartmentRouteLabel(department)
   if (currentLanguage.value === 'zh') {
-    return `${label} 专家链路：发送种子后继续一问一答；信息足够后才开放 Go Coding。`
+    return `${label} 专家链路：发送种子后继续一问一答；信息足够后先生成文档，文档 OK 后再交接到 Vibe Coding。`
   }
   if (currentLanguage.value === 'de') {
-    return `${label}-Expertenkette: Seed senden und fokussiert weiterklaeren; Go Coding wird erst bei ausreichender Information freigeschaltet.`
+    return `${label}-Expertenkette: Seed senden und fokussiert weiterklaeren; zuerst Dokumente erzeugen, dann an Vibe Coding uebergeben.`
   }
   if (currentLanguage.value === 'ms') {
-    return `Expert chain ${label}: hantar seed dan teruskan soalan fokus; Go Coding dibuka hanya apabila maklumat cukup.`
+    return `Expert chain ${label}: hantar seed dan teruskan soalan fokus; jana dokumen dahulu, kemudian handoff ke Vibe Coding.`
   }
-  return `${label} expert chain: send a seed, continue the focused interview, and unlock Go Coding only when enough information is collected.`
+  return `${label} expert chain: send a seed, continue the focused interview, generate documents when ready, then hand them off to Vibe Coding.`
 }
 
 const activeSessionSummary = computed(() => sessions.value.find((item) => item.session_id === sessionId.value) || null)
@@ -883,7 +883,17 @@ const composerFastSeedOptions = computed<FastSeedOption[]>(() => {
 })
 const latestPrdDocument = computed(() => findLatestDocumentMessage('prd_doc'))
 const latestDesignDocument = computed(() => findLatestDocumentMessage('design_doc'))
-const canOpenGoCoding = computed(() => hasSession.value && structuredRequirementProgress.value.readyToGenerate)
+const pmMethodologyReadyForHandoff = computed(() =>
+  !pmMethodologyState.value.checks.length || pmMethodologyState.value.ready_for_pm_review,
+)
+const canGenerateDocumentsForCurrentState = computed(() =>
+  structuredRequirementProgress.value.readyToGenerate && pmMethodologyReadyForHandoff.value,
+)
+const canOpenGoCoding = computed(() =>
+  hasSession.value &&
+  canGenerateDocumentsForCurrentState.value &&
+  Boolean(latestPrdDocument.value),
+)
 type ConversationGoalStepKey = 'seed' | 'interview' | 'handoff'
 const conversationGoalVisible = computed(() =>
   hasSession.value &&
@@ -901,79 +911,87 @@ const conversationGoalCurrentStep = computed<ConversationGoalStepKey>(() => {
 const conversationGoalCopy = computed(() => {
   if (currentLanguage.value === 'zh') {
     return {
-      target: 'Go Coding 信息充分度',
-      summary: '通过专家链路把需求补到可生成文档、可交接 Go Coding 的程度。',
-      assumptionNote: '每轮只补一个关键缺口；信息足够后才开放 Go Coding。',
+      target: '文档交接准备度',
+      summary: '通过专家链路把需求补到可生成文档、可交接 Vibe Coding 的程度。',
+      assumptionNote: '每轮只补一个关键缺口；信息足够后先生成文档，文档 OK 后再交接。',
       now: '当前',
       steps: {
         seed: '发送一句话种子',
         interview: '专家访谈补齐',
-        handoff: '打开 Vibe Coding',
+        handoff: '交接 Vibe Coding',
       },
     }
   }
   if (currentLanguage.value === 'de') {
     return {
-      target: 'Go Coding readiness',
+      target: 'Document handoff readiness',
       summary: 'Eine vage Idee ueber die Expertenkette bis zur dokumentierbaren Go-Coding-Uebergabe klaeren.',
-      assumptionNote: 'Pro Runde eine zentrale Luecke; Go Coding erst bei ausreichender Information.',
+      assumptionNote: 'Pro Runde eine zentrale Luecke; zuerst Dokumente erzeugen, danach uebergeben.',
       now: 'Jetzt',
       steps: {
         seed: 'Ein-Satz-Seed senden',
         interview: 'Experteninterview',
-        handoff: 'Vibe Coding oeffnen',
+        handoff: 'Go Coding',
       },
     }
   }
   if (currentLanguage.value === 'ms') {
     return {
-      target: 'Go Coding readiness',
+      target: 'Document handoff readiness',
       summary: 'Gunakan expert chain untuk melengkapkan requirement sehingga sedia untuk dokumen dan Go Coding.',
-      assumptionNote: 'Setiap pusingan tutup satu gap penting; Go Coding hanya apabila maklumat cukup.',
+      assumptionNote: 'Setiap pusingan tutup satu gap penting; jana dokumen dahulu, kemudian handoff.',
       now: 'Sekarang',
       steps: {
         seed: 'Hantar seed satu ayat',
         interview: 'Interview pakar',
-        handoff: 'Buka Vibe Coding',
+        handoff: 'Go Coding',
       },
     }
   }
   return {
-    target: 'Go Coding readiness',
+    target: 'Document handoff readiness',
     summary: 'Use the expert chain to collect enough requirements for documents and Go Coding handoff.',
-    assumptionNote: 'Close one key gap per round; Go Coding unlocks only when enough information is collected.',
+    assumptionNote: 'Close one key gap per round; generate documents first, then hand them off.',
     now: 'Now',
     steps: {
       seed: 'Send the one-sentence seed',
       interview: 'Expert interview',
-      handoff: 'Open Vibe Coding',
+      handoff: 'Go Coding',
     },
   }
 })
 const conversationGoalStatusNote = computed(() => {
   if (conversationGoalCurrentStep.value === 'interview') {
     if (currentLanguage.value === 'zh') {
-      return '继续专家链路：系统会判断缺口是否足够少，满足后才开放 Go Coding。'
+      return '继续专家链路：系统会判断缺口是否足够少，满足后先生成文档。'
     }
     if (currentLanguage.value === 'de') {
-      return 'Expertenkette fortsetzen: Go Coding wird erst freigeschaltet, wenn die groessten Luecken geschlossen sind.'
+      return 'Expertenkette fortsetzen: Nach dem Schliessen der groessten Luecken zuerst Dokumente erzeugen.'
     }
     if (currentLanguage.value === 'ms') {
-      return 'Teruskan expert chain: Go Coding dibuka hanya selepas gap utama cukup ditutup.'
+      return 'Teruskan expert chain: selepas gap utama ditutup, jana dokumen dahulu.'
     }
-    return 'Continue the expert chain: Go Coding unlocks once the largest gaps are closed.'
+    return 'Continue the expert chain: generate documents once the largest gaps are closed.'
   }
   if (conversationGoalCurrentStep.value === 'handoff') {
     if (currentLanguage.value === 'zh') {
-      return '需求信息已足够：可以生成文档并打开 Vibe Coding。'
+      return latestPrdDocument.value
+        ? '文档已生成：可以交接到 Vibe Coding。'
+        : '需求信息已足够：请先生成文档，文档 OK 后再交接到 Vibe Coding。'
     }
     if (currentLanguage.value === 'de') {
-      return 'Die Anforderung ist ausreichend: Dokumente erzeugen und Vibe Coding oeffnen.'
+      return latestPrdDocument.value
+        ? 'Dokumente sind erzeugt: Uebergabe an Vibe Coding ist moeglich.'
+        : 'Die Anforderung ist ausreichend: zuerst Dokumente erzeugen, danach an Vibe Coding uebergeben.'
     }
     if (currentLanguage.value === 'ms') {
-      return 'Requirement sudah cukup: jana dokumen dan buka Vibe Coding.'
+      return latestPrdDocument.value
+        ? 'Dokumen sudah dijana: boleh handoff ke Vibe Coding.'
+        : 'Requirement sudah cukup: jana dokumen dahulu, kemudian handoff ke Vibe Coding.'
     }
-    return 'Requirements are ready: generate documents and open Vibe Coding.'
+    return latestPrdDocument.value
+      ? 'Documents are generated: you can hand them off to Vibe Coding.'
+      : 'Requirements are ready: generate documents first, then hand them off to Vibe Coding.'
   }
   return conversationGoalCopy.value.assumptionNote
 })
@@ -994,37 +1012,41 @@ const conversationGoalSteps = computed(() =>
 const showProcessRail = computed(() => false)
 const composerGoCodingReadyCta = computed(() => canOpenGoCoding.value)
 const composerGoCodingHelpText = computed(() => {
-  if (!canOpenGoCoding.value) {
+  if (!structuredRequirementProgress.value.readyToGenerate) {
     const blockers = structuredRequirementProgress.value.blockingQuestionCount
     if (currentLanguage.value === 'zh') {
-      return `文档已生成，但右侧仍有 ${blockers} 个 open/pending questions；全部确认后才开放 Vibe Coding。`
+      return `需求信息还不够稳定；右侧仍有 ${blockers} 个 open/pending questions。先补齐关键缺口，再生成文档。`
     }
     if (currentLanguage.value === 'de') {
-      return `Dokumente sind erzeugt, aber rechts bleiben ${blockers} Open/Pending Questions; Vibe Coding wird erst nach vollstaendiger Bestaetigung geoeffnet.`
+      return `Die Anforderung ist noch nicht stabil genug; rechts bleiben ${blockers} Open/Pending Questions. Klaere zuerst die groessten Luecken, dann Dokumente erzeugen.`
     }
     if (currentLanguage.value === 'ms') {
-      return `Dokumen sudah dijana, tetapi masih ada ${blockers} open/pending questions di kanan; Vibe Coding hanya dibuka selepas semua disahkan.`
+      return `Requirement belum cukup stabil; masih ada ${blockers} open/pending questions. Tutup gap utama dahulu, kemudian jana dokumen.`
     }
-    return `Documents exist, but ${blockers} open/pending questions remain on the right; Vibe Coding unlocks only after everything is confirmed.`
+    return `Requirements are not stable enough yet; ${blockers} open/pending questions remain. Close the key gaps first, then generate documents.`
+  }
+  if (!latestPrdDocument.value) {
+    if (currentLanguage.value === 'zh') {
+      return '需求信息已足够；请先生成并确认需求文档，Go Coding 会把这份文档交接给 Vibe Coding 平台。'
+    }
+    if (currentLanguage.value === 'de') {
+      return 'Die Anforderung reicht aus; erzeugen und pruefen Sie zuerst das Requirement-Dokument. Go Coding uebergibt dieses Dokument an Vibe Coding.'
+    }
+    if (currentLanguage.value === 'ms') {
+      return 'Requirement sudah cukup; jana dan semak dokumen dahulu. Go Coding akan handoff dokumen itu ke Vibe Coding.'
+    }
+    return 'Requirements are ready; generate and review the requirement document first. Go Coding sends that document handoff to Vibe Coding.'
   }
   if (currentLanguage.value === 'zh') {
-    return latestDesignDocument.value
-      ? '文档已准备好，含 Handoff Packet 和 IT 评审清单，可作为单向交接包发给 Vibe Coding；AIPM 不会自动收到实现结果。'
-      : '信息已足够；点击后会先生成需求文档与交接清单，再打开 Vibe Coding。'
+    return '文档已准备好，可作为单向交接包发给 Vibe Coding；AIPM 不会自动收到实现结果。'
   }
   if (currentLanguage.value === 'de') {
-    return latestDesignDocument.value
-      ? 'Die Dokumente sind mit Handoff Packet und IT-Review-Checkliste als einseitiges Paket fuer Vibe Coding bereit; AIPM erhaelt keinen Build-Status automatisch.'
-      : 'Die Information reicht aus; AIPM erzeugt zuerst Dokumente und Handoff-Checkliste, dann wird Vibe Coding geoeffnet.'
+    return 'Die Dokumente sind als einseitiges Paket fuer Vibe Coding bereit; AIPM erhaelt keinen Build-Status automatisch.'
   }
   if (currentLanguage.value === 'ms') {
-    return latestDesignDocument.value
-      ? 'Dokumen sedia sebagai paket sehala untuk Vibe Coding bersama Handoff Packet dan senarai semakan IT; AIPM tidak terima status build automatik.'
-      : 'Maklumat sudah cukup; AIPM jana dokumen dan senarai semak handoff dahulu, kemudian buka Vibe Coding.'
+    return 'Dokumen sedia sebagai paket sehala untuk Vibe Coding; AIPM tidak terima status build automatik.'
   }
-  return latestDesignDocument.value
-    ? 'Documents are ready as a one-way Vibe Coding handoff with the Handoff Packet and IT review checklist; AIPM will not receive build status automatically.'
-    : 'Enough information has been collected; AIPM will generate the documents and handoff checklist before opening Vibe Coding.'
+  return 'Documents are ready as a one-way Vibe Coding handoff; AIPM will not receive build status automatically.'
 })
 const composerGoCodingButtonLabel = computed(() => {
   if (openingGoCoding.value) {
@@ -1033,10 +1055,7 @@ const composerGoCodingButtonLabel = computed(() => {
     if (currentLanguage.value === 'ms') return 'Membuka...'
     return 'Opening...'
   }
-  if (currentLanguage.value === 'zh') return '打开 Vibe Coding'
-  if (currentLanguage.value === 'de') return 'Vibe Coding oeffnen'
-  if (currentLanguage.value === 'ms') return 'Buka Vibe Coding'
-  return 'Open Vibe Coding'
+  return 'Go Coding'
 })
 const conversationGoalActionLabel = computed(() => {
   if (conversationGoalCurrentStep.value === 'handoff') {
@@ -1057,16 +1076,45 @@ const conversationGoalActionDisabled = computed(() => {
   return true
 })
 function goCodingNotReadyMessage(): string {
+  if (
+    structuredRequirementProgress.value.readyToGenerate &&
+    latestPrdDocument.value &&
+    !pmMethodologyReadyForHandoff.value
+  ) {
+    const missingCount = pmMethodologyState.value.missing_evidence.length
+    if (currentLanguage.value === 'zh') {
+      return `Go Coding 还不能交接：PM Methodology 仍有 ${missingCount || '若干'} 个缺口。请先补齐右侧 Missing/Partial 项，再交接到 Vibe Coding。`
+    }
+    if (currentLanguage.value === 'de') {
+      return `Go Coding ist noch blockiert: In der PM Methodology bleiben ${missingCount || 'einige'} Luecken. Bitte zuerst die Missing/Partial-Punkte rechts schliessen.`
+    }
+    if (currentLanguage.value === 'ms') {
+      return `Go Coding masih belum boleh handoff: PM Methodology ada ${missingCount || 'beberapa'} gap. Tutup item Missing/Partial di panel kanan dahulu.`
+    }
+    return `Go Coding is still blocked: PM Methodology has ${missingCount || 'some'} remaining gaps. Close the Missing/Partial items in the right panel first.`
+  }
+  if (structuredRequirementProgress.value.readyToGenerate && !latestPrdDocument.value) {
+    if (currentLanguage.value === 'zh') {
+      return 'Go Coding 需要先有生成完成的需求文档。请先点击“生成文档”，确认文档 OK 后再交接到 Vibe Coding。'
+    }
+    if (currentLanguage.value === 'de') {
+      return 'Go Coding braucht zuerst ein erzeugtes Requirement-Dokument. Bitte zuerst Dokumente erzeugen und pruefen, danach an Vibe Coding uebergeben.'
+    }
+    if (currentLanguage.value === 'ms') {
+      return 'Go Coding memerlukan dokumen requirement yang sudah dijana. Jana dan semak dokumen dahulu, kemudian handoff ke Vibe Coding.'
+    }
+    return 'Go Coding requires a generated requirement document first. Generate and review the document, then hand it off to Vibe Coding.'
+  }
   if (currentLanguage.value === 'zh') {
-    return '还需要补齐核心需求信息；请继续回答专家链路问题，信息足够后才能打开 Vibe Coding。'
+    return '还需要补齐核心需求信息；请继续回答专家链路问题，信息足够后先生成文档。'
   }
   if (currentLanguage.value === 'de') {
-    return 'Es fehlen noch zentrale Anforderungsinformationen. Bitte beantworte die Expertenfrage weiter; Go Coding wird erst bei ausreichender Information geoeffnet.'
+    return 'Es fehlen noch zentrale Anforderungsinformationen. Bitte beantworte die Expertenfrage weiter; danach zuerst Dokumente erzeugen.'
   }
   if (currentLanguage.value === 'ms') {
-    return 'Maklumat requirement utama masih belum cukup. Sila terus jawab soalan expert chain; Go Coding dibuka selepas maklumat mencukupi.'
+    return 'Maklumat requirement utama masih belum cukup. Sila terus jawab soalan expert chain; kemudian jana dokumen dahulu.'
   }
-  return 'Core requirement information is still missing. Continue the expert-chain interview; Go Coding unlocks once enough information is collected.'
+  return 'Core requirement information is still missing. Continue the expert-chain interview, then generate documents first.'
 }
 const selectedBusinessTemplate = computed<BusinessTemplateDetail | null>(() => {
   const templateId = selectedBusinessTemplateId.value
@@ -1241,10 +1289,10 @@ const fastDiscoveryRoundCurrent = computed(() =>
 const fastDiscoveryRoundLabel = computed(() => {
   const round = fastDiscoveryRoundCurrent.value
   if (structuredRequirementProgress.value.readyToGenerate) {
-    if (currentLanguage.value === 'zh') return 'Go Coding ready'
-    if (currentLanguage.value === 'de') return 'Go Coding bereit'
-    if (currentLanguage.value === 'ms') return 'Go Coding ready'
-    return 'Go Coding ready'
+    if (currentLanguage.value === 'zh') return latestPrdDocument.value ? '可交接 Vibe Coding' : '文档可生成'
+    if (currentLanguage.value === 'de') return latestPrdDocument.value ? 'Handoff bereit' : 'Dokument bereit'
+    if (currentLanguage.value === 'ms') return latestPrdDocument.value ? 'Handoff ready' : 'Dokumen ready'
+    return latestPrdDocument.value ? 'Handoff ready' : 'Documents ready'
   }
   if (currentLanguage.value === 'zh') {
     return round === 1 ? `访谈 ${FAST_PRD_DISCOVERY_FIRST_ROUND_LABEL}` : `访谈 ${FAST_PRD_DISCOVERY_FINAL_ROUND_LABEL}`
@@ -1863,6 +1911,7 @@ function formatTemplateTag(value: string): string {
 }
 
 function resetStructuredRequirementState() {
+  clearStructuredRequirementRefreshTimer()
   structuredRequirementModel.value = createEmptyStructuredRequirementModel()
   conversationChainState.value = createEmptyConversationChainState()
   pmMethodologyState.value = createEmptyPMMethodologyState()
@@ -1945,6 +1994,25 @@ function completeMessagePipeline(state: { replyReleased: boolean; syncStarted: b
 
 function shouldRefreshStructuredRequirement(syncStatus?: string): boolean {
   return syncStatus === 'stale' || syncStatus === 'missing'
+}
+
+function clearStructuredRequirementRefreshTimer() {
+  if (structuredRequirementRefreshTimer === null) {
+    return
+  }
+  window.clearTimeout(structuredRequirementRefreshTimer)
+  structuredRequirementRefreshTimer = null
+}
+
+function scheduleStructuredRequirementRefresh(targetSessionId: string) {
+  clearStructuredRequirementRefreshTimer()
+  structuredRequirementRefreshTimer = window.setTimeout(() => {
+    structuredRequirementRefreshTimer = null
+    if (sessionId.value !== targetSessionId) {
+      return
+    }
+    void loadStructuredRequirement(targetSessionId, { background: true })
+  }, 2500)
 }
 
 function sessionTitle(rawTitle: string): string {
@@ -2261,13 +2329,6 @@ async function openGoCodingWhenReady(): Promise<boolean> {
     await loadStructuredRequirement(sessionId.value, { background: false })
     await nextTick()
   }
-  if (!latestPrdDocument.value && structuredRequirementProgress.value.readyToGenerate && sessionId.value) {
-    const generated = await generateDocuments({ skipReadinessConfirm: true, refreshBeforeGate: false })
-    await nextTick()
-    if (!generated) {
-      return false
-    }
-  }
   if (!canOpenGoCoding.value && sessionId.value) {
     await syncCurrentSessionDetail(sessionId.value)
     await nextTick()
@@ -2311,16 +2372,29 @@ async function ensureBusinessTemplateDetail(templateId: string): Promise<Busines
 
 function buildDocumentGenerationConfirmMessage(): string {
   const progress = structuredRequirementProgress.value
+  if (structuredRequirementProgress.value.readyToGenerate && !pmMethodologyReadyForHandoff.value) {
+    const missingCount = pmMethodologyState.value.missing_evidence.length
+    if (currentLanguage.value === 'zh') {
+      return `需求模型已经足够，但 PM Methodology 还没 ready：仍有 ${missingCount || '若干'} 个 Missing/Partial 缺口。请先补齐右侧 PM Methodology，再生成正式文档和 Go Coding 交接。`
+    }
+    if (currentLanguage.value === 'de') {
+      return `Das Requirement-Modell ist ausreichend, aber die PM Methodology ist noch nicht bereit: ${missingCount || 'einige'} Missing/Partial-Luecken bleiben. Bitte zuerst die rechte PM-Methodology-Liste schliessen.`
+    }
+    if (currentLanguage.value === 'ms') {
+      return `Model requirement sudah cukup, tetapi PM Methodology belum ready: masih ada ${missingCount || 'beberapa'} gap Missing/Partial. Tutup item PM Methodology di panel kanan dahulu.`
+    }
+    return `The requirement model is ready, but PM Methodology is not: ${missingCount || 'some'} Missing/Partial gaps remain. Close the right-panel PM Methodology items before generating final documents or Go Coding handoff.`
+  }
   if (currentLanguage.value === 'zh') {
-    return `当前文档就绪度为 ${progress.readinessPercentage}%，收集覆盖率为 ${progress.collectionCoveragePercentage}%，确认完成度为 ${progress.confirmationPercentage}%。生成文档和 Go Coding 需要右侧所有结构化项全部确认，且没有 open questions 或 pending questions；当前还有 ${progress.blockingQuestionCount} 个待确认问题。请先补齐右侧关键待确认项。`
+    return `当前文档就绪度为 ${progress.readinessPercentage}%，收集覆盖率为 ${progress.collectionCoveragePercentage}%，确认完成度为 ${progress.confirmationPercentage}%。生成文档需要无冲突、覆盖率至少 75%、确认完成度至少 40%；Go Coding 只能在文档生成并确认 OK 后交接到 Vibe Coding。请先补齐右侧关键缺口。`
   }
   if (currentLanguage.value === 'de') {
-    return `Die Dokumentreife liegt bei ${progress.readinessPercentage}%, die Erfassungsquote bei ${progress.collectionCoveragePercentage}% und der Bestaetigungsstand bei ${progress.confirmationPercentage}%. Dokumenterzeugung und Go Coding brauchen alle Strukturpunkte bestaetigt und keine Open Questions oder Pending Questions; aktuell bleiben ${progress.blockingQuestionCount} offene Punkte. Bitte zuerst die kritischen offenen Punkte klaeren.`
+    return `Die Dokumentreife liegt bei ${progress.readinessPercentage}%, die Erfassungsquote bei ${progress.collectionCoveragePercentage}% und der Bestaetigungsstand bei ${progress.confirmationPercentage}%. Dokumenterzeugung braucht keine Konflikte, mindestens 75% Abdeckung und mindestens 40% Bestaetigung; Go Coding uebergibt erst nach erzeugtem und geprueftem Dokument an Vibe Coding. Bitte zuerst die groessten Luecken klaeren.`
   }
   if (currentLanguage.value === 'ms') {
-    return `Kesediaan dokumen kini ${progress.readinessPercentage}%, liputan kutipan ${progress.collectionCoveragePercentage}% dan kemajuan pengesahan ${progress.confirmationPercentage}%. Penjanaan dokumen dan Go Coding memerlukan semua item struktur disahkan dan tiada open questions atau pending questions; kini masih ada ${progress.blockingQuestionCount} item belum selesai. Sila sahkan item kritikal dahulu.`
+    return `Kesediaan dokumen kini ${progress.readinessPercentage}%, liputan kutipan ${progress.collectionCoveragePercentage}% dan kemajuan pengesahan ${progress.confirmationPercentage}%. Penjanaan dokumen perlukan tiada konflik, liputan sekurang-kurangnya 75% dan pengesahan sekurang-kurangnya 40%; Go Coding hanya handoff ke Vibe Coding selepas dokumen dijana dan OK. Sila tutup gap utama dahulu.`
   }
-  return `Document readiness is ${progress.readinessPercentage}%, collection coverage is ${progress.collectionCoveragePercentage}%, and confirmation progress is ${progress.confirmationPercentage}%. Document generation and Go Coding require every structured item to be confirmed with no open questions or pending questions; ${progress.blockingQuestionCount} blocking questions remain. Please resolve the key pending items first.`
+  return `Document readiness is ${progress.readinessPercentage}%, collection coverage is ${progress.collectionCoveragePercentage}%, and confirmation progress is ${progress.confirmationPercentage}%. Document generation requires no conflicts, at least 75% coverage, and at least 40% confirmation; Go Coding only hands off to Vibe Coding after the document has been generated and reviewed. Please resolve the key gaps first.`
 }
 
 function resolveDocumentGenerationConfirm(confirmed: boolean) {
@@ -2361,10 +2435,12 @@ async function loadStructuredRequirement(
     return
   }
 
+  if (!options.background) {
+    clearStructuredRequirementRefreshTimer()
+  }
   const requestToken = ++structuredRequirementRequestToken
   structuredRequirementError.value = ''
-  const useBackgroundSync =
-    Boolean(options.background) || hasStructuredRequirementContent(structuredRequirementModel.value)
+  const useBackgroundSync = Boolean(options.background)
 
   if (useBackgroundSync) {
     beginStructuredRequirementSync()
@@ -2373,13 +2449,22 @@ async function loadStructuredRequirement(
   }
 
   try {
+    const params = new URLSearchParams({ language: currentLanguage.value })
+    if (useBackgroundSync) {
+      params.set('background', '1')
+    }
     const data = await apiJson<StructuredRequirementResponse>(
-      `/api/sessions/${targetSessionId}/structured-requirement?language=${encodeURIComponent(currentLanguage.value)}`,
+      `/api/sessions/${targetSessionId}/structured-requirement?${params.toString()}`,
     )
     if (requestToken !== structuredRequirementRequestToken || sessionId.value !== targetSessionId) {
       return
     }
     applyStructuredRequirementPayload(data)
+    if (useBackgroundSync && shouldRefreshStructuredRequirement(data.structured_requirement_sync_status)) {
+      scheduleStructuredRequirementRefresh(targetSessionId)
+    } else if (!shouldRefreshStructuredRequirement(data.structured_requirement_sync_status)) {
+      clearStructuredRequirementRefreshTimer()
+    }
   } catch (error) {
     if (requestToken !== structuredRequirementRequestToken || sessionId.value !== targetSessionId) {
       return
@@ -3291,6 +3376,12 @@ function createSmoothWriter(target: ChatMessage) {
       pending += chunk
       scheduleFlush()
     },
+    reset(content: string) {
+      pending = ''
+      target.content = content
+      scheduled = false
+      scrollToBottom()
+    },
     async finish() {
       flush()
       scrollToBottom()
@@ -3305,7 +3396,8 @@ async function sendMessageStream(
   language: LanguageCode = 'zh',
   pipelineState?: { replyReleased: boolean; syncStarted: boolean },
   displayMessage?: string,
-) {
+): Promise<{ receivedSummary: boolean }> {
+  let receivedSummary = false
   const response = await fetch(apiUrl(`/api/sessions/${session}/messages/stream`), {
     method: 'POST',
     headers: {
@@ -3356,6 +3448,10 @@ async function sendMessageStream(
         writer.push(payload.delta)
       }
 
+      if (parsed.event === 'replace_content' && typeof payload.content === 'string') {
+        writer.reset(payload.content)
+      }
+
       if (parsed.event === 'thinking' && typeof payload.delta === 'string') {
         assistantMessage.thinking = (assistantMessage.thinking || '') + payload.delta
         scrollToBottom()
@@ -3377,6 +3473,7 @@ async function sendMessageStream(
 
       if (parsed.event === 'summary') {
         applyStructuredRequirementPayload(payload)
+        receivedSummary = true
         if (pipelineState) {
           finishMessageSyncPhase(pipelineState)
         }
@@ -3385,6 +3482,7 @@ async function sendMessageStream(
   }
 
   await writer.finish()
+  return { receivedSummary }
 }
 
 async function sendMessageFallback(
@@ -3731,15 +3829,17 @@ function isImmediateVibeCodingOpenText(text: string): boolean {
   if (!normalized) {
     return false
   }
+  if (/(打开|进入|交接|发送|传到|传给|推送到|转到)\s*(vibe coding|go coding)/i.test(text)) {
+    return true
+  }
+  if (/\b(open|proceed|move|send|handoff|transfer)\b[\s\S]{0,24}\b(vibe coding|go coding)\b/i.test(normalized)) {
+    return true
+  }
   return (
-    normalized.includes('go coding') ||
     normalized.includes('open vibe coding now') ||
-    normalized.includes('open vibe coding') ||
     normalized.includes('vibe coding oeffnen') ||
     normalized.includes('vibe coding öffnen') ||
-    normalized.includes('buka vibe coding') ||
-    normalized.includes('打开 vibe coding') ||
-    normalized.includes('直接打开 vibe coding')
+    normalized.includes('buka vibe coding')
   )
 }
 
@@ -3950,7 +4050,7 @@ async function sendMessage(forceGeneratePrdV0AfterSend: boolean | Event = false)
   scrollToBottom()
 
   try {
-    await sendMessageStream(
+    const streamResult = await sendMessageStream(
       sessionId.value,
       message,
       assistantMessage,
@@ -3968,7 +4068,13 @@ async function sendMessage(forceGeneratePrdV0AfterSend: boolean | Event = false)
     }
 
     await refreshHistory()
-    void loadStructuredRequirement(sessionId.value, { background: true })
+    // Only fetch structured requirement separately if the stream did NOT
+    // already deliver a summary event with fresh right-panel data.
+    // When the stream includes a summary event, calling loadStructuredRequirement
+    // would race and overwrite the fresh data with a stale cache snapshot.
+    if (!streamResult.receivedSummary) {
+      void loadStructuredRequirement(sessionId.value, { background: true })
+    }
     sentSuccessfully = true
   } catch (error) {
     messages.value = messages.value.filter(
@@ -4000,12 +4106,12 @@ async function generateDocuments(_options: GenerateDocumentsOptions = {}) {
     return false
   }
 
-  if (_options.refreshBeforeGate && !structuredRequirementProgress.value.readyToGenerate && sessionId.value) {
+  if (_options.refreshBeforeGate && !canGenerateDocumentsForCurrentState.value && sessionId.value) {
     await loadStructuredRequirement(sessionId.value, { background: false })
     await nextTick()
   }
 
-  const generateFinalDocuments = structuredRequirementProgress.value.readyToGenerate
+  const generateFinalDocuments = canGenerateDocumentsForCurrentState.value
   if (!generateFinalDocuments) {
     globalError.value = buildDocumentGenerationConfirmMessage()
     return false

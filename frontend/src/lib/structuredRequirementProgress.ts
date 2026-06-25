@@ -100,14 +100,10 @@ export function computeStructuredRequirementProgress(
   } else if (pendingConfirmationCount > 0 || blockingQuestionCount > 0) {
     readinessPercentage = Math.min(readinessPercentage, 94)
   }
-  // Reachable gate (kept in sync with backend _structured_requirement_progress):
-  // no conflict + strong coverage + a meaningful share confirmed. The AI converges
-  // to "ready to generate" on this same basis, so the button must not demand 100%.
-  const readyToGenerate =
-    totalCount > 0 &&
-    conflictCount === 0 &&
-    collectionCoveragePercentage >= 75 &&
-    confirmationPercentage >= 40
+  // Formal-document gate (kept in sync with backend _structured_requirement_progress):
+  // every structured requirement item must be confirmed. Pending fields should
+  // keep the interview going instead of producing a PRD V0/draft handoff.
+  const readyToGenerate = fullyConfirmed
 
   return {
     totalCount,

@@ -89,7 +89,7 @@ Code output boundary:
 
 Document output boundary:
 - Do not hand-write or paste a full PRD/URD/requirements document in the conversation (no full multi-section numbered document). The formal document is produced by a separate pipeline when the user clicks the Generate Document button — never author it inline in chat.
-- When key information is sufficient, say in one or two sentences that requirements are ready and the user can click Generate Document or proceed to Go Coding; keep remaining unknowns as assumptions instead of expanding into a long inline document.
+- When key information is sufficient, say in one or two sentences that requirements are ready and the user can click Generate Document. Go Coding means sending the generated/approved document handoff to the Vibe Coding platform after the document exists; never offer to skip the document or go directly to coding.
 
 Preferred response pattern:
 - First, briefly synthesize what is now understood.
@@ -166,7 +166,7 @@ PM_SYSTEM_PROMPT_ZH = """你是一位资深且方法论扎实的产品经理，�
 
 文档输出边界：
 - 不要在对话里手写或粘贴完整的 PRD/URD/需求文档（不要输出带编号章节的整份文档）。正式文档由用户点击"生成文档"按钮经独立流程产出，不在聊天里生成。
-- 当关键信息足够时，只用一两句话说明"需求已足够，可点击生成文档或进入 Go Coding"，把剩余未确认项留作假设，不要在聊天里展开成长文档。
+- 当关键信息足够时，只用一两句话说明"需求已足够，可以点击生成文档"；Go Coding 的含义是文档生成/确认 OK 后，把文档交接给 Vibe Coding 平台。不要提供"跳过文档直接 Go Coding/直接编码"的选项。
 
 建议的回答结构：
 - 先用一句话概括当前已明确的关键信息
@@ -1227,17 +1227,29 @@ class RequirementCollectorService:
         if not self._session_has_user_messages(session):
             self._update_session_title_from_message(session_id, display_message or user_message, response_language)
         session = self._require_session(session_id)
-
+        # Build the structured model from the latest turn first, so the readiness-state
+        # directive injected into the prompt reflects the current gate state. The LLM drives
+        # the conversation; the directive constrains it up front and the guard backstops it.
+        self._build_and_cache_structured_requirement_model(
+            session,
+            response_language,
+            force_refresh=True,
+        )
         system_prompt = self._pm_prompt(session, response_language)
         llm_messages = self._build_llm_messages(system_prompt, session.messages)
         assistant_text_raw = self.llm_client.chat(llm_messages)
         assistant_text, thinking_text = self._split_thinking(assistant_text_raw)
         assistant_text = self._ensure_choice_question_format(assistant_text, response_language)
+        assistant_text = self._guard_assistant_readiness_response(
+            session_id,
+            assistant_text,
+            response_language,
+        )
 
         self._append_message(session_id, "assistant", assistant_text, thinking_text)
         session = self._require_session(session_id)
 
-        structured_requirement_model = self._build_and_cache_structured_requirement_model(session, response_language)
+        structured_requirement_model = self._promote_cached_structured_requirement_model(session, response_language)
         conversation_chain_state = self.build_conversation_chain_state(
             session,
             structured_requirement_model,
@@ -1281,10 +1293,17 @@ class RequirementCollectorService:
         if not self._session_has_user_messages(session):
             self._update_session_title_from_message(session_id, display_message or user_message, response_language)
         session = self._require_session(session_id)
+        # Build the structured model from the latest turn first, so the readiness-state
+        # directive injected into the prompt reflects the current gate state. The LLM drives
+        # the conversation; the directive constrains it up front and the guard backstops it.
+        self._build_and_cache_structured_requirement_model(
+            session,
+            response_language,
+            force_refresh=True,
+        )
 
         assistant_text_parts: list[str] = []
         thinking_parts: list[str] = []
-
         system_prompt = self._pm_prompt(session, response_language)
         llm_messages = self._build_llm_messages(system_prompt, session.messages)
         for item in self.llm_client.stream_chat(llm_messages):
@@ -1317,17 +1336,53 @@ class RequirementCollectorService:
             yield {"event": "content", "delta": assistant_delta}
             assistant_text = formatted_assistant_text
 
+        guarded_assistant_text = self._guard_assistant_readiness_response(
+            session_id,
+            assistant_text,
+            response_language,
+        )
+        if guarded_assistant_text != assistant_text:
+            yield {"event": "replace_content", "content": guarded_assistant_text}
+            assistant_text = guarded_assistant_text
+
         self._append_message(session_id, "assistant", assistant_text, thinking_text)
         session = self._require_session(session_id)
 
         if thinking_text:
             yield {"event": "thinking_done", "thinking": thinking_text}
         yield {"event": "assistant_done", "session_id": session.id, "message_count": len(session.messages)}
+
+        structured_requirement_model = self._promote_cached_structured_requirement_model(session, response_language)
+        conversation_chain_state = self.build_conversation_chain_state(
+            session,
+            structured_requirement_model,
+            response_language,
+        )
+        pm_methodology_state = self.build_pm_methodology_state(
+            structured_requirement_model,
+            response_language,
+        )
+        ic_substrate_evidence_state = self.build_ic_substrate_evidence_state(
+            session,
+            structured_requirement_model,
+            response_language,
+        )
+        yield {
+            "event": "summary",
+            "session_id": session.id,
+            "message_count": len(session.messages),
+            "summary": structured_requirement_model,
+            "structured_requirement_model": structured_requirement_model,
+            "structured_requirement_sync_status": "ready",
+            "conversation_chain_state": conversation_chain_state,
+            "pm_methodology_state": pm_methodology_state,
+            "ic_substrate_evidence_state": ic_substrate_evidence_state,
+        }
         yield {
             "event": "done",
             "session_id": session.id,
             "message_count": len(session.messages),
-            "structured_requirement_sync_status": "stale",
+            "structured_requirement_sync_status": "ready",
         }
 
     def build_session_summary(self, session_id: str, language: str = "zh") -> dict[str, Any]:
@@ -1366,6 +1421,409 @@ class RequirementCollectorService:
         return build_pm_methodology_state_payload(
             structured_requirement_model,
             self._normalize_language(language),
+        )
+
+    def _pm_methodology_ready_for_generation(
+        self,
+        structured_requirement_model: dict[str, Any] | None,
+        language: str = "zh",
+    ) -> tuple[bool, dict[str, Any]]:
+        pm_methodology_state = self.build_pm_methodology_state(
+            structured_requirement_model,
+            language,
+        )
+        ready = (
+            not pm_methodology_state.get("checks")
+            or bool(pm_methodology_state.get("ready_for_pm_review"))
+        )
+        return ready, pm_methodology_state
+
+    def _guard_assistant_readiness_response(
+        self,
+        session_id: str,
+        assistant_text: str,
+        language: str,
+    ) -> str:
+        if not self._assistant_claims_document_generation_ready(assistant_text):
+            return assistant_text
+
+        session = self.get_session(session_id)
+        if session is None:
+            raise KeyError("Session not found.")
+
+        structured_requirement_model = self.build_structured_requirement_model(session_id, language)
+        progress = self._structured_requirement_progress(structured_requirement_model)
+        methodology_ready, pm_methodology_state = self._pm_methodology_ready_for_generation(
+            structured_requirement_model,
+            language,
+        )
+        # Generate Documents requires BOTH gates (structured Fully Confirmed + PM Methodology
+        # ready) - the same bar the right-side "Generate Documents" button uses. Keep these in
+        # sync so the assistant never claims readiness the button does not grant.
+        if progress.get("ready_to_generate") and methodology_ready:
+            return assistant_text
+
+        return self._build_readiness_gate_follow_up(
+            structured_requirement_model,
+            progress,
+            pm_methodology_state,
+            language,
+        )
+
+    def _assistant_claims_document_generation_ready(self, text: str) -> bool:
+        lowered = text.strip().lower()
+        if not lowered:
+            return False
+        # Broad on purpose: this only triggers a rewrite when the gates are NOT passed
+        # (see _guard_assistant_readiness_response), and the rewrite target is always a
+        # correct "not ready, here is the next gap" message. So catching any offer/mention
+        # of generating the document or starting Go Coding is safe, and stops premature CTAs
+        # from leaking when the model ignores the readiness directive.
+        readiness_patterns = (
+            r"\b(enough|sufficient|complete|ready)\b[\s\S]{0,80}\b(generate|document|prd|urd|handoff)\b",
+            r"\bclick\b[\s\S]{0,40}\b(generate|document|documents|prd|urd)\b",
+            r"\brequirements?\b[\s\S]{0,40}\b(ready|complete|enough|sufficient)\b",
+            r"\b(finalize|finalise)\b[\s\S]{0,80}\b(requirements?|documented requirements|prd|urd)\b",
+            r"\bhandoff readiness\b[\s\S]{0,120}\b(generate|document|documents|prd|urd|handoff)\b",
+            r"\b(generate|create|produce|draft)\b[\s\S]{0,40}\b(document|documents|requirement|requirements|prd|urd|spec)\b",
+            r"\bdocument generation\b",
+            r"\b(go|vibe)[\s_-]*coding\b",
+            r"(需求|信息)[\s\S]{0,20}(足够|完整|就绪|可以生成)",
+            r"(生成|出)[\s\S]{0,12}(正式)?[\s\S]{0,12}(需求)?[\s\S]{0,8}(文档|prd|urd)",
+            r"(点击|请)[\s\S]{0,12}生成[\s\S]{0,12}(文档|prd|urd)?",
+            r"(进入|开始|打开)[\s\S]{0,10}(编码|coding|vibe|go\s*coding)",
+            r"(anforderungen|requirements)[\s\S]{0,50}(bereit|ready)",
+            r"\bdokument(en)?\s*(generierung|erzeugen|erstellen)\b",
+            r"(ready|sedia)[\s\S]{0,40}(jana|hasilkan)[\s\S]{0,20}(dokumen|prd|urd)",
+        )
+        return any(re.search(pattern, lowered, flags=re.IGNORECASE) for pattern in readiness_patterns)
+
+    def _build_readiness_gate_follow_up(
+        self,
+        structured_requirement_model: dict[str, Any],
+        progress: dict[str, Any],
+        pm_methodology_state: dict[str, Any],
+        language: str,
+    ) -> str:
+        normalized = self._normalize_language(language)
+        blocker = self._next_readiness_blocker(
+            structured_requirement_model,
+            progress,
+            pm_methodology_state,
+        )
+        blocker_question = blocker["question"]
+        options = self._readiness_blocker_choice_block(blocker, normalized)
+        if normalized == "zh":
+            return (
+                "还不能生成正式文档：右侧 readiness gate 还没通过。"
+                f"当前收集覆盖率 {progress.get('collection_coverage_percentage', 0)}%，"
+                f"确认完成度 {progress.get('confirmation_percentage', 0)}%，"
+                f"PM Methodology {pm_methodology_state.get('score', 0)}%。\n\n"
+                f"下一步只补一个最高价值缺口：{blocker_question}\n\n"
+                f"{options}"
+            )
+        if normalized == "de":
+            return (
+                "Das formale Dokument ist noch nicht freigegeben: Das rechte Readiness-Gate ist noch nicht erfuellt. "
+                f"Abdeckung {progress.get('collection_coverage_percentage', 0)}%, "
+                f"Bestaetigung {progress.get('confirmation_percentage', 0)}%, "
+                f"PM Methodology {pm_methodology_state.get('score', 0)}%.\n\n"
+                f"Naechster Schritt, nur eine wichtigste Luecke: {blocker_question}\n\n"
+                f"{options}"
+            )
+        if normalized == "ms":
+            return (
+                "Dokumen rasmi belum boleh dijana: readiness gate di panel kanan belum lulus. "
+                f"Liputan {progress.get('collection_coverage_percentage', 0)}%, "
+                f"pengesahan {progress.get('confirmation_percentage', 0)}%, "
+                f"PM Methodology {pm_methodology_state.get('score', 0)}%.\n\n"
+                f"Langkah seterusnya, satu gap paling penting sahaja: {blocker_question}\n\n"
+                f"{options}"
+            )
+        return (
+            "Not ready to generate the formal document yet: the right-side readiness gate has not passed. "
+            f"Collection coverage is {progress.get('collection_coverage_percentage', 0)}%, "
+            f"confirmation progress is {progress.get('confirmation_percentage', 0)}%, "
+            f"and PM Methodology is {pm_methodology_state.get('score', 0)}%.\n\n"
+            f"Next, close one highest-value gap: {blocker_question}\n\n"
+            f"{options}"
+        )
+
+    def _next_readiness_blocker(
+        self,
+        structured_requirement_model: dict[str, Any],
+        progress: dict[str, Any],
+        pm_methodology_state: dict[str, Any],
+    ) -> dict[str, str]:
+        if not progress.get("ready_to_generate"):
+            structured_blocker = self._next_structured_requirement_blocker(structured_requirement_model)
+            if structured_blocker:
+                return structured_blocker
+
+        checks = pm_methodology_state.get("checks")
+        if isinstance(checks, list):
+            for raw_check in checks:
+                if not isinstance(raw_check, dict) or raw_check.get("ready"):
+                    continue
+                question = str(raw_check.get("next_question", "")).strip()
+                if question:
+                    evidence = self._first_blocker_evidence(raw_check.get("evidence"))
+                    return {
+                        "source": "pm_methodology",
+                        "key": str(raw_check.get("key", "")).strip(),
+                        "label": str(raw_check.get("label", "")).strip(),
+                        "question": question,
+                        "evidence": evidence,
+                    }
+
+        structured_blocker = self._next_structured_requirement_blocker(structured_requirement_model)
+        if structured_blocker:
+            return structured_blocker
+
+        if progress.get("conflict_count"):
+            return {
+                "source": "conflict",
+                "key": "conflict",
+                "label": "Conflict",
+                "question": "Which conflicting requirement should be treated as the source of truth for version one?",
+                "evidence": "",
+            }
+        return {
+            "source": "fallback",
+            "key": "acceptance",
+            "label": "Acceptance criteria",
+            "question": "What is the single most important acceptance criterion for version one?",
+            "evidence": "",
+        }
+
+    def _next_structured_requirement_blocker(
+        self,
+        structured_requirement_model: dict[str, Any],
+    ) -> dict[str, str] | None:
+        collection_status = normalize_structured_requirement_model(structured_requirement_model).get(
+            "collection_status",
+            {},
+        )
+        for key in REQUIREMENT_ITEM_KEYS:
+            item = collection_status.get(key)
+            if not isinstance(item, dict):
+                continue
+            status = str(item.get("status", "")).strip().lower()
+            if status == "confirmed":
+                continue
+            pending_questions = item.get("pending_questions")
+            if isinstance(pending_questions, list):
+                for question in pending_questions:
+                    question_text = str(question).strip()
+                    if question_text:
+                        evidence = self._structured_requirement_evidence_for_key(
+                            structured_requirement_model,
+                            key,
+                        )
+                        return {
+                            "source": "structured_requirement",
+                            "key": key,
+                            "label": self._readiness_blocker_label(key),
+                            "question": question_text,
+                            "evidence": evidence,
+                        }
+            evidence = self._structured_requirement_evidence_for_key(
+                structured_requirement_model,
+                key,
+            )
+            default_question = self._default_structured_requirement_question(key)
+            if default_question:
+                return {
+                    "source": "structured_requirement",
+                    "key": key,
+                    "label": self._readiness_blocker_label(key),
+                    "question": default_question,
+                    "evidence": evidence,
+                }
+        return None
+
+    def _default_structured_requirement_question(self, key: str) -> str:
+        questions = {
+            "objective": "What business outcome should this dashboard improve?",
+            "scope": "What should the first version include, and what should wait?",
+            "users": "Who will use this dashboard first?",
+            "scenarios": "What is the first real scenario this dashboard should support?",
+            "features": "What information or action must be visible on the first screen?",
+            "pages": "What screens or views are needed for the first version?",
+            "rules": "How should the key metric or business rule be calculated?",
+            "integrations": "What source system or file will provide the data?",
+            "acceptance": "How will you know the first version works well enough?",
+        }
+        return questions.get(key, "")
+
+    def _readiness_blocker_label(self, key: str) -> str:
+        labels = {
+            "objective": "Business goal",
+            "scope": "Scope",
+            "users": "Target users",
+            "scenarios": "Core scenarios",
+            "features": "Functional requirements",
+            "pages": "Pages",
+            "rules": "Business rules",
+            "integrations": "Integration systems",
+            "acceptance": "Acceptance criteria",
+        }
+        return labels.get(key, key.replace("_", " ").title())
+
+    def _friendly_blocker_label(self, blocker: dict[str, str]) -> str:
+        key = blocker.get("key", "")
+        labels = {
+            "opportunity_solution_tree": "business goal and user problem",
+            "success_metric": "success metric",
+            "assumption_risk": "assumptions and risks",
+            "prioritization": "first-version scope",
+            "validation_plan": "validation plan",
+            "story_acceptance": "user story and acceptance",
+            "roadmap_release": "release plan",
+            "objective": "business goal",
+            "scope": "scope",
+            "users": "target users",
+            "scenarios": "core scenario",
+            "features": "functional requirements",
+            "pages": "pages",
+            "rules": "business rules",
+            "integrations": "data source",
+            "acceptance": "acceptance criteria",
+        }
+        return labels.get(key, blocker.get("label") or "this point")
+
+    def _localized_friendly_blocker_label(self, blocker: dict[str, str], language: str) -> str:
+        if language != "zh":
+            return self._friendly_blocker_label(blocker)
+        key = blocker.get("key", "")
+        labels = {
+            "opportunity_solution_tree": "业务目标和用户问题",
+            "success_metric": "成功指标",
+            "assumption_risk": "假设与风险",
+            "prioritization": "首版范围",
+            "validation_plan": "验证方式",
+            "story_acceptance": "用户场景和验收",
+            "roadmap_release": "发布边界",
+            "objective": "业务目标",
+            "scope": "范围",
+            "users": "目标用户",
+            "scenarios": "核心场景",
+            "features": "功能需求",
+            "pages": "页面",
+            "rules": "业务规则",
+            "integrations": "数据来源",
+            "acceptance": "验收标准",
+        }
+        return labels.get(key, blocker.get("label") or "这个点")
+
+    def _first_blocker_evidence(self, raw_evidence: Any) -> str:
+        if isinstance(raw_evidence, list):
+            for item in raw_evidence:
+                text = str(item).strip()
+                if text:
+                    return self._clip_option_text(text)
+        text = str(raw_evidence or "").strip()
+        return self._clip_option_text(text) if text else ""
+
+    def _structured_requirement_evidence_for_key(
+        self,
+        structured_requirement_model: dict[str, Any],
+        key: str,
+    ) -> str:
+        model = normalize_structured_requirement_model(structured_requirement_model)
+        paths_by_key = {
+            "objective": ("background.objective", "background.summary"),
+            "scope": ("scope.in_scope", "scope.out_of_scope"),
+            "users": ("users_and_scenarios.target_users", "product_context.primary_user"),
+            "scenarios": ("users_and_scenarios.core_scenarios",),
+            "features": ("functional_requirements.overview", "functional_requirements.feature_details"),
+            "pages": ("page_and_interaction.pages", "page_and_interaction.interaction_flow"),
+            "rules": ("business_rules",),
+            "integrations": ("data_and_dependencies",),
+            "acceptance": ("acceptance_criteria", "product_context.acceptance_owner"),
+        }
+        for path in paths_by_key.get(key, ()):
+            values = self._flatten_path_strings(model, path)
+            if values:
+                return self._clip_option_text(" / ".join(values[:2]))
+        return ""
+
+    def _clip_option_text(self, text: str, limit: int = 120) -> str:
+        normalized = " ".join(str(text or "").split())
+        if len(normalized) <= limit:
+            return normalized
+        return f"{normalized[: limit - 1].rstrip()}…"
+
+    def _readiness_blocker_label(self, key: str) -> str:
+        labels = {
+            "objective": "Business goal",
+            "scope": "Scope",
+            "users": "Target users",
+            "scenarios": "Core scenarios",
+            "features": "Functional requirements",
+            "pages": "Pages",
+            "rules": "Business rules",
+            "integrations": "Integration systems",
+            "acceptance": "Acceptance criteria",
+        }
+        return labels.get(key, key.replace("_", " ").title())
+
+    def _is_degenerate_capture(self, text: str) -> bool:
+        """A captured value that is empty or essentially says 'not stated'.
+
+        Such values must never be offered as an 'A. confirm the current wording' option
+        or echoed as an opening summary, or the user is asked to confirm a non-answer.
+        """
+        normalized = str(text or "").strip().lower()
+        if not normalized:
+            return True
+        markers = (
+            "未说明", "未明确", "未提供", "未确认", "尚未", "暂未", "待确认", "待补充", "未知", "待定",
+            "not stated", "unspecified", "unclear", "not specified", "to be defined", "tbd", "n/a",
+        )
+        return any(marker in normalized for marker in markers)
+
+    def _readiness_blocker_choice_block(self, blocker: dict[str, str], language: str) -> str:
+        label = self._localized_friendly_blocker_label(blocker, language)
+        evidence = blocker.get("evidence", "").strip()
+        if self._is_degenerate_capture(evidence):
+            evidence = ""
+        if evidence:
+            assumption_en = f"Use the current captured wording for {label}: {evidence}"
+            assumption_zh = f"按当前已捕获内容确认 {label}：{evidence}"
+            assumption_de = f"Aktuellen erfassten Wortlaut fuer {label} verwenden: {evidence}"
+            assumption_ms = f"Gunakan wording semasa untuk {label}: {evidence}"
+        else:
+            assumption_en = f"Confirm {label} with a clear version-one assumption"
+            assumption_zh = f"用一个明确的首版假设确认 {label}"
+            assumption_de = f"{label} mit einer klaren Version-1-Annahme bestaetigen"
+            assumption_ms = f"Sahkan {label} dengan andaian versi pertama yang jelas"
+        if language == "zh":
+            return (
+                "请选择一个选项：\n"
+                f"A. {assumption_zh}\n"
+                f"B. 我补充真实的 {label} 口径或例外情况\n"
+                "C. 这个点先保持待确认"
+            )
+        if language == "de":
+            return (
+                "Bitte waehle eine Option:\n"
+                f"A. {assumption_de}\n"
+                f"B. Ich ergaenze die echte fachliche Definition oder Ausnahme fuer {label}\n"
+                "C. Diesen Punkt vorerst offen lassen"
+            )
+        if language == "ms":
+            return (
+                "Sila pilih satu pilihan:\n"
+                f"A. {assumption_ms}\n"
+                f"B. Saya tambah definisi bisnes sebenar atau pengecualian untuk {label}\n"
+                "C. Kekalkan perkara ini sebagai belum sah dahulu"
+            )
+        return (
+            "Choose one option:\n"
+            f"A. {assumption_en}\n"
+            f"B. I will provide the real {label} wording or exception\n"
+            "C. Keep this point pending for now"
         )
 
     def build_ic_substrate_evidence_state(
@@ -1566,6 +2024,26 @@ class RequirementCollectorService:
                 status="quality_gate_blocked",
                 save_history=False,
             )
+        methodology_ready, _ = self._pm_methodology_ready_for_generation(
+            structured_requirement_model,
+            language,
+        )
+        if not methodology_ready:
+            return self._build_generated_document_result(
+                session_id=session_id,
+                document_kind=DESIGN_MESSAGE_KIND,
+                language=language,
+                doc_markdown=self._document_quality_gate_block_markdown(
+                    structured_requirement_model,
+                    progress,
+                    language,
+                    "system_design",
+                    session,
+                ),
+                structured_requirement_model=structured_requirement_model,
+                status="quality_gate_blocked",
+                save_history=False,
+            )
         seed_markdown = self._build_design_doc_seed_markdown(
             structured_requirement_model,
             progress,
@@ -1626,6 +2104,32 @@ class RequirementCollectorService:
         structured_requirement_model = self.build_structured_requirement_model(session_id, language)
         progress = self._structured_requirement_progress(structured_requirement_model)
         if not progress["ready_to_generate"]:
+            doc_markdown = self._document_quality_gate_block_markdown(
+                structured_requirement_model,
+                progress,
+                language,
+                "system_design",
+                session,
+            )
+            yield {"event": "content", "delta": doc_markdown}
+            yield {
+                "event": "done",
+                **self._build_generated_document_result(
+                    session_id=session_id,
+                    document_kind=DESIGN_MESSAGE_KIND,
+                    language=language,
+                    doc_markdown=doc_markdown,
+                    structured_requirement_model=structured_requirement_model,
+                    status="quality_gate_blocked",
+                    save_history=False,
+                ),
+            }
+            return
+        methodology_ready, _ = self._pm_methodology_ready_for_generation(
+            structured_requirement_model,
+            language,
+        )
+        if not methodology_ready:
             doc_markdown = self._document_quality_gate_block_markdown(
                 structured_requirement_model,
                 progress,
@@ -1744,6 +2248,26 @@ class RequirementCollectorService:
                 status="quality_gate_blocked",
                 save_history=False,
             )
+        methodology_ready, _ = self._pm_methodology_ready_for_generation(
+            structured_requirement_model,
+            language,
+        )
+        if not methodology_ready:
+            return self._build_generated_document_result(
+                session_id=session_id,
+                document_kind=PRD_MESSAGE_KIND,
+                language=language,
+                doc_markdown=self._document_quality_gate_block_markdown(
+                    structured_requirement_model,
+                    progress,
+                    language,
+                    "prd",
+                    session,
+                ),
+                structured_requirement_model=structured_requirement_model,
+                status="quality_gate_blocked",
+                save_history=False,
+            )
         doc_markdown = self.llm_client.chat(
             self._build_prd_doc_messages(
                 session,
@@ -1806,6 +2330,32 @@ class RequirementCollectorService:
         structured_requirement_model = self.build_structured_requirement_model(session_id, language)
         progress = self._structured_requirement_progress(structured_requirement_model)
         if not progress["ready_to_generate"]:
+            doc_markdown = self._document_quality_gate_block_markdown(
+                structured_requirement_model,
+                progress,
+                language,
+                "prd",
+                session,
+            )
+            yield {"event": "content", "delta": doc_markdown}
+            yield {
+                "event": "done",
+                **self._build_generated_document_result(
+                    session_id=session_id,
+                    document_kind=PRD_MESSAGE_KIND,
+                    language=language,
+                    doc_markdown=doc_markdown,
+                    structured_requirement_model=structured_requirement_model,
+                    status="quality_gate_blocked",
+                    save_history=False,
+                ),
+            }
+            return
+        methodology_ready, _ = self._pm_methodology_ready_for_generation(
+            structured_requirement_model,
+            language,
+        )
+        if not methodology_ready:
             doc_markdown = self._document_quality_gate_block_markdown(
                 structured_requirement_model,
                 progress,
@@ -1918,36 +2468,12 @@ class RequirementCollectorService:
             return prd_doc_path, prd_doc_path.name
         return None
 
-    def _ensure_saved_prd_v0_document_for_handoff(
-        self,
-        session: Session,
-        language: str,
-    ) -> tuple[Path, str] | None:
-        existing = self.get_saved_prd_document(session.id)
-        if existing is not None:
-            return existing
-
-        conversation_messages = self._chat_history_messages(session.messages)
-        if not self._session_matches_ic_substrate_fast_path(session, language):
-            return None
-        structured_requirement_model = self.build_structured_requirement_model(session.id, language)
-        progress = self._structured_requirement_progress(structured_requirement_model)
-        if not progress.get("ready_to_generate"):
-            return None
-
-        result = self.build_prd_document(session.id, language, save_history=True)
-        if result.get("status") not in {"draft_with_assumptions", "ok"}:
-            return None
-        return self.get_saved_prd_document(session.id)
-
     def build_implementation_context(self, session_id: str, language: str = "zh") -> dict[str, Any]:
         session = self.get_session(session_id)
         if session is None:
             raise KeyError("Session not found.")
 
         prd_result = self.get_saved_prd_document(session_id)
-        if prd_result is None:
-            prd_result = self._ensure_saved_prd_v0_document_for_handoff(session, language)
         design_result = self.get_saved_design_document(session_id)
 
         missing_documents: list[str] = []
@@ -1978,6 +2504,23 @@ class RequirementCollectorService:
             )
             or self._empty_structured_requirement_model()
         )
+        methodology_ready, pm_methodology_state = self._pm_methodology_ready_for_generation(
+            structured_requirement_model,
+            normalized_language,
+        )
+        if not methodology_ready:
+            return {
+                "source": "pm",
+                "transport": "browser-handoff",
+                "session_id": session_id,
+                "title": session.title,
+                "language": normalized_language,
+                "documents_ready": True,
+                "handoff_ready": False,
+                "methodology_ready": False,
+                "methodology_gaps": pm_methodology_state.get("missing_evidence", []),
+                "pm_methodology_state": pm_methodology_state,
+            }
         ic_substrate_evidence = self._ic_substrate_readiness_evidence_gate(
             session,
             structured_requirement_model,
@@ -2020,8 +2563,6 @@ class RequirementCollectorService:
             raise KeyError("Session not found.")
 
         prd_result = self.get_saved_prd_document(session_id)
-        if prd_result is None:
-            prd_result = self._ensure_saved_prd_v0_document_for_handoff(session, language)
         design_result = self.get_saved_design_document(session_id)
 
         missing_documents: list[str] = []
@@ -2051,6 +2592,23 @@ class RequirementCollectorService:
             )
             or self._empty_structured_requirement_model()
         )
+        methodology_ready, pm_methodology_state = self._pm_methodology_ready_for_generation(
+            structured_requirement_model,
+            normalized_language,
+        )
+        if not methodology_ready:
+            return {
+                "source": "pm",
+                "transport": "browser-handoff",
+                "session_id": session_id,
+                "title": session.title,
+                "language": normalized_language,
+                "documents_ready": True,
+                "handoff_ready": False,
+                "methodology_ready": False,
+                "methodology_gaps": pm_methodology_state.get("missing_evidence", []),
+                "pm_methodology_state": pm_methodology_state,
+            }
         ic_substrate_evidence = self._ic_substrate_readiness_evidence_gate(
             session,
             structured_requirement_model,
@@ -2079,6 +2637,8 @@ class RequirementCollectorService:
             "title": session.title,
             "language": normalized_language,
             "documents_ready": True,
+            "handoff_ready": True,
+            "methodology_ready": True,
             "implementation_prompt": implementation_prompt,
             "documents": [
                 {
@@ -2106,7 +2666,7 @@ class RequirementCollectorService:
 
     def create_coding_handoff(self, session_id: str, language: str = "zh") -> dict[str, Any]:
         payload = self.build_browser_handoff_payload(session_id, language)
-        if not payload.get("documents_ready"):
+        if not payload.get("documents_ready") or not payload.get("handoff_ready", True):
             return payload
 
         created_at = datetime.now(timezone.utc)
@@ -2237,6 +2797,59 @@ class RequirementCollectorService:
             structured_requirement_model,
         )
         return structured_requirement_model
+
+    def _promote_cached_structured_requirement_model(
+        self,
+        session: Session,
+        language: str,
+    ) -> dict[str, Any]:
+        """Re-save the latest cached structured requirement model at the current
+        message_count without making a new LLM extraction call.
+
+        After the assistant reply is appended, message_count increments but the
+        assistant text itself doesn't contain new requirement information.  This
+        method looks up the model that was extracted *before* the assistant
+        reply (at message_count - 1) and promotes it to the current
+        message_count cache slot so that subsequent snapshot reads see it as
+        'ready' rather than 'stale'.
+
+        Falls back to a full rebuild if no prior cache entry is found.
+        """
+        normalized_language = self._normalize_language(language)
+        message_count = self._message_count(session.messages)
+
+        # Try to find the model cached during the pre-reply extraction.
+        cached_model = self._get_latest_cached_structured_requirement_model(
+            session.id,
+            normalized_language,
+            message_count,
+        )
+        if cached_model is None:
+            cached_model = self._get_latest_cached_structured_requirement_model(
+                session.id,
+                STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
+                message_count,
+            )
+
+        if cached_model is not None:
+            # Promote to both the canonical and language cache slots at the
+            # current message_count so snapshot reads return sync_status=ready.
+            self._save_structured_requirement_model_cache(
+                session.id,
+                STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
+                message_count,
+                cached_model,
+            )
+            self._save_structured_requirement_model_cache(
+                session.id,
+                normalized_language,
+                message_count,
+                cached_model,
+            )
+            return cached_model
+
+        # Fallback: no prior cache found, do a full rebuild.
+        return self._build_and_cache_structured_requirement_model(session, language)
 
     def _merge_structured_requirement_collection_status(
         self,
@@ -2661,7 +3274,7 @@ class RequirementCollectorService:
                 "- 当用户说“做系统/看板/工具”但没说清形态时，优先确认首版软件形态：dashboard、workflow/case tracking、data query、report/export、alerting、admin console 或跨部门 cockpit；不要直接追完整制造流程。\n"
                 "- 软件形态是后端隐形路由，不要要求用户在前端选择；如果用户已经暗示 dashboard、workflow/case tracking、report/export、data query、alerting 或 admin console，就按该形态问一个更专业的问题。\n"
                 "- 每轮只问一个专业问题，但问题里可以给 2-5 个业务选项帮助用户快速确认，例如部门/owner 分组、lot / panel / unit 粒度、现行指标口径、现行状态流转或责任边界。\n"
-                "- Go Coding readiness gate：即使用户只给一句模糊的软件想法，也不能直接开放 Go Coding；先用一个最高价值问题补齐业务动作、使用者/owner、数据源、集成/写回边界或验收证据中最关键的缺口。只有结构化需求 ready_to_generate=true 时，才提示生成文档并打开 Go Coding。\n"
+                "- Go Coding handoff gate：即使用户只给一句模糊的软件想法，也不能直接开放 Go Coding；先用一个最高价值问题补齐业务动作、使用者/owner、数据源、集成/写回边界或验收证据中最关键的缺口。只有结构化需求 ready_to_generate=true 时，才提示生成文档；文档生成/确认 OK 后，Go Coding 才能把文档交接给 Vibe Coding 平台。不要提供跳过文档直接 Go Coding 的选项。\n"
                 "- 硬性约束：每轮只能有一个问句，不要用“另外/同时/以及/还需要”追加第二个问题；如果两个口径都缺，先问更影响链路边界的那个。\n"
                 "- 硬性约束：在用户确认前，TDI 只能写作 TDI，不要写成 TDI（技术/异常/导入/接口）或任何括号解释。\n"
                 "- 硬性约束：部门首问的选项说明里也不能展开 TDI；只能写 Production/Quality/TDI 这些部门名，不要把 TDI 解释成技术导入、异常处理、接口集成或其他含义。\n"
@@ -2687,7 +3300,7 @@ class RequirementCollectorService:
                 "- Wenn der Nutzer System/Dashboard/Tool sagt, aber die Produktform unklar ist, zuerst die First-Version Softwareform klaeren: dashboard, workflow/case tracking, data query, report/export, alerting, admin console oder cross-department cockpit.\n"
                 "- Softwareform ist ein verborgenes Backend-Routing, keine Frontend-Auswahl. Wenn der Nutzer dashboard, workflow/case tracking, report/export, data query, alerting oder admin console andeutet, eine fachlich passende PM-Frage stellen.\n"
                 "- Pro Runde genau eine professionelle Frage stellen; 2-5 fachliche Optionen sind erlaubt, wenn sie dem Nutzer beim schnellen Einordnen helfen.\n"
-                "- Go Coding readiness gate: Auch bei einer vagen Software-Idee Go Coding nicht direkt anbieten. Stelle eine high-value Frage zur wichtigsten Luecke in business action, user/owner, source of truth, integration/writeback boundary oder acceptance evidence. Go Coding erst anbieten, wenn structured requirement ready_to_generate=true ist.\n"
+                "- Go Coding handoff gate: Auch bei einer vagen Software-Idee Go Coding nicht direkt anbieten. Stelle eine high-value Frage zur wichtigsten Luecke in business action, user/owner, source of truth, integration/writeback boundary oder acceptance evidence. Bei structured requirement ready_to_generate=true zuerst Dokumente erzeugen; Go Coding uebergibt erst nach erzeugtem/geprueftem Dokument an Vibe Coding. Keine Option anbieten, Dokumente zu ueberspringen.\n"
                 "- Harte Regel: TDI bis zur Nutzerbestaetigung nur als TDI schreiben, ohne Klammererklaerung oder implizite Bedeutung in Department-Optionen.\n"
                 "- Harte Regel: Keine TDI case states, SLA-Zahlen, Owner-Rollen, Approval Levels, Production route/station/yield formulas, Quality inspection points/defect taxonomy/spec limits/MRB/CAPA states, Finance cost formulas, Equipment OEE/MTBF/MTTR formulas, EHS SLA oder Planning-Regeln erfinden.\n"
                 "- Keine unbestaetigten Station-Abkuerzungen, Prozessschritte, Equipmentnamen, Lieferanten, Systemmarken oder internen Begriffe einfuehren; Begriffe wie FVI, AOI, E-test, AVI, SAP, EAP, SPC, MES, QMS oder ERP nur verwenden, wenn Nutzer oder Quelle sie bestaetigt.\n"
@@ -2708,7 +3321,7 @@ class RequirementCollectorService:
                 "- Apabila pengguna menyebut system/dashboard/tool tetapi bentuk produk belum jelas, sahkan dahulu first-version software shape: dashboard, workflow/case tracking, data query, report/export, alerting, admin console atau cross-department cockpit.\n"
                 "- Software shape ialah routing backend tersembunyi, bukan pilihan frontend. Jika pengguna sudah membayangkan dashboard, workflow/case tracking, report/export, data query, alerting atau admin console, tanya satu soalan PM yang lebih khusus untuk shape itu.\n"
                 "- Tanya tepat satu soalan profesional setiap pusingan; 2-5 pilihan bisnes boleh diberi jika membantu pengguna mengesahkan dengan cepat.\n"
-                "- Go Coding readiness gate: walaupun pengguna hanya beri idea software kabur, jangan terus tawarkan Go Coding. Tanya satu soalan high-value untuk gap paling penting dalam business action, user/owner, source of truth, integration/writeback boundary atau acceptance evidence. Tawarkan Go Coding hanya apabila structured requirement ready_to_generate=true.\n"
+                "- Go Coding handoff gate: walaupun pengguna hanya beri idea software kabur, jangan terus tawarkan Go Coding. Tanya satu soalan high-value untuk gap paling penting dalam business action, user/owner, source of truth, integration/writeback boundary atau acceptance evidence. Jika structured requirement ready_to_generate=true, jana dokumen dahulu; Go Coding hanya handoff dokumen yang sudah dijana/OK ke Vibe Coding. Jangan beri pilihan skip dokumen.\n"
                 "- Peraturan keras: tulis TDI hanya sebagai TDI sehingga pengguna mengesahkan maksudnya; jangan tambah penerangan dalam kurungan atau membayangkan makna dalam pilihan jabatan.\n"
                 "- Peraturan keras: jangan reka TDI case states, nombor SLA, owner roles, approval levels, Production route/station/yield formulas, Quality inspection points/defect taxonomy/spec limits/MRB/CAPA states, Finance cost formulas, Equipment OEE/MTBF/MTTR formulas, EHS SLA atau Planning rules.\n"
                 "- Jangan masukkan station abbreviation, process step, equipment name, supplier, system brand atau istilah dalaman yang belum disahkan; istilah seperti FVI, AOI, E-test, AVI, SAP, EAP, SPC, MES, QMS atau ERP hanya boleh digunakan jika pengguna atau sumber jelas mengesahkan.\n"
@@ -2728,7 +3341,7 @@ class RequirementCollectorService:
             "- When the user says system/dashboard/tool but has not clarified the product shape, first confirm whether the first version is a dashboard, workflow/case tracker, data query, report/export, alerting, admin console, or cross-department cockpit. Do not jump directly into the whole manufacturing process.\n"
             "- Software shape is hidden backend routing, not a frontend choice. If the user already implies dashboard, workflow/case tracking, report/export, data query, alerting, or admin console, ask one more expert PM question for that shape.\n"
             "- Ask one professional question per turn, but include 2-5 domain options when helpful, such as department/owner groups, lot / panel / unit grain, current metric definitions, current state flow, or ownership boundaries.\n"
-            "- Go Coding readiness gate: even when the user gives one vague software idea, do not offer Go Coding directly. Ask one high-value question for the most important gap among business action, user/owner, source of truth, integration/writeback boundary, or acceptance evidence. Offer Go Coding only when structured requirement ready_to_generate=true.\n"
+            "- Go Coding handoff gate: even when the user gives one vague software idea, do not offer Go Coding directly. Ask one high-value question for the most important gap among business action, user/owner, source of truth, integration/writeback boundary, or acceptance evidence. When structured requirement ready_to_generate=true, suggest generating documents first; Go Coding only sends the generated/approved document handoff to the Vibe Coding platform. Never offer an option to skip documents and go directly to coding.\n"
             "- Hard constraint: each turn may contain only one question. Do not append a second question with \"also\", \"and\", \"in addition\", or similar wording; if two definitions are missing, ask the one that affects the boundary most.\n"
             "- Hard constraint: until the user confirms the meaning, write TDI only as TDI. Do not add any parenthetical expansion such as technology, exception, introduction, or interface.\n"
             "- Hard constraint: do not expand TDI inside department-first option descriptions either. Write only Production/Quality/TDI department names; do not explain TDI as technology introduction, exception handling, interface integration, or any other meaning.\n"
@@ -5127,8 +5740,9 @@ class RequirementCollectorService:
                 )
             lines.extend(
                 [
-                    "- 使用规则：这些方法论维度主要用于生成文档时补全，不要为它们单独向用户追问；缺失时在文档中用合理默认假设填入并标记为待确认。",
-                    "- 只有当某个方法论缺口同时也是核心需求字段（objective/scope/users/scenarios/features/rules/integrations/acceptance）的缺口时才追问，且每次只问一个，优先最阻塞 PRD/验收质量的那个。",
+                    "- 硬门禁：PM Methodology 未 ready_for_pm_review 时，禁止说“需求已足够/可以生成文档/ready for handoff”。",
+                    "- 下一轮必须继续追问上面列出的第一个方法论缺口；每次只问一个问题，并给 A/B/C 快速确认选项。",
+                    "- 只有 structured requirement ready_to_generate=true 且 PM Methodology ready_for_pm_review=true 时，才允许提示生成文档。",
                 ]
             )
             return "\n".join(lines)
@@ -5146,8 +5760,9 @@ class RequirementCollectorService:
             )
         lines.extend(
             [
-                "- Use these dimensions mainly to enrich the generated document; do NOT raise separate questions for them. When missing, fill the document with reasonable default assumptions marked as pending confirmation.",
-                "- Only ask about a methodology gap when it is also a missing core requirement field (objective/scope/users/scenarios/features/rules/integrations/acceptance), and still ask exactly one question per turn.",
+                "- Hard gate: while PM Methodology is not ready_for_pm_review, do NOT say requirements are ready, do NOT tell the user to generate documents, and do NOT claim handoff readiness.",
+                "- The next assistant turn must ask the first methodology gap listed above; ask exactly one question and include A/B/C quick-confirmation options.",
+                "- Only suggest document generation when structured requirement ready_to_generate=true AND PM Methodology ready_for_pm_review=true.",
             ]
         )
         return "\n".join(lines)
@@ -5217,47 +5832,53 @@ class RequirementCollectorService:
         confirmed = self._safe_int(progress.get("confirmed_count"))
         total = self._safe_int(progress.get("total_count"))
         conflicts = self._safe_int(progress.get("conflict_count"))
-        if progress.get("fully_confirmed"):
+        methodology_ready, pm_methodology_state = self._pm_methodology_ready_for_generation(
+            structured_requirement_model,
+            language,
+        )
+        if progress.get("fully_confirmed") and methodology_ready:
             return ""
+        methodology_score = self._safe_int(pm_methodology_state.get("score"))
+        methodology_missing = len(pm_methodology_state.get("missing_evidence", []))
 
         if language == "zh":
             return (
                 "Go Coding readiness discovery：目标是用专家链路收集足够需求信息，而不是提前产出半成品文档。\n"
                 "- 从零开始时，不要只反问。每次回复先给 2-3 个短句：已理解、推荐理解、当前最大缺口。\n"
                 "- response budget：正文最多 5 lines；每轮只问 1 个最高杠杆问题，不要输出长段落、完整 PRD 或多题清单。\n"
-                "- 不要承诺用户现在可以打开 Go Coding；只有 structured requirement ready_to_generate=true 时，才提示生成文档并打开 Go Coding。\n"
+                "- 不要承诺用户现在可以打开 Go Coding；只有 structured requirement ready_to_generate=true 且 PM Methodology ready_for_pm_review=true 时，才提示生成文档。Go Coding 只能在文档生成/确认 OK 后，把文档交接给 Vibe Coding 平台。\n"
                 "- 未确认信息可作为待确认假设辅助追问，但不得当成事实，也不得作为绕过 readiness 的理由。\n"
-                "- 如果信息已经足够，不要继续开新问题；收口为确认/生成文档/Go Coding 的下一步。\n"
-                f"- 当前结构化覆盖率 {coverage}%，已确认 {confirmed}/{total}，conflict_count={conflicts}。如果未 ready，只问最阻塞文档质量的一个缺口。"
+                "- 如果两套 gate 都已经 ready，不要继续开新问题；收口为确认并生成文档，不要提供跳过文档直接 Go Coding 的选项。\n"
+                f"- 当前结构化覆盖率 {coverage}%，已确认 {confirmed}/{total}，conflict_count={conflicts}，PM Methodology {methodology_score}% / gaps={methodology_missing}。如果任一 gate 未 ready，只问最阻塞文档质量的一个缺口。"
             )
         if language == "de":
             return (
                 "Go Coding readiness discovery: Nutze die Expertenkette, um genug Requirements zu sammeln, nicht um ein fruehes Teildokument zu erzwingen.\n"
                 "- Beim Start from scratch nicht nur Rueckfragen stellen. Jede Antwort nennt kurz: verstanden, empfohlene Interpretation, groesste Luecke.\n"
                 "- response budget: maximal 5 lines; pro Runde genau 1 high-leverage Frage, keine langen Abschnitte, kein vollstaendiges PRD, keine Frage-Liste.\n"
-                "- Versprich Go Coding erst, wenn structured requirement ready_to_generate=true ist; dann Dokumente erzeugen und Go Coding oeffnen.\n"
+                "- Versprich Go Coding nicht als direkten Coding-Start. Nur bei structured requirement ready_to_generate=true UND PM Methodology ready_for_pm_review=true zuerst Dokumente erzeugen; Go Coding uebergibt erst nach erzeugtem/geprueftem Dokument an Vibe Coding.\n"
                 "- Annahmen helfen beim Nachfragen, sind aber nie bestaetigte Fakten und duerfen readiness nicht umgehen.\n"
-                "- Wenn die Informationen reichen, keine neue Discovery starten; auf Bestaetigung, Dokumenterzeugung und Go Coding konvergieren.\n"
-                f"- Aktuelle Abdeckung {coverage}%, bestaetigt {confirmed}/{total}, conflict_count={conflicts}. Wenn nicht ready, frage nur die eine groesste Qualitaetsluecke."
+                "- Wenn beide Gates ready sind, keine neue Discovery starten; auf Bestaetigung und Dokumenterzeugung konvergieren, ohne Dokument-Skip-Option.\n"
+                f"- Aktuelle Abdeckung {coverage}%, bestaetigt {confirmed}/{total}, conflict_count={conflicts}, PM Methodology {methodology_score}% / gaps={methodology_missing}. Wenn ein Gate nicht ready ist, frage nur die eine groesste Qualitaetsluecke."
             )
         if language == "ms":
             return (
                 "Go Coding readiness discovery: gunakan expert chain untuk kumpul maklumat cukup, bukan memaksa dokumen separuh siap.\n"
                 "- Untuk start from scratch, jangan hanya bertanya. Setiap jawapan ringkaskan: difahami, tafsiran dicadang, gap terbesar.\n"
                 "- response budget: maksimum 5 lines; setiap pusingan hanya 1 soalan high-leverage, tiada perenggan panjang, PRD penuh atau senarai soalan.\n"
-                "- Jangan janji Go Coding sebelum structured requirement ready_to_generate=true; apabila ready, jana dokumen dan buka Go Coding.\n"
+                "- Jangan janji Go Coding sebagai mula coding langsung. Hanya jika structured requirement ready_to_generate=true DAN PM Methodology ready_for_pm_review=true, jana dokumen dahulu; Go Coding hanya handoff dokumen yang sudah dijana/OK ke Vibe Coding.\n"
                 "- Andaian boleh bantu discovery tetapi bukan fakta sah dan tidak boleh memintas readiness.\n"
-                "- Jika maklumat sudah cukup, jangan buka discovery baharu; tutup kepada pengesahan, dokumen dan Go Coding.\n"
-                f"- Liputan semasa {coverage}%, disahkan {confirmed}/{total}, conflict_count={conflicts}. Jika belum ready, tanya satu gap kualiti paling penting sahaja."
+                "- Jika kedua-dua gate ready, jangan buka discovery baharu; tutup kepada pengesahan dan penjanaan dokumen, tanpa pilihan skip dokumen.\n"
+                f"- Liputan semasa {coverage}%, disahkan {confirmed}/{total}, conflict_count={conflicts}, PM Methodology {methodology_score}% / gaps={methodology_missing}. Jika mana-mana gate belum ready, tanya satu gap kualiti paling penting sahaja."
             )
         return (
             "Go Coding readiness discovery: use the expert chain to collect enough requirements, not to force an early partial document.\n"
             "- For start from scratch, do not only ask back. Each reply briefly states: understood, recommended interpretation, biggest gap.\n"
             "- response budget: keep the main reply within 5 lines; ask exactly 1 high-leverage question per round. Do not write long paragraphs, a full PRD, or a list of questions.\n"
-            "- Do not promise Go Coding until structured requirement ready_to_generate=true; once ready, suggest generating documents and opening Go Coding.\n"
+            "- Do not present Go Coding as a direct coding start. Only when structured requirement ready_to_generate=true AND PM Methodology ready_for_pm_review=true, suggest generating documents first; Go Coding only hands the generated/approved document package to Vibe Coding.\n"
             "- Assumptions may guide discovery, but they are not confirmed facts and must not bypass readiness.\n"
-            "- If information is sufficient, stop opening new discovery and converge on confirmation, document generation, and Go Coding.\n"
-            f"- Current collection coverage is {coverage}%, confirmed {confirmed}/{total}, conflict_count={conflicts}. If not ready, ask only the single largest quality gap."
+            "- If both gates are ready, stop opening new discovery and converge on confirmation and document generation. Never offer a skip-document path to Go Coding.\n"
+            f"- Current collection coverage is {coverage}%, confirmed {confirmed}/{total}, conflict_count={conflicts}, PM Methodology {methodology_score}% / gaps={methodology_missing}. If either gate is not ready, ask only the single largest quality gap."
         )
 
     def _skill_style_ai_pm_method_prompt(self, language: str | None = None) -> str:
@@ -5275,7 +5896,7 @@ class RequirementCollectorService:
                 "- 对 IC Substrate，优先统一部门、业务对象、粒度、状态、指标口径、数据源、验收 owner；不要自造现场术语、状态名、公式、系统名或 SLA。\n"
                 "- 当用户给出业务术语时，把它沉淀为后续 PRD 的 glossary/definition；当术语未确认时，写成 open question 或 assumption。\n"
                 "- 追问必须服务 PRD 质量门：problem、business goal、requesting department、primary user、core scenario、decision/action、data source、business rule、workflow state、acceptance criteria、out-of-scope。\n"
-                "- 如果这些关键块已经足够生成文档，不要继续开新坑；请收口为确认问题，并提示可以生成文档。\n"
+                "- 只有结构化需求 gate 和 PM Methodology gate 都 ready 时，才允许提示生成文档；否则继续问右侧 gate 的最高价值缺口。\n"
                 "- 如果还缺信息，只问那个最阻塞 PRD 可交付质量的缺口，并说明为什么它影响文档质量。"
             )
         if normalized_language == "de":
@@ -6972,11 +7593,85 @@ class RequirementCollectorService:
         ]
         return "\n".join(lines)
 
+    def _readiness_phase_directive_for_prompt(self, session: Session, language: str) -> str:
+        """Authoritative, deterministic readiness directive injected before the model speaks.
+
+        Both gates (structured requirements fully confirmed + PM Methodology ready) and the
+        single next blocker are computed from the same progress / pm_methodology_state the
+        right-hand panel renders, so the conversation stays aligned with the metrics by
+        construction instead of being patched reactively after the fact.
+        """
+        normalized = self._normalize_language(language)
+        model = self._latest_structured_requirement_model_for_prompt(session, normalized)
+        progress = self._structured_requirement_progress(model)
+        methodology_ready, pm_state = self._pm_methodology_ready_for_generation(model, normalized)
+        # "Generate Documents" unlocks only when BOTH gates pass (matches the right-side
+        # canGenerateDocuments = readyToGenerate && methodologyReadyForHandoff).
+        gates_ready = bool(progress.get("ready_to_generate")) and methodology_ready
+        has_prd = self.get_saved_prd_document(session.id) is not None
+        cov = self._safe_int(progress.get("collection_coverage_percentage"))
+        conf = self._safe_int(progress.get("confirmation_percentage"))
+        confirmed = self._safe_int(progress.get("confirmed_count"))
+        total = self._safe_int(progress.get("total_count"))
+        score = self._safe_int(pm_state.get("score"))
+        zh = normalized == "zh"
+
+        # Phase 1 - collecting: at least one gate (structured Fully Confirmed / PM Methodology) is open.
+        if not gates_ready:
+            blocker = self._next_readiness_blocker(model, progress, pm_state)
+            blocker_question = str(blocker.get("question", "")).strip()
+            blocker_label = str(blocker.get("label", "")).strip()
+            if zh:
+                return (
+                    "就绪状态机（权威指示，优先级最高，覆盖任何相反说法）：\n"
+                    f"- 阶段=采集中。门禁未全过：结构化已确认 {confirmed}/{total}（覆盖 {cov}%、确认 {conf}%），PM Methodology {score}%。\n"
+                    "- 严禁声称“需求已足够/已完整/可以生成文档/可以 Go Coding”，严禁让用户点 Generate 或 Open Vibe Coding；这两个按钮只有结构化全部确认且 PM Methodology ready 后才会亮。\n"
+                    "- 本轮只补这一个最高价值缺口：只问一个问题，结尾给 A/B/C。\n"
+                    f"- 下一个缺口（{blocker_label}）：{blocker_question}"
+                )
+            return (
+                "READINESS STATE MACHINE (authoritative, highest priority, overrides any contrary statement):\n"
+                f"- Phase = collecting. Gates not all passed: structured {confirmed}/{total} confirmed (coverage {cov}%, confirmation {conf}%), PM Methodology {score}%.\n"
+                "- Do NOT claim the requirement is enough/complete/ready, and do NOT tell the user to click Generate or Open Vibe Coding; both buttons unlock only after every structured item is confirmed AND PM Methodology is ready.\n"
+                "- This turn close exactly one highest-value gap: one question, end with A/B/C.\n"
+                f"- Next gap ({blocker_label}): {blocker_question}"
+            )
+
+        # Phase 2 - ready to generate: both gates passed, document not produced yet.
+        if not has_prd:
+            if zh:
+                return (
+                    "就绪状态机（权威指示，优先级最高）：\n"
+                    f"- 阶段=可生成。两道门已全绿（结构化全部确认、PM Methodology ready {score}%），右侧 “Generate Documents” 按钮已可点。\n"
+                    "- 请告诉用户需求已就绪、点击右侧 “Generate Documents” 生成正式文档；不要再开新澄清问题，除非用户补充新范围。\n"
+                    "- 生成文档之前还不要声称可以 Go Coding。"
+                )
+            return (
+                "READINESS STATE MACHINE (authoritative, highest priority):\n"
+                f"- Phase = ready to generate. Both gates are green (structured fully confirmed, PM Methodology ready {score}%); the right-side \"Generate Documents\" button is enabled.\n"
+                "- Tell the user the requirement is ready and to click \"Generate Documents\"; do not open new clarification questions unless they add scope.\n"
+                "- Do not claim Go Coding is ready until the document has been generated."
+            )
+
+        # Phase 3 - ready for handoff: both gates passed and the document exists.
+        if zh:
+            return (
+                "就绪状态机（权威指示，优先级最高）：\n"
+                "- 阶段=可交接。两道门已全绿且正式文档已生成。\n"
+                "- 可以引导用户点击右侧 Open Vibe Coding 进入编码交接；不要再开新澄清问题，除非出现冲突或新范围。"
+            )
+        return (
+            "READINESS STATE MACHINE (authoritative, highest priority):\n"
+            "- Phase = ready for handoff. Both gates are green and the document exists.\n"
+            "- Guide the user to click Open Vibe Coding for the coding handoff; do not open new clarification questions unless a conflict or new scope appears."
+        )
+
     def _pm_prompt(self, session: Session, language: str) -> str:
         language = self._normalize_language(language)
         normalized = self._normalize_prompt_template(session.prompt_template)
         base_prompt = PM_SYSTEM_PROMPT_ZH if language == "zh" else PM_SYSTEM_PROMPT
         prompt_parts = [base_prompt]
+        prompt_parts.append(self._readiness_phase_directive_for_prompt(session, language))
         prompt_parts.append(self._skill_style_ai_pm_method_prompt(language))
         methodology_state_addendum = self._pm_methodology_state_for_prompt(session, language)
         if methodology_state_addendum:
@@ -7185,33 +7880,29 @@ class RequirementCollectorService:
         if normalized == "zh":
             return (
                 "为了方便你快速确认，我先给三个选项：\n"
-                "A. 同意按上面的建议口径作为首版假设继续推进\n"
-                "B. 不同意，我补充实际业务口径或例外情况\n"
-                "C. 这个点先记为待确认，继续推进下一个关键需求\n\n"
-                "建议回复 A、B、C，或直接写你的补充。"
+                "A. 按一个明确的首版假设确认这个点\n"
+                "B. 我补充真实业务口径或例外情况\n"
+                "C. 这个点先保持待确认"
             )
         if normalized == "de":
             return (
                 "Zur schnellen Bestaetigung schlage ich drei Optionen vor:\n"
-                "A. Die oben genannte Empfehlung als Annahme fuer Version 1 verwenden\n"
-                "B. Nicht korrekt; ich ergaenze die echte Fachdefinition oder Ausnahme\n"
-                "C. Diesen Punkt vorerst offen lassen und mit der naechsten Kernanforderung fortfahren\n\n"
-                "Bitte antworte mit A, B, C oder deiner Ergaenzung."
+                "A. Diesen Punkt mit einer klaren Version-1-Annahme bestaetigen\n"
+                "B. Ich ergaenze die echte Fachdefinition oder Ausnahme\n"
+                "C. Diesen Punkt vorerst offen lassen"
             )
         if normalized == "ms":
             return (
                 "Untuk pengesahan cepat, saya cadangkan tiga pilihan:\n"
-                "A. Terima cadangan di atas sebagai andaian versi pertama\n"
-                "B. Tidak tepat; saya tambah definisi bisnes sebenar atau pengecualian\n"
-                "C. Simpan perkara ini sebagai belum disahkan dan teruskan ke keperluan utama seterusnya\n\n"
-                "Sila balas A, B, C atau tulis tambahan anda."
+                "A. Sahkan perkara ini dengan andaian versi pertama yang jelas\n"
+                "B. Saya tambah definisi bisnes sebenar atau pengecualian\n"
+                "C. Kekalkan perkara ini sebagai belum disahkan"
             )
         return (
             "To make this quick to confirm, choose one option:\n"
-            "A. Use the suggested interpretation above as the version-one assumption\n"
-            "B. Not quite; I will provide the real business wording or exception\n"
-            "C. Keep this point pending and move to the next key requirement\n\n"
-            "Reply with A, B, C, or write your correction directly."
+            "A. Confirm this point with a clear version-one assumption\n"
+            "B. I will provide the real business wording or exception\n"
+            "C. Keep this point pending for now"
         )
 
     def _normalize_start_function(self, start_function: str | None) -> str:
@@ -7234,7 +7925,7 @@ class RequirementCollectorService:
                 "- 用户不是从零开始，而是上传或粘贴了半成品需求书；先利用附件和对话里已有内容，不要重复询问已经明确的信息。\n"
                 "- 每次回复先简短归纳：已明确、推断但待确认、缺失、冲突。只保留和 PRD 质量有关的高信号内容。\n"
                 "- 下一问只追一个最影响 PRD 产出质量的缺口，优先级为：业务目标/范围、使用者与 owner、核心场景、业务规则、数据源/口径、流程状态、验收标准、out-of-scope。\n"
-                "- Draft completion：不要引入快速半成品文档概念；用附件 + 专家链路补齐最关键缺口。只有 structured requirement ready_to_generate=true 时，才提示生成文档并打开 Go Coding。\n"
+                "- Draft completion：不要引入快速半成品文档概念；用附件 + 专家链路补齐最关键缺口。只有 structured requirement ready_to_generate=true 时，才提示生成文档；文档生成/确认 OK 后，Go Coding 才能把文档交接给 Vibe Coding 平台。\n"
                 "- 附件推断永远是待确认，不得写成已确认事实；如果附件与用户口径冲突，直接指出冲突并请用户确认一个版本。\n"
                 "- 对 Production/Quality/TDI 仍使用对应专家链路，但问题必须围绕补齐 draft 缺口，而不是重新做流程审计。\n"
                 "- 最后一段必须给 A/B/C 选项，帮助用户快速确认、修正或暂存该缺口。"
@@ -7245,7 +7936,7 @@ class RequirementCollectorService:
                 "- Der Nutzer startet nicht bei null, sondern verbessert einen vorhandenen Requirement-Draft; nutze vorhandene Anhangs- und Dialoginhalte und frage klare Punkte nicht erneut.\n"
                 "- Jede Antwort fasst kurz zusammen: bestaetigt, abgeleitet aber zu bestaetigen, fehlend, Konflikt.\n"
                 "- Die naechste Frage schliesst genau die eine Luecke, die die PRD-Qualitaet am meisten blockiert: Ziel/Scope, Nutzer/Owner, Kernscenario, Regel, Datenquelle/Definition, Workflow-State, Acceptance oder Out-of-scope.\n"
-                "- Draft completion: kein fruehes Teildokument versprechen; nutze Anhang + Expertenkette, um die wichtigste Luecke zu schliessen. Go Coding erst anbieten, wenn structured requirement ready_to_generate=true ist.\n"
+                "- Draft completion: kein fruehes Teildokument versprechen; nutze Anhang + Expertenkette, um die wichtigste Luecke zu schliessen. Bei structured requirement ready_to_generate=true zuerst Dokumente erzeugen; Go Coding uebergibt erst danach an Vibe Coding.\n"
                 "- Anhangsableitungen sind immer pending confirmation, nie bestaetigte Fakten.\n"
                 "- Fuer Production/Quality/TDI bleibt die Expertenkette aktiv, aber sie dient der Draft-Lueckenschliessung statt einer neuen Prozessauditierung.\n"
                 "- Der letzte Absatz muss A/B/C Optionen zur schnellen Bestaetigung, Korrektur oder Pending-Markierung enthalten."
@@ -7256,7 +7947,7 @@ class RequirementCollectorService:
                 "- Pengguna bukan bermula dari kosong; gunakan kandungan lampiran dan perbualan sedia ada, jangan tanya semula perkara yang sudah jelas.\n"
                 "- Setiap jawapan ringkaskan secara pendek: sudah jelas, inferens perlu disahkan, masih kurang, konflik.\n"
                 "- Soalan seterusnya hanya menutup satu gap yang paling menghalang kualiti PRD: business goal/scope, user/owner, core scenario, business rule, data source/definition, workflow state, acceptance atau out-of-scope.\n"
-                "- Draft completion: jangan janji dokumen separuh siap awal; gunakan lampiran + expert chain untuk menutup gap paling penting. Tawarkan Go Coding hanya apabila structured requirement ready_to_generate=true.\n"
+                "- Draft completion: jangan janji dokumen separuh siap awal; gunakan lampiran + expert chain untuk menutup gap paling penting. Jika structured requirement ready_to_generate=true, jana dokumen dahulu; Go Coding hanya handoff dokumen itu ke Vibe Coding selepas dokumen OK.\n"
                 "- Inferens daripada lampiran sentiasa pending confirmation, bukan fakta sah.\n"
                 "- Untuk Production/Quality/TDI, kekalkan expert chain tetapi fokus pada melengkapkan gap draft, bukan audit proses baharu.\n"
                 "- Perenggan akhir mesti ada pilihan A/B/C untuk sahkan, betulkan atau simpan pending."
@@ -7266,7 +7957,7 @@ class RequirementCollectorService:
             "- The user is not starting from scratch; they are improving an existing draft requirement. Use attachment and conversation content first, and do not re-ask facts already present.\n"
             "- In each reply, briefly separate: confirmed, inferred but pending confirmation, missing, and conflicts. Keep only PRD-quality-relevant signal.\n"
             "- Ask exactly one next question that closes the biggest PRD-quality gap: business goal/scope, user/owner, core scenario, business rule, data source/definition, workflow state, acceptance criteria, or out-of-scope.\n"
-            "- Draft completion: do not promise an early partial document; use the attachment plus expert chain to close the biggest gap. Offer Go Coding only when structured requirement ready_to_generate=true.\n"
+            "- Draft completion: do not promise an early partial document; use the attachment plus expert chain to close the biggest gap. Once structured requirement ready_to_generate=true, generate documents first; Go Coding only hands that generated/approved document package to Vibe Coding.\n"
             "- Attachment-derived content is pending confirmation, never confirmed fact. If it conflicts with the user's wording, name the conflict and ask which version wins.\n"
             "- Production/Quality/TDI expert chains still apply, but use them to close draft gaps instead of restarting a process audit.\n"
             "- The final paragraph must include A/B/C options so the user can confirm, correct, or keep the gap pending."
@@ -7962,15 +8653,10 @@ class RequirementCollectorService:
             statuses_by_name.get(key) == "confirmed"
             for key in STRUCTURED_REQUIREMENT_GENERATION_CORE_KEYS
         )
-        # Reachable gate (kept in sync with frontend structuredRequirementProgress.ts):
-        # no conflict + strong coverage + a meaningful share confirmed. Models reliably
-        # plateau ~1 field short of all-confirmed; remaining gaps become assumptions.
-        ready_to_generate = (
-            total_count > 0
-            and conflict_count == 0
-            and collection_coverage_percentage >= 75
-            and confirmation_percentage >= 40
-        )
+        # Formal-document gate (kept in sync with frontend structuredRequirementProgress.ts):
+        # every structured requirement item must be confirmed. This app no longer
+        # treats pending fields as a PRD V0/draft handoff path.
+        ready_to_generate = fully_confirmed
 
         return {
             "total_count": total_count,
