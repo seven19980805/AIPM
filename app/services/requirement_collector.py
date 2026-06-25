@@ -7962,7 +7962,15 @@ class RequirementCollectorService:
             statuses_by_name.get(key) == "confirmed"
             for key in STRUCTURED_REQUIREMENT_GENERATION_CORE_KEYS
         )
-        ready_to_generate = fully_confirmed
+        # Reachable gate (kept in sync with frontend structuredRequirementProgress.ts):
+        # no conflict + strong coverage + a meaningful share confirmed. Models reliably
+        # plateau ~1 field short of all-confirmed; remaining gaps become assumptions.
+        ready_to_generate = (
+            total_count > 0
+            and conflict_count == 0
+            and collection_coverage_percentage >= 75
+            and confirmation_percentage >= 40
+        )
 
         return {
             "total_count": total_count,

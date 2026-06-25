@@ -3751,21 +3751,16 @@ function isDocumentGenerationIntentText(text: string): boolean {
   if (/(不要|不用|别|暫緩|暂缓|先不|not|don't|do not|no need).{0,12}(生成|generate|create)/i.test(text)) {
     return false
   }
-  return (
-    normalized.includes('生成文档') ||
-    normalized.includes('生成需求文档') ||
-    normalized.includes('生成 prd') ||
-    normalized.includes('生成prd') ||
-    normalized.includes('出文档') ||
-    normalized.includes('进入文档生成') ||
-    normalized.includes('文档生成阶段') ||
-    normalized.includes('generate document') ||
-    normalized.includes('generate documents') ||
-    normalized.includes('generate prd') ||
-    normalized.includes('create document') ||
-    normalized.includes('create documents') ||
-    normalized.includes('create prd')
-  )
+  // Chinese: 生成/出 ... 文档/需求文档/PRD/URD
+  if (/(生成|出)\s*(需求)?\s*(文档|prd|urd)/i.test(text)) {
+    return true
+  }
+  // English: "generate/create [the] document(s)/PRD/URD" — tolerate words in between
+  // (e.g. "A. Yes — generate the document").
+  if (/\b(generate|create)\b[\s\S]{0,10}\b(document|documents|doc|prd|urd)\b/i.test(normalized)) {
+    return true
+  }
+  return false
 }
 
 function isImmediateVibeCodingOpenChoice(option: ChoiceReplyOption): boolean {

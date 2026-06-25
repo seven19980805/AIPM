@@ -323,10 +323,10 @@ class TemplateExampleStartTest(unittest.TestCase):
         self.assertEqual(merged["collection_status"]["rules"]["status"], "confirmed")
         self.assertEqual(merged["collection_status"]["integrations"]["status"], "captured")
 
-    def test_generation_readiness_requires_all_items_confirmed_without_open_questions(self) -> None:
-        # Generation and Go Coding share the strict final-readiness gate:
-        # every structured item must be confirmed and no open/pending questions
-        # can remain.
+    def test_generation_readiness_allows_assumptions_with_open_questions(self) -> None:
+        # Reachable gate: no conflict + coverage >= 75% + confirmation >= 40%.
+        # Open/pending questions become assumptions and do NOT block generation,
+        # though they keep fully_confirmed False.
         collection_status = {
             key: {"status": "confirmed", "reason": "Confirmed.", "pending_questions": []}
             for key in REQUIREMENT_ITEM_KEYS
@@ -354,11 +354,12 @@ class TemplateExampleStartTest(unittest.TestCase):
 
         with_assumptions_progress = self.service._structured_requirement_progress(with_assumptions_model)
 
-        # Open/pending questions mean the requirement is not ready.
+        # Not "fully confirmed" (questions remain) ...
         self.assertFalse(with_assumptions_progress["fully_confirmed"])
         self.assertEqual(with_assumptions_progress["pending_question_count"], 1)
         self.assertEqual(with_assumptions_progress["open_question_count"], 1)
-        self.assertFalse(with_assumptions_progress["ready_to_generate"])
+        # ... but generation is still unlocked (unknowns become assumptions).
+        self.assertTrue(with_assumptions_progress["ready_to_generate"])
 
     def test_generation_readiness_blocks_on_conflict_or_low_coverage(self) -> None:
         # Conflict blocks readiness even at full coverage.
@@ -372,7 +373,7 @@ class TemplateExampleStartTest(unittest.TestCase):
         )
         self.assertFalse(conflict_progress["ready_to_generate"])
 
-        # One missing field is still not ready.
+        # One missing field is tolerated (8/9 = 89% coverage) -> still ready.
         one_missing = {
             key: {"status": "confirmed", "reason": "Confirmed.", "pending_questions": []}
             for key in REQUIREMENT_ITEM_KEYS
@@ -381,7 +382,7 @@ class TemplateExampleStartTest(unittest.TestCase):
         one_missing_progress = self.service._structured_requirement_progress(
             normalize_structured_requirement_model({"collection_status": one_missing})
         )
-        self.assertFalse(one_missing_progress["ready_to_generate"])
+        self.assertTrue(one_missing_progress["ready_to_generate"])
 
         # Too many missing fields (low coverage) blocks readiness.
         low_coverage = {
