@@ -679,6 +679,13 @@ DOCUMENT_FILENAME_LABELS = {
     },
 }
 
+DOCX_CONTENT_WIDTH_DXA = 9026
+DOCX_BULLET_NUM_ID = 1
+DOCX_ORDERED_NUM_ID_START = 2
+DOCX_PAGE_WIDTH_DXA = 11906
+DOCX_PAGE_HEIGHT_DXA = 16838
+DOCX_PAGE_MARGIN_DXA = 1440
+
 CONVERSATION_LABELS = {
     "en": "Requirement conversation messages",
     "de": "Nachrichten aus dem Anforderungsdialog",
@@ -8454,7 +8461,8 @@ class RequirementCollectorService:
         return f"{document_label}-{timestamp}.md"
 
     def _markdown_to_docx_bytes(self, markdown: str) -> bytes:
-        body_parts = self._markdown_to_docx_body(markdown)
+        numbering_state = {"next_ordered_num_id": DOCX_ORDERED_NUM_ID_START}
+        body_parts = self._markdown_to_docx_body(markdown, numbering_state)
         document_xml = (
             '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
@@ -8462,8 +8470,9 @@ class RequirementCollectorService:
             + "".join(body_parts)
             + (
                 "<w:sectPr>"
-                '<w:pgSz w:w="11906" w:h="16838"/>'
-                '<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" '
+                f'<w:pgSz w:w="{DOCX_PAGE_WIDTH_DXA}" w:h="{DOCX_PAGE_HEIGHT_DXA}"/>'
+                f'<w:pgMar w:top="{DOCX_PAGE_MARGIN_DXA}" w:right="{DOCX_PAGE_MARGIN_DXA}" '
+                f'w:bottom="{DOCX_PAGE_MARGIN_DXA}" w:left="{DOCX_PAGE_MARGIN_DXA}" '
                 'w:header="708" w:footer="708" w:gutter="0"/>'
                 "</w:sectPr>"
             )
@@ -8476,6 +8485,10 @@ class RequirementCollectorService:
             '<Default Extension="xml" ContentType="application/xml"/>'
             '<Override PartName="/word/document.xml" '
             'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+            '<Override PartName="/word/styles.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'
+            '<Override PartName="/word/numbering.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>'
             "</Types>"
         )
         rels_xml = (
@@ -8486,19 +8499,38 @@ class RequirementCollectorService:
             'Target="word/document.xml"/>'
             "</Relationships>"
         )
+        document_rels_xml = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" '
+            'Target="styles.xml"/>'
+            '<Relationship Id="rId2" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" '
+            'Target="numbering.xml"/>'
+            "</Relationships>"
+        )
 
         buffer = BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
             archive.writestr("[Content_Types].xml", content_types_xml)
             archive.writestr("_rels/.rels", rels_xml)
+            archive.writestr("word/_rels/document.xml.rels", document_rels_xml)
             archive.writestr("word/document.xml", document_xml)
+            archive.writestr("word/styles.xml", self._docx_styles_xml())
+            archive.writestr(
+                "word/numbering.xml",
+                self._docx_numbering_xml(numbering_state["next_ordered_num_id"]),
+            )
         return buffer.getvalue()
 
-    def _markdown_to_docx_body(self, markdown: str) -> list[str]:
+    def _markdown_to_docx_body(self, markdown: str, numbering_state: dict[str, int]) -> list[str]:
         markdown = self._plain_text_math_for_docx(markdown)
         lines = markdown.replace("\r\n", "\n").replace("\r", "\n").split("\n")
         body_parts: list[str] = []
         index = 0
+        active_list_type = ""
+        active_ordered_num_id = 0
 
         while index < len(lines):
             raw_line = lines[index]
@@ -8506,11 +8538,15 @@ class RequirementCollectorService:
             stripped = line.strip()
             if not stripped:
                 body_parts.append(self._docx_paragraph(""))
+                active_list_type = ""
+                active_ordered_num_id = 0
                 index += 1
                 continue
 
             fence_match = re.match(r"^\s*```([\w-]*)\s*$", line)
             if fence_match:
+                active_list_type = ""
+                active_ordered_num_id = 0
                 language = fence_match.group(1).strip().lower()
                 code_lines: list[str] = []
                 index += 1
@@ -8525,37 +8561,72 @@ class RequirementCollectorService:
                     body_parts.append(self._docx_paragraph(code_line, code=True))
                 continue
 
+            if re.match(r"^\s*([-*_])(?:\s*\1){2,}\s*$", line):
+                body_parts.append(self._docx_horizontal_rule())
+                active_list_type = ""
+                active_ordered_num_id = 0
+                index += 1
+                continue
+
             heading_match = re.match(r"^(#{1,6})\s+(.+?)\s*#*\s*$", line)
             if heading_match:
                 level = min(len(heading_match.group(1)), 6)
                 body_parts.append(self._docx_paragraph(heading_match.group(2), heading_level=level))
+                active_list_type = ""
+                active_ordered_num_id = 0
                 index += 1
                 continue
 
             if self._is_markdown_table_start(lines, index):
                 table_rows, next_index = self._collect_markdown_table(lines, index)
                 body_parts.append(self._docx_table(table_rows))
+                active_list_type = ""
+                active_ordered_num_id = 0
                 index = next_index
                 continue
 
-            unordered_match = re.match(r"^\s*[-*+]\s+(.+)$", line)
-            ordered_match = re.match(r"^\s*(\d+)[.)]\s+(.+)$", line)
+            unordered_match = re.match(r"^(\s*)[-*+]\s+(.+)$", line)
+            ordered_match = re.match(r"^(\s*)(\d+)[.)]\s+(.+)$", line)
             if unordered_match:
-                body_parts.append(self._docx_paragraph(unordered_match.group(1), prefix="• "))
+                level = self._docx_list_level(unordered_match.group(1))
+                body_parts.append(
+                    self._docx_paragraph(
+                        unordered_match.group(2),
+                        numbering_id=DOCX_BULLET_NUM_ID,
+                        numbering_level=level,
+                    )
+                )
+                active_list_type = "unordered"
+                active_ordered_num_id = 0
                 index += 1
                 continue
             if ordered_match:
-                body_parts.append(self._docx_paragraph(ordered_match.group(2), prefix=f"{ordered_match.group(1)}. "))
+                level = self._docx_list_level(ordered_match.group(1))
+                if active_list_type != "ordered" or active_ordered_num_id <= 0:
+                    active_ordered_num_id = numbering_state["next_ordered_num_id"]
+                    numbering_state["next_ordered_num_id"] += 1
+                body_parts.append(
+                    self._docx_paragraph(
+                        ordered_match.group(3),
+                        numbering_id=active_ordered_num_id,
+                        numbering_level=level,
+                    )
+                )
+                active_list_type = "ordered"
                 index += 1
                 continue
 
             quote_match = re.match(r"^\s*>\s?(.*)$", line)
             if quote_match:
                 body_parts.append(self._docx_paragraph(quote_match.group(1), italic=True))
+                active_list_type = ""
+                active_ordered_num_id = 0
                 index += 1
                 continue
 
             body_parts.append(self._docx_paragraph(stripped))
+            active_list_type = ""
+            active_ordered_num_id = 0
             index += 1
 
         return body_parts
@@ -8611,31 +8682,61 @@ class RequirementCollectorService:
         text: str,
         *,
         heading_level: int = 0,
-        prefix: str = "",
         bold: bool = False,
         italic: bool = False,
         code: bool = False,
+        numbering_id: int = 0,
+        numbering_level: int = 0,
     ) -> str:
         paragraph_props = ""
         if heading_level:
-            size = max(24, 36 - ((heading_level - 1) * 2))
             paragraph_props = (
                 "<w:pPr>"
+                f'<w:pStyle w:val="Heading{heading_level}"/>'
                 f'<w:outlineLvl w:val="{heading_level - 1}"/>'
                 "</w:pPr>"
             )
             return (
                 "<w:p>"
                 + paragraph_props
-                + self._docx_run(text, bold=True, size=size)
+                + self._docx_run(text)
                 + "</w:p>"
             )
 
         run_props = ""
+        paragraph_props = self._docx_paragraph_props(numbering_id, numbering_level)
         if code:
             run_props = '<w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/><w:sz w:val="18"/></w:rPr>'
-        runs = self._docx_inline_runs(f"{prefix}{text}", bold=bold, italic=italic, run_props=run_props)
+        runs = self._docx_inline_runs(text, bold=bold, italic=italic, run_props=run_props)
         return f"<w:p>{paragraph_props}{runs}</w:p>"
+
+    def _docx_paragraph_props(self, numbering_id: int = 0, numbering_level: int = 0) -> str:
+        if numbering_id <= 0:
+            return ""
+        return (
+            "<w:pPr>"
+            "<w:numPr>"
+            f'<w:ilvl w:val="{max(0, numbering_level)}"/>'
+            f'<w:numId w:val="{numbering_id}"/>'
+            "</w:numPr>"
+            "</w:pPr>"
+        )
+
+    def _docx_horizontal_rule(self) -> str:
+        return (
+            "<w:p>"
+            "<w:pPr>"
+            "<w:pBdr>"
+            '<w:bottom w:val="single" w:sz="6" w:space="1" w:color="B7C4D8"/>'
+            "</w:pBdr>"
+            '<w:spacing w:before="120" w:after="160"/>'
+            "</w:pPr>"
+            "</w:p>"
+        )
+
+    def _docx_list_level(self, leading_whitespace: str) -> int:
+        expanded = leading_whitespace.replace("\t", "    ")
+        return min(len(expanded) // 2, 2)
 
     def _docx_inline_runs(self, text: str, *, bold: bool = False, italic: bool = False, run_props: str = "") -> str:
         if run_props:
@@ -8708,31 +8809,146 @@ class RequirementCollectorService:
     def _docx_table(self, rows: list[list[str]]) -> str:
         if not rows:
             return self._docx_paragraph("")
+        column_count = max(len(row) for row in rows)
+        if column_count <= 0:
+            return self._docx_paragraph("")
+        normalized_rows = [row + [""] * (column_count - len(row)) for row in rows]
+        column_widths = self._docx_table_column_widths(column_count)
+        border_xml = (
+            '<w:top w:val="single" w:sz="4" w:space="0" w:color="D9E2F3"/>'
+            '<w:left w:val="single" w:sz="4" w:space="0" w:color="D9E2F3"/>'
+            '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="D9E2F3"/>'
+            '<w:right w:val="single" w:sz="4" w:space="0" w:color="D9E2F3"/>'
+            '<w:insideH w:val="single" w:sz="4" w:space="0" w:color="D9E2F3"/>'
+            '<w:insideV w:val="single" w:sz="4" w:space="0" w:color="D9E2F3"/>'
+        )
         table_parts = [
             "<w:tbl>",
             (
-                "<w:tblPr><w:tblBorders>"
-                '<w:top w:val="single" w:sz="4" w:space="0" w:color="D9E2F3"/>'
-                '<w:left w:val="single" w:sz="4" w:space="0" w:color="D9E2F3"/>'
-                '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="D9E2F3"/>'
-                '<w:right w:val="single" w:sz="4" w:space="0" w:color="D9E2F3"/>'
-                '<w:insideH w:val="single" w:sz="4" w:space="0" w:color="D9E2F3"/>'
-                '<w:insideV w:val="single" w:sz="4" w:space="0" w:color="D9E2F3"/>'
-                "</w:tblBorders></w:tblPr>"
+                "<w:tblPr>"
+                f'<w:tblW w:w="{DOCX_CONTENT_WIDTH_DXA}" w:type="dxa"/>'
+                "<w:tblBorders>"
+                + border_xml
+                + "</w:tblBorders>"
+                '<w:tblLook w:firstRow="1" w:lastRow="0" w:firstColumn="0" w:lastColumn="0" '
+                'w:noHBand="0" w:noVBand="1"/>'
+                "</w:tblPr>"
             ),
+            "<w:tblGrid>",
+            "".join(f'<w:gridCol w:w="{width}"/>' for width in column_widths),
+            "</w:tblGrid>",
         ]
-        for row_index, row in enumerate(rows):
+        for row_index, row in enumerate(normalized_rows):
             table_parts.append("<w:tr>")
-            for cell in row:
+            for column_index, cell in enumerate(row):
+                width = column_widths[column_index]
+                shading = '<w:shd w:val="clear" w:color="auto" w:fill="EAF2FF"/>' if row_index == 0 else ""
                 table_parts.append(
                     "<w:tc>"
-                    "<w:tcPr><w:tcW w:w=\"2400\" w:type=\"dxa\"/></w:tcPr>"
+                    f'<w:tcPr><w:tcW w:w="{width}" w:type="dxa"/>'
+                    + '<w:tcMar><w:top w:w="80" w:type="dxa"/><w:left w:w="120" w:type="dxa"/>'
+                    + '<w:bottom w:w="80" w:type="dxa"/><w:right w:w="120" w:type="dxa"/></w:tcMar>'
+                    + shading
+                    + "</w:tcPr>"
                     + self._docx_paragraph(cell, bold=row_index == 0)
                     + "</w:tc>"
                 )
             table_parts.append("</w:tr>")
         table_parts.append("</w:tbl>")
         return "".join(table_parts)
+
+    def _docx_table_column_widths(self, column_count: int) -> list[int]:
+        base_width = DOCX_CONTENT_WIDTH_DXA // column_count
+        widths = [base_width] * column_count
+        widths[-1] += DOCX_CONTENT_WIDTH_DXA - sum(widths)
+        return widths
+
+    def _docx_styles_xml(self) -> str:
+        heading_styles = []
+        heading_sizes = {1: 32, 2: 28, 3: 25, 4: 23, 5: 22, 6: 21}
+        for level in range(1, 7):
+            heading_styles.append(
+                f'<w:style w:type="paragraph" w:styleId="Heading{level}">'
+                f'<w:name w:val="heading {level}"/>'
+                '<w:basedOn w:val="Normal"/>'
+                '<w:next w:val="Normal"/>'
+                '<w:qFormat/>'
+                f'<w:pPr><w:keepNext/><w:spacing w:before="{240 if level <= 2 else 180}" '
+                f'w:after="{160 if level <= 2 else 100}"/>'
+                f'<w:outlineLvl w:val="{level - 1}"/></w:pPr>'
+                '<w:rPr><w:b/>'
+                f'<w:sz w:val="{heading_sizes[level]}"/>'
+                '<w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:eastAsia="Microsoft YaHei"/>'
+                "</w:rPr>"
+                "</w:style>"
+            )
+        return (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            "<w:docDefaults>"
+            "<w:rPrDefault><w:rPr>"
+            '<w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:eastAsia="Microsoft YaHei"/>'
+            '<w:sz w:val="22"/>'
+            '<w:lang w:val="en-US" w:eastAsia="zh-CN"/>'
+            "</w:rPr></w:rPrDefault>"
+            '<w:pPrDefault><w:pPr><w:spacing w:after="120"/></w:pPr></w:pPrDefault>'
+            "</w:docDefaults>"
+            '<w:style w:type="paragraph" w:default="1" w:styleId="Normal">'
+            '<w:name w:val="Normal"/>'
+            '<w:qFormat/>'
+            "</w:style>"
+            + "".join(heading_styles)
+            + "</w:styles>"
+        )
+
+    def _docx_numbering_xml(self, next_ordered_num_id: int) -> str:
+        ordered_nums = []
+        for num_id in range(DOCX_ORDERED_NUM_ID_START, max(next_ordered_num_id, DOCX_ORDERED_NUM_ID_START)):
+            ordered_nums.append(
+                f'<w:num w:numId="{num_id}"><w:abstractNumId w:val="2"/></w:num>'
+            )
+        return (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            '<w:abstractNum w:abstractNumId="1">'
+            '<w:multiLevelType w:val="hybridMultilevel"/>'
+            + self._docx_numbering_levels("bullet")
+            + "</w:abstractNum>"
+            '<w:abstractNum w:abstractNumId="2">'
+            '<w:multiLevelType w:val="hybridMultilevel"/>'
+            + self._docx_numbering_levels("decimal")
+            + "</w:abstractNum>"
+            f'<w:num w:numId="{DOCX_BULLET_NUM_ID}"><w:abstractNumId w:val="1"/></w:num>'
+            + "".join(ordered_nums)
+            + "</w:numbering>"
+        )
+
+    def _docx_numbering_levels(self, number_format: str) -> str:
+        levels = []
+        for level in range(3):
+            left = 720 + (level * 360)
+            if number_format == "bullet":
+                levels.append(
+                    f'<w:lvl w:ilvl="{level}">'
+                    '<w:start w:val="1"/>'
+                    '<w:numFmt w:val="bullet"/>'
+                    '<w:lvlText w:val="•"/>'
+                    '<w:lvlJc w:val="left"/>'
+                    f'<w:pPr><w:ind w:left="{left}" w:hanging="360"/></w:pPr>'
+                    '<w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr>'
+                    "</w:lvl>"
+                )
+            else:
+                levels.append(
+                    f'<w:lvl w:ilvl="{level}">'
+                    '<w:start w:val="1"/>'
+                    '<w:numFmt w:val="decimal"/>'
+                    '<w:lvlText w:val="%1."/>'
+                    '<w:lvlJc w:val="left"/>'
+                    f'<w:pPr><w:ind w:left="{left}" w:hanging="360"/></w:pPr>'
+                    "</w:lvl>"
+                )
+        return "".join(levels)
 
     def _safe_parse_structured_requirement_model(self, raw_model: str) -> dict[str, Any]:
         parsed = self._parse_json_from_model_output(raw_model)

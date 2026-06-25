@@ -3,7 +3,9 @@ import sys
 import tempfile
 import unittest
 import zipfile
+from io import BytesIO
 from pathlib import Path
+from xml.etree import ElementTree
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -1304,6 +1306,48 @@ class TemplateExampleStartTest(unittest.TestCase):
         self.assertIn("Do not present captured or pending_confirmation items as confirmed facts", prd_payload)
         self.assertIn("Document quality gate", design_payload)
         self.assertIn("Confirm the cost formula.", design_payload)
+
+    def test_docx_export_uses_word_structure_for_headings_lists_and_tables(self) -> None:
+        markdown = "\n".join(
+            [
+                "# Export Quality",
+                "",
+                "---",
+                "",
+                "## Scope",
+                "",
+                "- First bullet",
+                "- **Second bullet** with `code`",
+                "",
+                "1. First ordered item",
+                "2. Second ordered item",
+                "",
+                "| Area | Status |",
+                "|------|--------|",
+                "| Objective | Confirmed |",
+            ]
+        )
+
+        docx_bytes = self.service._markdown_to_docx_bytes(markdown)
+
+        with zipfile.ZipFile(BytesIO(docx_bytes)) as archive:
+            names = set(archive.namelist())
+            self.assertIn("word/styles.xml", names)
+            self.assertIn("word/numbering.xml", names)
+            document_xml = archive.read("word/document.xml").decode("utf-8")
+            numbering_xml = archive.read("word/numbering.xml").decode("utf-8")
+
+        root = ElementTree.fromstring(document_xml)
+        namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+
+        self.assertEqual(document_xml.count("•"), 0)
+        self.assertEqual(document_xml.count("---"), 0)
+        self.assertGreaterEqual(len(root.findall(".//w:pStyle", namespace)), 2)
+        self.assertGreaterEqual(len(root.findall(".//w:numPr", namespace)), 4)
+        self.assertGreaterEqual(len(root.findall(".//w:tblGrid", namespace)), 1)
+        self.assertGreaterEqual(len(root.findall(".//w:shd", namespace)), 1)
+        self.assertIn('w:val="bullet"', numbering_xml)
+        self.assertIn('w:val="decimal"', numbering_xml)
 
     def test_structured_requirement_prompt_contains_option_a_extraction_rules(self) -> None:
         session = self.service.create_session(language="zh")
