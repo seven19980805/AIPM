@@ -956,12 +956,12 @@ def create_coding_handoff(session_id: str):
 
     payload = result.get("payload") if isinstance(result.get("payload"), dict) else result
     if not payload.get("handoff_ready", True):
-        methodology_gaps = payload.get("methodology_gaps", [])
-        gap_summary = ", ".join(str(item) for item in methodology_gaps) or "PM methodology gaps"
+        handoff_gaps = payload.get("handoff_gaps") or payload.get("methodology_gaps", [])
+        gap_summary = ", ".join(str(item) for item in handoff_gaps) or "handoff gate not ready"
         return (
             jsonify(
                 {
-                    "error": f"PM Methodology is not ready for Go Coding handoff: {gap_summary}.",
+                    "error": f"Go Coding handoff is not ready: {gap_summary}.",
                     **payload,
                 }
             ),

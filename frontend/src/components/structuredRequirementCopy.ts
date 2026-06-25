@@ -142,7 +142,7 @@ export const structuredRequirementPanelCopy = {
       coverage: 'Collection Coverage',
       confirmationRate: 'Confirmation Progress',
       pendingConfirmation: 'Pending',
-      blockingQuestions: 'Open / pending questions',
+      blockingQuestions: 'Blocking questions',
       conflict: 'Conflict',
     },
     methodologyLabels: {
@@ -313,7 +313,7 @@ export const structuredRequirementPanelCopy = {
       coverage: 'Erfassungsgrad',
       confirmationRate: 'Bestaetigungsstand',
       pendingConfirmation: 'Offen',
-      blockingQuestions: 'Open / Pending Questions',
+      blockingQuestions: 'Blockierende Fragen',
       conflict: 'Konflikt',
     },
     methodologyLabels: {
@@ -484,7 +484,7 @@ export const structuredRequirementPanelCopy = {
       coverage: '\u6536\u96c6\u8986\u76d6\u7387',
       confirmationRate: '\u786e\u8ba4\u5b8c\u6210\u5ea6',
       pendingConfirmation: '\u5f85\u786e\u8ba4',
-      blockingQuestions: '待处理问题',
+      blockingQuestions: '阻塞问题',
       conflict: '\u6709\u51b2\u7a81',
     },
     methodologyLabels: {
@@ -655,7 +655,7 @@ export const structuredRequirementPanelCopy = {
       coverage: 'Liputan Kutipan',
       confirmationRate: 'Kemajuan Pengesahan',
       pendingConfirmation: 'Perlu sahkan',
-      blockingQuestions: 'Open / pending questions',
+      blockingQuestions: 'Soalan menghalang',
       conflict: 'Bercanggah',
     },
     methodologyLabels: {

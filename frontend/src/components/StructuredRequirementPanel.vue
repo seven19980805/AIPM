@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 
 import { structuredRequirementPanelCopy } from './structuredRequirementCopy'
+import type { DocumentQaState } from '../lib/documentQa'
 import { computeStructuredRequirementProgress } from '../lib/structuredRequirementProgress'
 import type { LanguageCode } from '../types/session'
 import type {
@@ -30,6 +31,7 @@ const props = withDefaults(
     generationDisabled?: boolean
     generationLabel?: string
     hasPrdDocument?: boolean
+    documentQaState?: DocumentQaState | null
     error?: string
   }>(),
   {
@@ -40,6 +42,7 @@ const props = withDefaults(
     generationDisabled: false,
     generationLabel: '',
     hasPrdDocument: false,
+    documentQaState: null,
     error: '',
   },
 )
@@ -145,14 +148,12 @@ const generationActionLabel = computed(() => {
   return copy.value.generateDocuments
 })
 
-const methodologyReadyForHandoff = computed(
-  () => !props.pmMethodologyState.checks.length || props.pmMethodologyState.ready_for_pm_review,
-)
-
-const canGenerateDocuments = computed(() => progress.value.readyToGenerate && methodologyReadyForHandoff.value)
+// PM Methodology is advisory (a quality score), not a hard gate. Generate unlocks on the
+// structured "Fully Confirmed" gate alone; Go Coding additionally needs the document.
+const canGenerateDocuments = computed(() => progress.value.readyToGenerate)
 
 const canOpenPanelGoCoding = computed(
-  () => progress.value.readyToGenerate && props.hasPrdDocument && methodologyReadyForHandoff.value,
+  () => progress.value.readyToGenerate && props.hasPrdDocument,
 )
 
 const methodologyVisible = computed(() => props.pmMethodologyState.checks.length > 0)
@@ -200,6 +201,61 @@ const icEvidenceContextRows = computed(() => {
       value: summarizeText(context.source_of_truth),
     },
   ].filter((item) => item.value)
+})
+
+const documentQaVisible = computed(() => props.documentQaState !== null)
+
+const documentQaSourceLabel = computed(() => {
+  if (!props.documentQaState) {
+    return ''
+  }
+  return props.documentQaState.sourceKind === 'design_doc' ? '设计文档 QA' : '需求文档 QA'
+})
+
+const documentQaProductionClass = computed(() => {
+  const readiness = props.documentQaState?.productionReadiness.toLowerCase() ?? ''
+  if (readiness.includes('blocked')) {
+    return 'blocked'
+  }
+  if (readiness.includes('review')) {
+    return 'review'
+  }
+  if (readiness.includes('ready')) {
+    return 'ready'
+  }
+  return 'unknown'
+})
+
+const documentQaTopBlockers = computed(() =>
+  (props.documentQaState?.productionBlockers ?? []).slice(0, 3),
+)
+
+const documentQaFindingCount = computed(
+  () =>
+    (props.documentQaState?.productionBlockers.length ?? 0) +
+    (props.documentQaState?.businessRuleFindings.length ?? 0) +
+    (props.documentQaState?.implementationFindings.length ?? 0),
+)
+
+const documentQaDemoReadinessText = computed(() =>
+  formatDocumentQaReadiness(props.documentQaState?.demoReadiness ?? '', 'Demo'),
+)
+
+const documentQaProductionReadinessText = computed(() =>
+  formatDocumentQaReadiness(props.documentQaState?.productionReadiness ?? '', '生产版'),
+)
+
+const documentQaHandoffNote = computed(() => {
+  if (!props.documentQaState) {
+    return ''
+  }
+  if (documentQaProductionClass.value === 'blocked') {
+    return 'Demo 可以交接；生产版仍有阻塞项。'
+  }
+  if (documentQaProductionClass.value === 'review') {
+    return 'Demo 可以交接；生产假设需要人工复核。'
+  }
+  return '文档已可交接。'
 })
 
 function buildRow(
@@ -283,6 +339,28 @@ function methodologyEvidenceSummary(check: PMMethodologyCheck): string {
     return summarizeList(check.missing, 2)
   }
   return copy.value.notCaptured
+}
+
+function formatDocumentQaReadiness(value: string, scopeLabel: string): string {
+  const normalized = value.trim()
+  const lower = normalized.toLowerCase()
+  const prefix = scopeLabel === 'Demo' ? 'Demo ' : scopeLabel
+  if (!normalized) {
+    return '-'
+  }
+  if (lower.includes('blocked')) {
+    return `${prefix}受阻`
+  }
+  if (lower.includes('review')) {
+    return '需人工复核'
+  }
+  if (lower.includes('ready') && lower.includes('assumption')) {
+    return `${prefix}可交接（含假设）`
+  }
+  if (lower.includes('ready')) {
+    return `${prefix}可交接`
+  }
+  return normalized
 }
 
 function icEvidenceSummary(check: ICSubstrateEvidenceCheck): string {
@@ -415,6 +493,51 @@ function summarizeText(value: string): string {
         >
           {{ generatingDocuments ? copy.generatingDocuments : generationActionLabel }}
         </button>
+      </div>
+    </section>
+
+    <section v-if="documentQaVisible && documentQaState" class="requirement-card document-qa-card">
+      <header class="card-head">
+        <div class="card-title">
+          <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 11l2 2 4-5"/>
+            <path d="M21 12a9 9 0 1 1-6.2-8.56"/>
+          </svg>
+          <h3>Document QA</h3>
+        </div>
+        <span class="document-qa-source">{{ documentQaSourceLabel }}</span>
+      </header>
+
+      <div class="document-qa-summary">
+        <div class="document-qa-row">
+          <span>Demo 可交付性</span>
+          <strong>{{ documentQaDemoReadinessText }}</strong>
+        </div>
+        <div class="document-qa-row">
+          <span>生产可用性</span>
+          <strong class="document-qa-status" :class="documentQaProductionClass">
+            {{ documentQaProductionReadinessText }}
+          </strong>
+        </div>
+        <div class="document-qa-row">
+          <span>未决问题</span>
+          <strong>{{ documentQaState.openQuestionCount ?? '-' }}</strong>
+        </div>
+        <div class="document-qa-row">
+          <span>QA 发现</span>
+          <strong>{{ documentQaFindingCount }}</strong>
+        </div>
+      </div>
+
+      <p class="document-qa-note" :class="documentQaProductionClass">
+        {{ documentQaHandoffNote }}
+      </p>
+
+      <div v-if="documentQaTopBlockers.length" class="document-qa-blockers">
+        <span>主要阻塞项</span>
+        <ul>
+          <li v-for="blocker in documentQaTopBlockers" :key="blocker">{{ blocker }}</li>
+        </ul>
       </div>
     </section>
 
@@ -619,6 +742,7 @@ function summarizeText(value: string): string {
 }
 
 .table-card {
+  order: 2;
   flex: 0 0 auto;
   width: 100%;
   min-height: 0;
@@ -628,6 +752,7 @@ function summarizeText(value: string): string {
 }
 
 .progress-card {
+  order: 1;
   flex: 0 0 auto;
   align-self: start;
   width: 100%;
@@ -850,13 +975,130 @@ function summarizeText(value: string): string {
 }
 
 .methodology-card {
+  order: 5;
   flex: 0 0 auto;
   width: 100%;
 }
 
 .ic-evidence-card {
+  order: 4;
   flex: 0 0 auto;
   width: 100%;
+}
+
+.document-qa-card {
+  order: 3;
+  flex: 0 0 auto;
+  width: 100%;
+}
+
+.document-qa-source {
+  flex-shrink: 0;
+  padding: 4px 7px;
+  border-radius: 8px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.document-qa-summary {
+  padding: 0 16px 10px;
+  display: grid;
+  gap: 0;
+}
+
+.document-qa-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+  font-size: 0.78rem;
+}
+
+.document-qa-row:first-child {
+  border-top: 0;
+}
+
+.document-qa-row span {
+  color: var(--muted);
+}
+
+.document-qa-row strong {
+  min-width: 0;
+  color: var(--ink);
+  font-size: 0.78rem;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.document-qa-status.blocked {
+  color: var(--status-danger-ink);
+}
+
+.document-qa-status.review {
+  color: var(--status-warning-ink);
+}
+
+.document-qa-status.ready {
+  color: var(--status-success-ink);
+}
+
+.document-qa-note {
+  margin: 0 16px 12px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  font-size: 0.76rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.document-qa-note.blocked {
+  background: var(--status-danger-bg);
+  color: var(--status-danger-ink);
+}
+
+.document-qa-note.review,
+.document-qa-note.unknown {
+  background: var(--status-warning-bg);
+  color: var(--status-warning-ink);
+}
+
+.document-qa-note.ready {
+  background: var(--status-success-bg);
+  color: var(--status-success-ink);
+}
+
+.document-qa-blockers {
+  margin: 0 16px 16px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.document-qa-blockers > span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.document-qa-blockers ul {
+  margin: 0;
+  padding-left: 16px;
+  display: grid;
+  gap: 5px;
+}
+
+.document-qa-blockers li {
+  color: var(--ink);
+  font-size: 0.74rem;
+  line-height: 1.35;
 }
 
 .methodology-summary {

@@ -74,7 +74,10 @@ export function computeStructuredRequirementProgress(
       sum + (model.collection_status[key]?.pending_questions ?? []).filter((item) => item.trim()).length,
     0,
   )
-  const blockingQuestionCount = openQuestionCount + pendingQuestionCount
+  // Top-level open_questions are PRD caveats/notes. They should be visible in
+  // previews, but they must not keep the interview circling once every
+  // structured requirement item is confirmed.
+  const blockingQuestionCount = pendingQuestionCount
   const collectionCoveragePercentage = totalCount
     ? Math.round((collectedCount / totalCount) * 100)
     : 0
@@ -101,8 +104,9 @@ export function computeStructuredRequirementProgress(
     readinessPercentage = Math.min(readinessPercentage, 94)
   }
   // Formal-document gate (kept in sync with backend _structured_requirement_progress):
-  // every structured requirement item must be confirmed. Pending fields should
-  // keep the interview going instead of producing a PRD V0/draft handoff.
+  // every structured requirement item must be confirmed. Field-level pending
+  // questions keep the interview going; top-level open_questions are carried as
+  // PRD caveats rather than hard blockers.
   const readyToGenerate = fullyConfirmed
 
   return {

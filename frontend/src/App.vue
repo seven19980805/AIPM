@@ -5,7 +5,9 @@ import type { BusinessTemplateDetail, BusinessTemplateSummary } from './types/bu
 import MarkdownRenderer from './components/MarkdownRenderer.vue'
 import RequirementMarkdownPreview from './components/RequirementMarkdownPreview.vue'
 import StructuredRequirementPanel from './components/StructuredRequirementPanel.vue'
+import { extractChoiceReplyOptions, type ChoiceReplyOption } from './lib/choiceReplyOptions'
 import { computeStructuredRequirementProgress } from './lib/structuredRequirementProgress'
+import { parseDocumentQa } from './lib/documentQa'
 import type {
   ChatMessage,
   ChatMessagePayload,
@@ -80,11 +82,6 @@ type FastSeedOption = {
   label: string
   seed: string
 }
-type ChoiceReplyOption = {
-  key: 'A' | 'B' | 'C'
-  label: string
-  value: string
-}
 type GenerateDocumentsOptions = {
   refreshBeforeGate?: boolean
 }
@@ -110,9 +107,6 @@ const SESSION_TITLE_MAX_ENGLISH_WORDS = 5
 const SESSION_TITLE_ELLIPSIS = '...'
 const SESSION_TITLE_CJK_PATTERN = /[\u3400-\u9fff]/
 const SESSION_TITLE_LATIN_PATTERN = /[A-Za-z]/
-const CHOICE_OPTION_BOUNDARY_PATTERN = String.raw`[\s:：?？。；;]`
-const PRD_V0_CHOICE_NOTE_PATTERN = /\bPRD V0\s+(?:fast path|schnellpfad|laluan pantas|快速路径)[\s\S]*$/i
-
 const loadingSession = ref(false)
 const loadingHistory = ref(false)
 const loadingTemplates = ref(false)
@@ -883,11 +877,19 @@ const composerFastSeedOptions = computed<FastSeedOption[]>(() => {
 })
 const latestPrdDocument = computed(() => findLatestDocumentMessage('prd_doc'))
 const latestDesignDocument = computed(() => findLatestDocumentMessage('design_doc'))
-const pmMethodologyReadyForHandoff = computed(() =>
-  !pmMethodologyState.value.checks.length || pmMethodologyState.value.ready_for_pm_review,
-)
+const latestDocumentQa = computed(() => {
+  const designDocument = latestDesignDocument.value
+  if (designDocument) {
+    const designQa = parseDocumentQa(designDocument.content, 'design_doc')
+    if (designQa) {
+      return designQa
+    }
+  }
+  const prdDocument = latestPrdDocument.value
+  return prdDocument ? parseDocumentQa(prdDocument.content, 'prd_doc') : null
+})
 const canGenerateDocumentsForCurrentState = computed(() =>
-  structuredRequirementProgress.value.readyToGenerate && pmMethodologyReadyForHandoff.value,
+  structuredRequirementProgress.value.readyToGenerate,
 )
 const canOpenGoCoding = computed(() =>
   hasSession.value &&
@@ -1015,15 +1017,15 @@ const composerGoCodingHelpText = computed(() => {
   if (!structuredRequirementProgress.value.readyToGenerate) {
     const blockers = structuredRequirementProgress.value.blockingQuestionCount
     if (currentLanguage.value === 'zh') {
-      return `需求信息还不够稳定；右侧仍有 ${blockers} 个 open/pending questions。先补齐关键缺口，再生成文档。`
+      return `需求信息还不够稳定；右侧仍有 ${blockers} 个字段级阻塞问题。先补齐关键缺口，再生成文档。`
     }
     if (currentLanguage.value === 'de') {
-      return `Die Anforderung ist noch nicht stabil genug; rechts bleiben ${blockers} Open/Pending Questions. Klaere zuerst die groessten Luecken, dann Dokumente erzeugen.`
+      return `Die Anforderung ist noch nicht stabil genug; rechts bleiben ${blockers} blockierende Feldfragen. Klaere zuerst die groessten Luecken, dann Dokumente erzeugen.`
     }
     if (currentLanguage.value === 'ms') {
-      return `Requirement belum cukup stabil; masih ada ${blockers} open/pending questions. Tutup gap utama dahulu, kemudian jana dokumen.`
+      return `Requirement belum cukup stabil; masih ada ${blockers} soalan field yang menghalang. Tutup gap utama dahulu, kemudian jana dokumen.`
     }
-    return `Requirements are not stable enough yet; ${blockers} open/pending questions remain. Close the key gaps first, then generate documents.`
+    return `Requirements are not stable enough yet; ${blockers} blocking field questions remain. Close the key gaps first, then generate documents.`
   }
   if (!latestPrdDocument.value) {
     if (currentLanguage.value === 'zh') {
@@ -1076,23 +1078,6 @@ const conversationGoalActionDisabled = computed(() => {
   return true
 })
 function goCodingNotReadyMessage(): string {
-  if (
-    structuredRequirementProgress.value.readyToGenerate &&
-    latestPrdDocument.value &&
-    !pmMethodologyReadyForHandoff.value
-  ) {
-    const missingCount = pmMethodologyState.value.missing_evidence.length
-    if (currentLanguage.value === 'zh') {
-      return `Go Coding 还不能交接：PM Methodology 仍有 ${missingCount || '若干'} 个缺口。请先补齐右侧 Missing/Partial 项，再交接到 Vibe Coding。`
-    }
-    if (currentLanguage.value === 'de') {
-      return `Go Coding ist noch blockiert: In der PM Methodology bleiben ${missingCount || 'einige'} Luecken. Bitte zuerst die Missing/Partial-Punkte rechts schliessen.`
-    }
-    if (currentLanguage.value === 'ms') {
-      return `Go Coding masih belum boleh handoff: PM Methodology ada ${missingCount || 'beberapa'} gap. Tutup item Missing/Partial di panel kanan dahulu.`
-    }
-    return `Go Coding is still blocked: PM Methodology has ${missingCount || 'some'} remaining gaps. Close the Missing/Partial items in the right panel first.`
-  }
   if (structuredRequirementProgress.value.readyToGenerate && !latestPrdDocument.value) {
     if (currentLanguage.value === 'zh') {
       return 'Go Coding 需要先有生成完成的需求文档。请先点击“生成文档”，确认文档 OK 后再交接到 Vibe Coding。'
@@ -2290,7 +2275,7 @@ function redirectToGoCoding(token: string) {
   targetUrl.searchParams.set('source', 'rqmd')
   targetUrl.searchParams.set('handoff_token', token)
   targetUrl.searchParams.set('pm_api_base_url', pmApiBaseUrlForExternalHandoff())
-  window.location.assign(targetUrl.toString())
+  window.open(targetUrl.toString(), '_blank', 'noopener')
 }
 
 async function openGoCoding() {
@@ -2372,19 +2357,6 @@ async function ensureBusinessTemplateDetail(templateId: string): Promise<Busines
 
 function buildDocumentGenerationConfirmMessage(): string {
   const progress = structuredRequirementProgress.value
-  if (structuredRequirementProgress.value.readyToGenerate && !pmMethodologyReadyForHandoff.value) {
-    const missingCount = pmMethodologyState.value.missing_evidence.length
-    if (currentLanguage.value === 'zh') {
-      return `需求模型已经足够，但 PM Methodology 还没 ready：仍有 ${missingCount || '若干'} 个 Missing/Partial 缺口。请先补齐右侧 PM Methodology，再生成正式文档和 Go Coding 交接。`
-    }
-    if (currentLanguage.value === 'de') {
-      return `Das Requirement-Modell ist ausreichend, aber die PM Methodology ist noch nicht bereit: ${missingCount || 'einige'} Missing/Partial-Luecken bleiben. Bitte zuerst die rechte PM-Methodology-Liste schliessen.`
-    }
-    if (currentLanguage.value === 'ms') {
-      return `Model requirement sudah cukup, tetapi PM Methodology belum ready: masih ada ${missingCount || 'beberapa'} gap Missing/Partial. Tutup item PM Methodology di panel kanan dahulu.`
-    }
-    return `The requirement model is ready, but PM Methodology is not: ${missingCount || 'some'} Missing/Partial gaps remain. Close the right-panel PM Methodology items before generating final documents or Go Coding handoff.`
-  }
   if (currentLanguage.value === 'zh') {
     return `当前文档就绪度为 ${progress.readinessPercentage}%，收集覆盖率为 ${progress.collectionCoveragePercentage}%，确认完成度为 ${progress.confirmationPercentage}%。生成文档需要无冲突、覆盖率至少 75%、确认完成度至少 40%；Go Coding 只能在文档生成并确认 OK 后交接到 Vibe Coding。请先补齐右侧关键缺口。`
   }
@@ -3729,50 +3701,12 @@ async function insertLineBreak(event: KeyboardEvent) {
   autoResizeTextarea()
 }
 
-function extractChoiceReplyOptions(content: string): ChoiceReplyOption[] {
-  const options: ChoiceReplyOption[] = []
-  const seen = new Set<string>()
-  const normalized = content.replace(/\r?\n/g, ' ')
-  const boundary = CHOICE_OPTION_BOUNDARY_PATTERN
-  const choiceRegex = new RegExp(
-    `(?:^|${boundary})(?:[-*]\\s*)?(?:\\*\\*)?([ABC])(?:\\*\\*)?\\s*[\\.)、:：-]\\s*([\\s\\S]*?)(?=(?:${boundary}|^)(?:[-*]\\s*)?(?:\\*\\*)?[ABC](?:\\*\\*)?\\s*[\\.)、:：-]\\s*|$)`,
-    'gi',
-  )
-
-  for (const match of normalized.matchAll(choiceRegex)) {
-    const key = match[1].toUpperCase() as ChoiceReplyOption['key']
-    if (seen.has(key)) {
-      continue
-    }
-    const label = match[2]
-      .replace(/\*\*/g, '')
-      .replace(PRD_V0_CHOICE_NOTE_PATTERN, '')
-      .replace(/\s+/g, ' ')
-      .replace(/^["'“”]+|["'“”]+$/g, '')
-      .trim()
-    if (!label) {
-      continue
-    }
-    options.push({
-      key,
-      label,
-      value: `${key}. ${label}`,
-    })
-    seen.add(key)
-    if (options.length >= 3) {
-      break
-    }
-  }
-
-  return options.length >= 2 ? options : []
-}
-
 function isPrdV0ChoiceOnlyReply(content: string): boolean {
   const trimmed = content.trim()
   return (
     trimmed.length <= PRD_V0_CHOICE_ONLY_MAX_LENGTH &&
     !trimmed.includes('\n') &&
-    /^[ABC]\s*[\.)、:：-]\s+\S[\s\S]*$/i.test(trimmed)
+    /^[ABCD]\s*[\.)、:：-]\s+\S[\s\S]*$/i.test(trimmed)
   )
 }
 
@@ -3812,7 +3746,10 @@ function welcomeChoiceSeedShape(option: ChoiceReplyOption): FastSeedShapeKey | '
   if (!activeIcSubstrateDepartment.value) {
     return ''
   }
-  const optionIndex = { A: 0, B: 1, C: 2 }[option.key]
+  const optionIndex = ({ A: 0, B: 1, C: 2 } as Partial<Record<ChoiceReplyOption['key'], number>>)[option.key]
+  if (optionIndex === undefined) {
+    return ''
+  }
   return fastSeedShapeKeysForDepartment(activeIcSubstrateDepartment.value)[optionIndex] ?? ''
 }
 
@@ -4966,6 +4903,7 @@ watch(messageRenderSignature, (signature, previousSignature) => {
                 :generation-disabled="messagePipelineActive || switchingSession || documentGenerationConfirmOpen || !hasSession"
                 :generation-label="documentGenerationActionLabel"
                 :has-prd-document="Boolean(latestPrdDocument)"
+                :document-qa-state="latestDocumentQa"
                 :error="structuredRequirementError"
                 @generate-documents="generatePanelDocuments"
                 @go-coding="openGoCodingWhenReady"
