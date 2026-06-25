@@ -2782,6 +2782,10 @@ class RequirementCollectorService:
                 canonical_model,
                 previous_canonical_model,
             )
+            canonical_model = self._apply_recent_choice_confirmation_to_model(
+                canonical_model,
+                session.messages,
+            )
             self._save_structured_requirement_model_cache(
                 session.id,
                 STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
@@ -2924,6 +2928,105 @@ class RequirementCollectorService:
         if previous_rank > current_rank:
             return previous
         return current
+
+    def _apply_recent_choice_confirmation_to_model(
+        self,
+        structured_requirement_model: dict[str, Any],
+        messages: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        model = normalize_structured_requirement_model(structured_requirement_model)
+        confirmed_key = self._recent_option_a_confirmed_requirement_key(messages)
+        if not confirmed_key:
+            return model
+
+        evidence = self._structured_requirement_evidence_for_key(model, confirmed_key)
+        if self._is_degenerate_capture(evidence):
+            return model
+
+        item = model["collection_status"].get(confirmed_key)
+        if not isinstance(item, dict):
+            return model
+        if str(item.get("status", "")).strip().lower() == "conflict":
+            return model
+
+        item["status"] = "confirmed"
+        item["reason"] = "Confirmed via Option A using the assistant's offered version-one wording."
+        item["pending_questions"] = []
+        return model
+
+    def _recent_option_a_confirmed_requirement_key(self, messages: list[dict[str, Any]]) -> str:
+        chat_messages = self._chat_history_messages(messages)
+        if len(chat_messages) < 2:
+            return ""
+
+        latest_user_index = next(
+            (
+                index
+                for index in range(len(chat_messages) - 1, -1, -1)
+                if str(chat_messages[index].get("role", "")).lower() == "user"
+            ),
+            -1,
+        )
+        if latest_user_index <= 0:
+            return ""
+
+        latest_user_text = str(chat_messages[latest_user_index].get("content", "") or "").strip()
+        if not self._looks_like_option_a_confirmation(latest_user_text):
+            return ""
+
+        previous_assistant = next(
+            (
+                chat_messages[index]
+                for index in range(latest_user_index - 1, -1, -1)
+                if str(chat_messages[index].get("role", "")).lower() == "assistant"
+            ),
+            None,
+        )
+        if not previous_assistant:
+            return ""
+
+        assistant_text = str(previous_assistant.get("content", "") or "")
+        option_a_text = self._extract_option_a_text(assistant_text)
+        return self._requirement_key_from_confirmation_text(
+            "\n".join([latest_user_text, option_a_text, assistant_text]),
+        )
+
+    def _looks_like_option_a_confirmation(self, text: str) -> bool:
+        normalized = " ".join(str(text or "").strip().split()).lower()
+        if not normalized:
+            return False
+        return bool(
+            re.match(r"^(a|a[.、):：-])\b", normalized)
+            or normalized.startswith(("选a", "我选a", "确认a", "按a", "confirm "))
+        )
+
+    def _extract_option_a_text(self, assistant_text: str) -> str:
+        match = re.search(
+            r"(?:^|\n)\s*A[.)、:：-]\s*([\s\S]*?)(?=(?:\n\s*B[.)、:：-]\s*)|$)",
+            assistant_text,
+            flags=re.IGNORECASE,
+        )
+        if not match:
+            return ""
+        return " ".join(match.group(1).split())
+
+    def _requirement_key_from_confirmation_text(self, text: str) -> str:
+        normalized = " ".join(str(text or "").lower().split())
+        label_patterns = (
+            ("acceptance", (r"\bacceptance\b", r"\b验收")),
+            ("rules", (r"\bbusiness rules?\b", r"\bcalculation", r"\bformula", r"\bfpy\b", r"\byield loss")),
+            ("integrations", (r"\bintegration", r"\bsource system", r"\bdata source")),
+            ("pages", (r"\bpages?\b", r"\bscreens?\b", r"\bviews?\b", r"\bentry point", r"\bbrowser url", r"\binteraction flow")),
+            ("features", (r"\bfunctional requirements?\b", r"\bfeatures?\b", r"\bvisuali[sz]ation", r"\bchart")),
+            ("scenarios", (r"\bcore scenarios?\b", r"\buse scenarios?\b", r"\buser tasks?\b")),
+            ("users", (r"\btarget users?\b", r"\bprimary users?\b", r"\bactors?\b")),
+            ("scope", (r"\bscope\b", r"\bp0\b", r"\bout of scope\b", r"\bfirst release\b")),
+            ("objective", (r"\bbusiness goal\b", r"\bobjective\b", r"\boutcome\b")),
+        )
+        for key, patterns in label_patterns:
+            if any(re.search(pattern, normalized) for pattern in patterns):
+                return key
+        return ""
 
     def _save_structured_requirement_model_cache(
         self,

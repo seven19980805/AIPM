@@ -3,6 +3,7 @@ import { computed } from 'vue'
 
 import { structuredRequirementPanelCopy } from './structuredRequirementCopy'
 import type { DocumentQaState } from '../lib/documentQa'
+import { summarizePMMethodologyDisplay } from '../lib/pmMethodologyDisplay'
 import { computeStructuredRequirementProgress } from '../lib/structuredRequirementProgress'
 import type { LanguageCode } from '../types/session'
 import type {
@@ -158,15 +159,19 @@ const canOpenPanelGoCoding = computed(
 
 const methodologyVisible = computed(() => props.pmMethodologyState.checks.length > 0)
 
-const methodologyReadyCount = computed(
-  () => props.pmMethodologyState.checks.filter((check) => check.ready).length,
+const methodologyDisplay = computed(() =>
+  summarizePMMethodologyDisplay(props.pmMethodologyState, progress.value.readyToGenerate),
 )
 
-const methodologyTopChecks = computed(() =>
-  [...props.pmMethodologyState.checks]
-    .sort((left, right) => methodologyStatusPriority(left.status) - methodologyStatusPriority(right.status))
-    .slice(0, 4),
+const methodologyReadyCount = computed(
+  () => methodologyDisplay.value.readyCount,
 )
+
+const methodologyMissingCount = computed(() => methodologyDisplay.value.missingCount)
+
+const methodologyTopChecks = computed(() => methodologyDisplay.value.checks)
+
+const methodologyShowNextQuestions = computed(() => methodologyDisplay.value.showNextQuestions)
 
 const icEvidenceVisible = computed(
   () => props.icSubstrateEvidenceState.enabled && props.icSubstrateEvidenceState.checks.length > 0,
@@ -566,7 +571,7 @@ function summarizeText(value: string): string {
         </div>
         <div>
           <span>{{ copy.methodologyLabels.missing }}</span>
-          <strong>{{ pmMethodologyState.missing_evidence.length }}</strong>
+          <strong>{{ methodologyMissingCount }}</strong>
         </div>
       </div>
 
@@ -589,7 +594,10 @@ function summarizeText(value: string): string {
           <p class="methodology-evidence">
             {{ methodologyEvidenceSummary(check) }}
           </p>
-          <div v-if="!check.ready && check.next_question" class="methodology-question">
+          <div
+            v-if="methodologyShowNextQuestions && !check.ready && check.next_question"
+            class="methodology-question"
+          >
             <span>{{ copy.methodologyLabels.nextQuestion }}</span>
             <p>{{ check.next_question }}</p>
           </div>

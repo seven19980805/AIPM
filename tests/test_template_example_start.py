@@ -386,6 +386,54 @@ class TemplateExampleStartTest(unittest.TestCase):
         self.assertNotIn("Choose one option", guarded)
         self.assertNotIn("Page layout", guarded)
 
+    def test_recent_option_a_confirmation_promotes_matching_structured_item(self) -> None:
+        session = self.service.create_session(language="en", starter_department="quality")
+        self.service._append_message(session.id, "user", "Build a quality yield dashboard.")
+        self.service._append_message(
+            session.id,
+            "assistant",
+            (
+                "Not ready to generate the formal document yet: the right-side readiness gate has not passed.\n\n"
+                "Next, close one highest-value gap: Please confirm the page elements and interaction flow.\n\n"
+                "Choose one option:\n"
+                "A. Use the current captured wording for pages: Yield Dashboard / Browser URL (no authentication)\n"
+                "B. I will provide the exact pages wording or an exception\n"
+                "C. Leave this pending for now"
+            ),
+        )
+        self.service._append_message(
+            session.id,
+            "user",
+            "A. Use the current captured wording for pages: Yield Dashboard / Browser URL (no authentication)",
+        )
+        model = normalize_structured_requirement_model(
+            {
+                "page_and_interaction": {
+                    "pages": [
+                        {
+                            "page_name": "Yield Dashboard",
+                            "entry_point": "Browser URL",
+                        }
+                    ]
+                },
+                "collection_status": {
+                    "pages": {
+                        "status": "captured",
+                        "reason": "Page wording captured but not marked confirmed by the model.",
+                        "pending_questions": ["Please confirm the page elements and interaction flow."],
+                    }
+                },
+            }
+        )
+
+        promoted = self.service._apply_recent_choice_confirmation_to_model(
+            model,
+            self.service._require_session(session.id).messages,
+        )
+
+        self.assertEqual(promoted["collection_status"]["pages"]["status"], "confirmed")
+        self.assertEqual(promoted["collection_status"]["pages"]["pending_questions"], [])
+
     def test_stream_false_ready_reply_emits_replacement_when_gate_is_not_ready(self) -> None:
         self.llm_client.chat_response = "# Not structured JSON"
         self.llm_client.stream_response_parts = [
