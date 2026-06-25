@@ -9,12 +9,14 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Iterator
+from typing import TYPE_CHECKING, Any, Iterator
 from xml.sax.saxutils import escape
 import zipfile
 
 from .business_template_library import BusinessTemplateLibrary
-from .llm_client import MiniMaxChatClient
+from .llm_client import LLMError
+from .ic_substrate_domain import build_ic_substrate_evidence_state as build_ic_substrate_evidence_state_payload
+from .pm_methodology import build_pm_methodology_state as build_pm_methodology_state_payload
 from .session_store import SQLiteSessionStore
 from .structured_requirement_model import (
     REQUIREMENT_ITEM_KEYS,
@@ -22,6 +24,9 @@ from .structured_requirement_model import (
     empty_structured_requirement_model,
     normalize_structured_requirement_model,
 )
+
+if TYPE_CHECKING:
+    from .llm_client import MiniMaxChatClient
 
 
 PM_SYSTEM_PROMPT = """You are a principal Product Manager leading professional requirement discovery.
@@ -80,7 +85,11 @@ Code output boundary:
 - In ordinary PM conversation, you do not implement the product.
 - Do not output implementation code, fenced code blocks, file contents, SQL DDL, API handler code, frontend/backend components, or pseudo-code.
 - Exception: Mermaid diagram fences are allowed for high-level workflow, data model, or architecture visualization. Prefer Mermaid over ASCII box diagrams, and do not draw entity/table relationships with plain text boxes.
-- If the user asks for code, stay in the Product Manager role: clarify requirements, summarize acceptance criteria, or explain that implementation belongs in the Go Coding handoff flow.
+- If the user asks for code, stay in the Product Manager role: clarify requirements, summarize acceptance criteria, or explain that implementation belongs in the Vibe Coding handoff flow.
+
+Document output boundary:
+- Do not hand-write or paste a full PRD/URD/requirements document in the conversation (no full multi-section numbered document). The formal document is produced by a separate pipeline when the user clicks the Generate Document button — never author it inline in chat.
+- When key information is sufficient, say in one or two sentences that requirements are ready and the user can click Generate Document or proceed to Go Coding; keep remaining unknowns as assumptions instead of expanding into a long inline document.
 
 Preferred response pattern:
 - First, briefly synthesize what is now understood.
@@ -153,7 +162,11 @@ PM_SYSTEM_PROMPT_ZH = """你是一位资深且方法论扎实的产品经理，�
 代码输出边界：
 - 在普通 PM 对话中，你不负责实现产品。
 - 不要输出实现代码、代码块、文件内容、SQL 建表语句、接口处理器代码、前后端组件代码或伪代码。
-- 如果用户要求写代码，仍以产品经理身份回应：澄清产品需求、整理验收标准，或说明实现代码应进入 Go Coding / 编码交接流程处理。
+- 如果用户要求写代码，仍以产品经理身份回应：澄清产品需求、整理验收标准，或说明实现代码应进入 Vibe Coding / 编码交接流程处理。
+
+文档输出边界：
+- 不要在对话里手写或粘贴完整的 PRD/URD/需求文档（不要输出带编号章节的整份文档）。正式文档由用户点击"生成文档"按钮经独立流程产出，不在聊天里生成。
+- 当关键信息足够时，只用一两句话说明"需求已足够，可点击生成文档或进入 Go Coding"，把剩余未确认项留作假设，不要在聊天里展开成长文档。
 
 建议的回答结构：
 - 先用一句话概括当前已明确的关键信息
@@ -323,15 +336,17 @@ PRD_TEMPLATE_FILE_BY_LANGUAGE = {
 }
 
 TEMPLATE_START_MODE_GUIDED = "guided"
-TEMPLATE_START_MODE_EXAMPLE = "example"
 PROMPT_TEMPLATE_PERSONAL_PROJECT = "personal_project"
 PROMPT_TEMPLATE_STANDARD = "standard"
+START_FUNCTION_FROM_SCRATCH = "from_scratch"
+START_FUNCTION_IMPROVE_DRAFT = "improve_draft"
+START_FUNCTION_VALUES = {START_FUNCTION_FROM_SCRATCH, START_FUNCTION_IMPROVE_DRAFT}
 
 IMPLEMENTATION_PROMPT_TEMPLATE_EN = """You are a senior full-stack engineer responsible for implementing a runnable project strictly from the provided documents.
 
 Read these files fully before writing code:
 1. PRD document: {prd_path}
-2. System design document: {design_path}
+{design_instruction}
 
 Project context:
 - Session ID: {session_id}
@@ -339,7 +354,7 @@ Project context:
 
 Execution rules:
 1. Use the PRD as the source of truth for product scope, roles, user flows, business rules, and acceptance expectations.
-2. Use the system design document as the source of truth for architecture, module boundaries, API contracts, and data model details.
+2. If a system design document is available, use it as the source of truth for architecture, module boundaries, API contracts, and data model details; otherwise derive the smallest runnable technical approach from the PRD and document assumptions.
 3. If the two documents conflict, resolve them with this priority:
    - Product scope, user value, and workflow intent -> PRD
    - Technical architecture, API shape, persistence model, and module responsibilities -> system design document
@@ -393,7 +408,7 @@ IMPLEMENTATION_PROMPT_TEMPLATE_DE = """Du bist ein erfahrener Full-Stack-Enginee
 
 Lies diese Dateien vollstaendig, bevor du Code schreibst:
 1. PRD-Dokument: {prd_path}
-2. Systemdesign-Dokument: {design_path}
+{design_instruction}
 
 Projektkontext:
 - Sitzungs-ID: {session_id}
@@ -401,7 +416,7 @@ Projektkontext:
 
 Ausfuehrungsregeln:
 1. Nutze das PRD als Quelle fuer Produktscope, Rollen, User Flows, Geschaeftsregeln und Akzeptanzerwartungen.
-2. Nutze das Systemdesign-Dokument als Quelle fuer Architektur, Modulgrenzen, API-Vertraege und Datenmodelldetails.
+2. Wenn ein Systemdesign-Dokument verfuegbar ist, nutze es als Quelle fuer Architektur, Modulgrenzen, API-Vertraege und Datenmodelldetails; andernfalls leite die kleinste lauffaehige technische Loesung aus dem PRD ab und dokumentiere Annahmen.
 3. Wenn beide Dokumente einander widersprechen, loese den Konflikt mit dieser Prioritaet:
    - Produktscope, Nutzerwert und Workflow-Absicht -> PRD
    - Technische Architektur, API-Form, Persistenzmodell und Modulverantwortlichkeiten -> Systemdesign-Dokument
@@ -455,7 +470,7 @@ IMPLEMENTATION_PROMPT_TEMPLATE_MS = """Anda ialah jurutera full-stack kanan yang
 
 Baca fail berikut sepenuhnya sebelum menulis kod:
 1. Dokumen PRD: {prd_path}
-2. Dokumen reka bentuk sistem: {design_path}
+{design_instruction}
 
 Konteks projek:
 - ID sesi: {session_id}
@@ -463,7 +478,7 @@ Konteks projek:
 
 Peraturan pelaksanaan:
 1. Gunakan PRD sebagai sumber kebenaran untuk skop produk, peranan, aliran pengguna, peraturan perniagaan dan jangkaan penerimaan.
-2. Gunakan dokumen reka bentuk sistem sebagai sumber kebenaran untuk seni bina, sempadan modul, kontrak API dan butiran model data.
+2. Jika dokumen reka bentuk sistem tersedia, gunakan sebagai sumber kebenaran untuk seni bina, sempadan modul, kontrak API dan butiran model data; jika tiada, bina pendekatan teknikal paling kecil yang boleh berjalan daripada PRD dan rekod andaian.
 3. Jika kedua-dua dokumen bercanggah, selesaikan mengikut keutamaan ini:
    - Skop produk, nilai pengguna dan niat aliran kerja -> PRD
    - Seni bina teknikal, bentuk API, model persistensi dan tanggungjawab modul -> dokumen reka bentuk sistem
@@ -517,7 +532,7 @@ IMPLEMENTATION_PROMPT_TEMPLATE_ZH = """你是一名资深全栈工程师，现�
 
 开始编码前，必须先完整阅读以下文件：
 1. PRD 文档：{prd_path}
-2. 系统设计文档：{design_path}
+{design_instruction}
 
 项目上下文：
 - 会话 ID：{session_id}
@@ -525,7 +540,7 @@ IMPLEMENTATION_PROMPT_TEMPLATE_ZH = """你是一名资深全栈工程师，现�
 
 执行规则：
 1. 以 PRD 作为产品范围、角色权限、用户流程、业务规则、验收预期的主要依据。
-2. 以系统设计文档作为技术架构、模块边界、API 契约、数据模型、存储设计的主要依据。
+2. 如果存在系统设计文档，则以其作为技术架构、模块边界、API 契约、数据模型、存储设计的主要依据；如果没有，则基于 PRD 推导最小可运行技术方案，并显式记录技术假设。
 3. 如果两份文档有冲突，按以下优先级处理：
    - 产品范围、用户价值、业务目标、流程意图 -> 以 PRD 为准
    - 技术架构、接口形式、数据表结构、模块职责 -> 以系统设计文档为准
@@ -629,6 +644,8 @@ STRUCTURED_REQUIREMENT_STATUS_READINESS_POINTS = {
 }
 STRUCTURED_REQUIREMENT_GENERATION_MIN_READINESS = 80
 STRUCTURED_REQUIREMENT_GENERATION_MIN_CONFIRMATION = 75
+PRD_V0_MINIMUM_USER_SEED_LENGTH = 4
+PRD_V0_FAST_DISCOVERY_TARGET_USER_TURNS = 2
 
 DESIGN_DOC_EMPTY_BY_LANGUAGE = {
     "en": "# System Design Document\n\nTBD: no requirement conversation found in this session.",
@@ -881,6 +898,7 @@ class Session:
     prompt_template: str = PROMPT_TEMPLATE_PERSONAL_PROJECT
     applied_template_id: str = ""
     applied_template_name: str = ""
+    start_function: str = START_FUNCTION_FROM_SCRATCH
     messages: list[dict[str, Any]] = field(default_factory=list)
 
 
@@ -900,11 +918,12 @@ class RequirementCollectorService:
         language: str = "zh",
         template_start_mode: str = TEMPLATE_START_MODE_GUIDED,
         starter_department: str | None = None,
+        start_function: str | None = START_FUNCTION_FROM_SCRATCH,
     ) -> Session:
         session_id = str(uuid.uuid4())
         created_at = datetime.now(timezone.utc).isoformat()
         normalized_language = self._normalize_language(language)
-        normalized_start_mode = self._normalize_template_start_mode(template_start_mode)
+        normalized_start_function = self._normalize_start_function(start_function)
         applied_template_id = ""
         applied_template_name = ""
         title = ""
@@ -920,13 +939,6 @@ class RequirementCollectorService:
             applied_template_id = template_detail["template_id"]
             applied_template_name = template_detail["template_name"]
             title = applied_template_name
-        elif normalized_start_mode == TEMPLATE_START_MODE_EXAMPLE:
-            raise ValueError("Field `template_id` is required when `template_start_mode` is `example`.")
-
-        if normalized_start_mode == TEMPLATE_START_MODE_EXAMPLE and template_detail is not None:
-            example_model = template_detail.get("example_model")
-            if not isinstance(example_model, dict) or not example_model:
-                raise ValueError("Business template does not include an example model.")
 
         record = self.session_store.create_session(
             session_id=session_id,
@@ -934,27 +946,21 @@ class RequirementCollectorService:
             title=title,
             applied_template_id=applied_template_id,
             applied_template_name=applied_template_name,
+            start_function=normalized_start_function,
         )
-        if normalized_start_mode == TEMPLATE_START_MODE_EXAMPLE and template_detail is not None:
-            self._seed_session_from_template_example(
+        starter_department_key = self._normalize_ic_substrate_starter_department(starter_department)
+        if starter_department_key and (
+            template_detail is None or self._template_matches_ic_substrate_focus(template_detail)
+        ):
+            self._seed_session_from_starter_department(
                 session_id=session_id,
-                template_detail=template_detail,
+                department=starter_department_key,
                 language=normalized_language,
+                start_function=normalized_start_function,
             )
             record = self.session_store.get_session(session_id)
             if record is None:
-                raise RuntimeError("Failed to load seeded session.")
-        elif template_detail is not None:
-            starter_department_key = self._normalize_ic_substrate_starter_department(starter_department)
-            if starter_department_key and self._template_matches_ic_substrate_focus(template_detail):
-                self._seed_session_from_starter_department(
-                    session_id=session_id,
-                    department=starter_department_key,
-                    language=normalized_language,
-                )
-                record = self.session_store.get_session(session_id)
-                if record is None:
-                    raise RuntimeError("Failed to load starter-department session.")
+                raise RuntimeError("Failed to load starter-department session.")
         return self._session_from_record(record)
 
     def _normalize_ic_substrate_starter_department(self, department: str | None) -> str:
@@ -974,22 +980,63 @@ class RequirementCollectorService:
         session_id: str,
         department: str,
         language: str,
+        start_function: str = START_FUNCTION_FROM_SCRATCH,
     ) -> None:
         model = self._empty_structured_requirement_model()
         department_label = self._ic_substrate_department_label(department, language)
         model["product_context"]["requesting_department"] = department_label
-        if self._normalize_language(language) == "zh":
-            model["background"]["summary"] = f"用户已选择 {department_label} 作为首版 IC Substrate 专业链路入口。"
-            model["open_questions"] = [f"请确认 {department_label} 的业务 owner、首版软件场景和验收 owner。"]
-        elif self._normalize_language(language) == "de":
-            model["background"]["summary"] = f"Der Nutzer hat {department_label} als First-Version Einstieg fuer die IC Substrate Expertenkette gewaehlt."
-            model["open_questions"] = [f"Business Owner, First-Version Software-Szenario und Acceptance Owner fuer {department_label} bestaetigen."]
-        elif self._normalize_language(language) == "ms":
-            model["background"]["summary"] = f"Pengguna memilih {department_label} sebagai entry versi pertama untuk rantaian pakar IC Substrate."
-            model["open_questions"] = [f"Sahkan business owner, senario software versi pertama dan acceptance owner untuk {department_label}."]
+        normalized_language = self._normalize_language(language)
+        draft_mode = self._normalize_start_function(start_function) == START_FUNCTION_IMPROVE_DRAFT
+        intake_question = self._prd_v0_intake_pack_open_question(department_label, normalized_language)
+        if normalized_language == "zh":
+            model["background"]["summary"] = (
+                f"用户已选择 {department_label} 作为首版 IC Substrate 专业链路入口，"
+                "并将基于半成品需求书逐步补齐 PRD 缺口。"
+                if draft_mode
+                else f"用户已选择 {department_label} 作为首版 IC Substrate 专业链路入口。"
+            )
+            model["open_questions"] = [
+                f"请上传或确认半成品需求书中的已明确内容、待确认假设、缺失项和冲突项。"
+                if draft_mode
+                else intake_question
+            ]
+        elif normalized_language == "de":
+            model["background"]["summary"] = (
+                f"Der Nutzer hat {department_label} als First-Version Einstieg gewaehlt und moechte einen vorhandenen Draft zur PRD-Reife bringen."
+                if draft_mode
+                else f"Der Nutzer hat {department_label} als First-Version Einstieg fuer die IC Substrate Expertenkette gewaehlt."
+            )
+            model["open_questions"] = [
+                "Bestaetige die bereits klaren Punkte, Annahmen, Luecken und Konflikte aus dem Draft."
+                if draft_mode
+                else intake_question
+            ]
+        elif normalized_language == "ms":
+            model["background"]["summary"] = (
+                f"Pengguna memilih {department_label} sebagai entry versi pertama dan mahu melengkapkan draft requirement kepada PRD."
+                if draft_mode
+                else f"Pengguna memilih {department_label} sebagai entry versi pertama untuk rantaian pakar IC Substrate."
+            )
+            model["open_questions"] = [
+                "Sahkan perkara yang jelas, assumption, gap dan konflik daripada draft requirement."
+                if draft_mode
+                else intake_question
+            ]
         else:
-            model["background"]["summary"] = f"The user selected {department_label} as the first-version entry for the IC Substrate expert chain."
-            model["open_questions"] = [f"Confirm the business owner, first-version software scenario, and acceptance owner for {department_label}."]
+            model["background"]["summary"] = (
+                f"The user selected {department_label} as the first-version entry and will improve a draft requirement into a PRD-ready spec."
+                if draft_mode
+                else f"The user selected {department_label} as the first-version entry for the IC Substrate expert chain."
+            )
+            model["open_questions"] = [
+                "Confirm the facts, assumptions, missing gaps, and conflicts found in the draft requirement."
+                if draft_mode
+                else intake_question
+            ]
+        if draft_mode:
+            model["risks_and_notes"].append(
+                "Draft completion mode: attachment-derived facts are pending until the user confirms them."
+            )
         self._save_structured_requirement_model_cache(
             session_id=session_id,
             cache_key=STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
@@ -1001,6 +1048,32 @@ class RequirementCollectorService:
             cache_key=self._normalize_language(language),
             message_count=0,
             structured_requirement_model=model,
+        )
+
+    def _prd_v0_intake_pack_open_question(self, department_label: str, language: str) -> str:
+        normalized_language = self._normalize_language(language)
+        if normalized_language == "zh":
+            return (
+                f"专家链路启动问题：请用一句话或 A/B/C + 补充，先确认 {department_label} 首版最关键的 5 个信息："
+                "business_action、primary_user_or_owner、source_of_truth、integration_writeback_boundary、acceptance_evidence；"
+                "unknown is OK，未知项会作为待确认假设继续追问，不会直接开放 Go Coding。"
+            )
+        if normalized_language == "de":
+            return (
+                f"Expertenketten-Startfrage: Bitte mit einem Satz oder A/B/C + Freitext die 5 wichtigsten Punkte fuer {department_label} klaeren: "
+                "business_action, primary_user_or_owner, source_of_truth, integration_writeback_boundary, acceptance_evidence; "
+                "unknown is OK; Unbekanntes bleibt pending assumption und oeffnet Go Coding noch nicht."
+            )
+        if normalized_language == "ms":
+            return (
+                f"Soalan mula expert chain: jawab dengan satu ayat atau A/B/C + teks ringkas untuk 5 maklumat utama {department_label}: "
+                "business_action, primary_user_or_owner, source_of_truth, integration_writeback_boundary, acceptance_evidence; "
+                "unknown is OK; perkara tidak pasti kekal sebagai assumption belum sah dan belum membuka Go Coding."
+            )
+        return (
+            f"Expert-chain starter question: answer in one sentence or A/B/C + free text for the 5 key fields in {department_label}: "
+            "business_action, primary_user_or_owner, source_of_truth, integration_writeback_boundary, acceptance_evidence; "
+            "unknown is OK; unknowns stay pending assumptions and do not unlock Go Coding yet."
         )
 
     def get_session(self, session_id: str) -> Session | None:
@@ -1017,383 +1090,6 @@ class RequirementCollectorService:
 
     def get_business_template(self, template_id: str) -> dict[str, Any] | None:
         return self.business_template_library.get_template(template_id)
-
-    def _seed_session_from_template_example(
-        self,
-        session_id: str,
-        template_detail: dict[str, Any],
-        language: str,
-    ) -> None:
-        example_model = template_detail.get("example_model")
-        if not isinstance(example_model, dict) or not example_model:
-            raise ValueError("Business template does not include an example model.")
-
-        structured_requirement_model = self._structured_requirement_model_from_template_example(
-            template_detail,
-            example_model,
-            language,
-        )
-        message = self._template_example_seed_message(
-            template_detail,
-            structured_requirement_model,
-            language,
-        )
-        self._append_message(session_id, "assistant", message)
-        self._save_structured_requirement_model_cache(
-            session_id,
-            STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
-            1,
-            structured_requirement_model,
-        )
-        self._save_structured_requirement_model_cache(
-            session_id,
-            language,
-            1,
-            structured_requirement_model,
-        )
-
-    def _structured_requirement_model_from_template_example(
-        self,
-        template_detail: dict[str, Any],
-        example_model: dict[str, Any],
-        language: str,
-    ) -> dict[str, Any]:
-        model = normalize_structured_requirement_model(example_model)
-
-        project_name = self._first_string_from_paths(
-            example_model,
-            (
-                "document_info.project_name",
-                "document_info.project",
-                "document_info.analysis_name",
-                "document_info.chart_name",
-                "document_info.document_name",
-            ),
-        )
-        requirement_name = self._first_string_from_paths(
-            example_model,
-            (
-                "document_info.requirement_name",
-                "document_info.process_name",
-                "document_info.analysis_name",
-                "document_info.chart_name",
-                "document_info.document_name",
-            ),
-        )
-        model["document_info"]["project_name"] = model["document_info"]["project_name"] or project_name
-        model["document_info"]["requirement_name"] = (
-            model["document_info"]["requirement_name"]
-            or requirement_name
-            or str(template_detail.get("template_name", "")).strip()
-        )
-
-        model["background"]["summary"] = model["background"]["summary"] or self._first_string_from_paths(
-            example_model,
-            (
-                "background.summary",
-                "business_background.summary",
-                "background_objectives.background",
-                "summary",
-            ),
-        )
-        model["background"]["objective"] = model["background"]["objective"] or self._first_joined_strings_from_paths(
-            example_model,
-            (
-                "background.objective",
-                "business_objectives.objectives",
-                "background_objectives.objectives",
-                "objective",
-            ),
-        )
-
-        model["scope"]["in_scope"] = model["scope"]["in_scope"] or self._first_string_list_from_paths(
-            example_model,
-            ("scope.in_scope", "business_scope.in_scope"),
-        )
-        model["scope"]["out_of_scope"] = model["scope"]["out_of_scope"] or self._first_string_list_from_paths(
-            example_model,
-            ("scope.out_of_scope", "scope.out_scope", "business_scope.out_scope", "business_scope.out_of_scope"),
-        )
-        if not model["scope"]["in_scope"]:
-            model["scope"]["in_scope"] = self._flatten_path_strings(example_model, "scope.items")[:8]
-
-        model["users_and_scenarios"]["target_users"] = model["users_and_scenarios"]["target_users"] or self._first_string_list_from_paths(
-            example_model,
-            ("users_and_scenarios.target_users", "roles_and_scenarios.target_roles", "stakeholders.roles"),
-        )
-        model["users_and_scenarios"]["core_scenarios"] = model["users_and_scenarios"]["core_scenarios"] or self._first_string_list_from_paths(
-            example_model,
-            ("users_and_scenarios.core_scenarios", "roles_and_scenarios.core_scenarios"),
-        )
-        if not model["users_and_scenarios"]["core_scenarios"]:
-            model["users_and_scenarios"]["core_scenarios"] = self._flatten_path_strings(
-                example_model,
-                "process_description.step_matrix",
-            )[:8]
-
-        model["functional_requirements"]["overview"] = model["functional_requirements"]["overview"] or self._first_string_from_paths(
-            example_model,
-            ("functional_requirements.overview", "chart_presentation.overview"),
-        )
-        if not model["functional_requirements"]["feature_details"]:
-            model["functional_requirements"]["feature_details"] = self._feature_details_from_template_example(example_model)
-
-        if not model["business_rules"]:
-            model["business_rules"] = self._first_string_list_from_paths(
-                example_model,
-                (
-                    "business_rules",
-                    "business_rules.rules",
-                    "business_rules_and_data.rules",
-                    "yield_definition.rules",
-                    "data_description.quality_rules",
-                    "data_contract.quality_rules",
-                ),
-            )
-
-        if not model["page_and_interaction"]["pages"]:
-            model["page_and_interaction"]["pages"] = self._pages_from_template_example(example_model)
-        if not model["page_and_interaction"]["interaction_flow"]:
-            model["page_and_interaction"]["interaction_flow"] = self._first_string_list_from_paths(
-                example_model,
-                ("page_and_interaction.interaction_flow",),
-            ) or self._flatten_path_strings(example_model, "page_and_process.pages")[:8]
-
-        if not model["data_and_dependencies"]:
-            model["data_and_dependencies"] = self._unique_strings(
-                [
-                    *self._flatten_path_strings(example_model, "business_rules_and_data.key_data"),
-                    *self._flatten_path_strings(example_model, "integration_dependencies.external_systems"),
-                    *self._flatten_path_strings(example_model, "data_description.sources"),
-                    *self._flatten_path_strings(example_model, "data_description.fields"),
-                    *self._flatten_path_strings(example_model, "data_contract.sources"),
-                    *self._flatten_path_strings(example_model, "data_contract.fields"),
-                ]
-            )
-
-        if not model["risks_and_notes"]:
-            model["risks_and_notes"] = self._first_string_list_from_paths(
-                example_model,
-                ("risks_and_notes", "risks_and_questions.risks"),
-            )
-        if not model["acceptance_criteria"]:
-            model["acceptance_criteria"] = self._unique_strings(
-                [
-                    *self._flatten_path_strings(example_model, "acceptance_criteria"),
-                    *self._flatten_path_strings(example_model, "milestone_acceptance.milestones"),
-                    *self._flatten_path_strings(example_model, "uat.acceptance_criteria"),
-                    *self._flatten_path_strings(example_model, "uat.criteria"),
-                ]
-            )[:12]
-        if not model["open_questions"]:
-            model["open_questions"] = self._unique_strings(
-                [
-                    *self._flatten_path_strings(example_model, "open_questions"),
-                    *self._flatten_path_strings(example_model, "risks_and_questions.open_questions"),
-                    *[
-                        str(item.get("content", "")).strip()
-                        for item in template_detail.get("prompt_questions", [])
-                        if isinstance(item, dict) and str(item.get("content", "")).strip()
-                    ],
-                ]
-            )
-
-        reason = self._template_example_status_reason(language)
-        model["collection_status"] = {
-            key: {
-                "status": "confirmed",
-                "reason": reason,
-                "pending_questions": [],
-            }
-            for key in REQUIREMENT_ITEM_KEYS
-        }
-        return normalize_structured_requirement_model(model)
-
-    def _template_example_seed_message(
-        self,
-        template_detail: dict[str, Any],
-        structured_requirement_model: dict[str, Any],
-        language: str,
-    ) -> str:
-        template_name = str(template_detail.get("template_name", "")).strip() or "Business template"
-        model = normalize_structured_requirement_model(structured_requirement_model)
-        example_model = template_detail.get("example_model") if isinstance(template_detail.get("example_model"), dict) else {}
-        page_lines = self._template_example_page_lines(model, language)
-        image_description_lines = self._template_example_image_description_lines(example_model, language)
-        if self._normalize_language(language) == "zh":
-            intro = (
-                f"已加载「{template_name}」的默认示例业务。\n\n"
-                "你可以直接基于这份示例生成需求文档和设计文档，也可以继续告诉我需要调整的业务范围、角色、流程、规则或指标。"
-            )
-        else:
-            intro = (
-                f"I loaded the default example business for \"{template_name}\".\n\n"
-                "You can generate the PRD and design document from this example, or tell me what to adjust in the scope, roles, workflows, rules, or metrics."
-            )
-
-        lines = [
-            intro,
-            "",
-            "# 示例业务" if self._normalize_language(language) == "zh" else "# Example Business",
-            "",
-            f"- {'项目' if self._normalize_language(language) == 'zh' else 'Project'}: {model['document_info']['project_name'] or 'TBD'}",
-            f"- {'需求' if self._normalize_language(language) == 'zh' else 'Requirement'}: {model['document_info']['requirement_name'] or 'TBD'}",
-            "",
-            "## 背景" if self._normalize_language(language) == "zh" else "## Background",
-            "",
-            model["background"]["summary"] or "TBD",
-            "",
-            "## 目标" if self._normalize_language(language) == "zh" else "## Objective",
-            "",
-            model["background"]["objective"] or "TBD",
-            "",
-            "## 范围" if self._normalize_language(language) == "zh" else "## In Scope",
-            *[f"- {item}" for item in model["scope"]["in_scope"]],
-            "",
-            "## 目标用户" if self._normalize_language(language) == "zh" else "## Target Users",
-            *[f"- {item}" for item in model["users_and_scenarios"]["target_users"]],
-            "",
-            "## 核心场景" if self._normalize_language(language) == "zh" else "## Core Scenarios",
-            *[f"{index + 1}. {item}" for index, item in enumerate(model["users_and_scenarios"]["core_scenarios"])],
-            "",
-            "## 功能概述" if self._normalize_language(language) == "zh" else "## Feature Overview",
-            "",
-            model["functional_requirements"]["overview"] or "TBD",
-            "",
-            "## 业务规则" if self._normalize_language(language) == "zh" else "## Business Rules",
-            *[f"- {item}" for item in model["business_rules"][:10]],
-            "",
-            "## 数据与依赖" if self._normalize_language(language) == "zh" else "## Data and Dependencies",
-            *[f"- {item}" for item in model["data_and_dependencies"][:10]],
-            "",
-            "## 页面与图表" if self._normalize_language(language) == "zh" else "## Pages and Charts",
-            *page_lines,
-            "",
-            "## 图片文字描述" if self._normalize_language(language) == "zh" else "## Image Descriptions",
-            *image_description_lines,
-            "",
-            "## 验收标准" if self._normalize_language(language) == "zh" else "## Acceptance Criteria",
-            *[f"- {item}" for item in model["acceptance_criteria"][:10]],
-        ]
-        if not image_description_lines:
-            image_heading = "## 图片文字描述" if self._normalize_language(language) == "zh" else "## Image Descriptions"
-            try:
-                image_heading_index = lines.index(image_heading)
-                del lines[image_heading_index:image_heading_index + 2]
-            except ValueError:
-                pass
-        return "\n".join(lines).strip()
-
-    def _template_example_page_lines(self, model: dict[str, Any], language: str) -> list[str]:
-        pages = model.get("page_and_interaction", {}).get("pages", [])
-        if not isinstance(pages, list):
-            return ["- TBD"]
-
-        lines: list[str] = []
-        for page in pages[:6]:
-            if not isinstance(page, dict):
-                continue
-            page_name = str(page.get("page_name", "")).strip()
-            if not page_name:
-                continue
-            elements = self._string_list(page.get("page_elements"))[:4]
-            if elements:
-                elements_label = "页面元素" if self._normalize_language(language) == "zh" else "elements"
-                lines.append(f"- {page_name}: {elements_label} - {', '.join(elements)}")
-            else:
-                lines.append(f"- {page_name}")
-        return lines or ["- TBD"]
-
-    def _template_example_image_description_lines(self, example_model: dict[str, Any], language: str) -> list[str]:
-        image_descriptions = self._first_string_list_from_paths(
-            example_model,
-            (
-                "template_specific_details.image_descriptions",
-                "image_descriptions",
-            ),
-        )
-        if not image_descriptions:
-            return []
-
-        return [f"- {item}" for item in image_descriptions[:8]]
-
-    def _template_example_status_reason(self, language: str) -> str:
-        if self._normalize_language(language) == "zh":
-            return "已由模板示例业务预填，可被用户后续修改意见覆盖。"
-        return "Pre-filled from the template example business; later user changes can override it."
-
-    def _feature_details_from_template_example(self, example_model: dict[str, Any]) -> list[dict[str, Any]]:
-        raw_features = self._value_at_path(example_model, "functional_requirements.features")
-        if raw_features is None:
-            raw_features = self._value_at_path(example_model, "features")
-        if not isinstance(raw_features, list):
-            return []
-
-        features: list[dict[str, Any]] = []
-        for raw_item in raw_features:
-            if not isinstance(raw_item, dict):
-                continue
-            feature = {
-                "feature_name": self._first_non_empty_string(
-                    raw_item.get("feature_name"),
-                    raw_item.get("feature"),
-                    raw_item.get("name"),
-                ),
-                "description": self._first_non_empty_string(raw_item.get("description"), raw_item.get("summary")),
-                "trigger": self._first_non_empty_string(raw_item.get("trigger")),
-                "processing_logic": "; ".join(
-                    self._string_list(raw_item.get("processing_logic"))
-                    or self._string_list(raw_item.get("logic"))
-                    or self._string_list(raw_item.get("rules"))
-                ),
-                "inputs": self._string_list(raw_item.get("inputs")),
-                "outputs": self._string_list(raw_item.get("outputs")),
-                "exception_cases": self._string_list(raw_item.get("exception_cases"))
-                or self._string_list(raw_item.get("exceptions")),
-            }
-            if any(value for value in feature.values() if value):
-                features.append(feature)
-        return features
-
-    def _pages_from_template_example(self, example_model: dict[str, Any]) -> list[dict[str, Any]]:
-        raw_pages = self._value_at_path(example_model, "page_and_interaction.pages")
-        if raw_pages is None:
-            raw_pages = self._value_at_path(example_model, "page_and_process.pages")
-        if raw_pages is None:
-            raw_pages = self._value_at_path(example_model, "pages_functions.page_list")
-        if not isinstance(raw_pages, list):
-            return []
-
-        pages: list[dict[str, Any]] = []
-        for raw_item in raw_pages:
-            if isinstance(raw_item, str):
-                pages.append(
-                    {
-                        "page_name": raw_item,
-                        "entry_point": "",
-                        "page_elements": [],
-                        "button_actions": [],
-                    }
-                )
-                continue
-            if not isinstance(raw_item, dict):
-                continue
-            page = {
-                "page_name": self._first_non_empty_string(
-                    raw_item.get("page_name"),
-                    raw_item.get("page"),
-                    raw_item.get("name"),
-                    raw_item.get("module"),
-                ),
-                "entry_point": self._first_non_empty_string(raw_item.get("entry_point"), raw_item.get("entry")),
-                "page_elements": self._string_list(raw_item.get("page_elements"))
-                or self._string_list(raw_item.get("elements")),
-                "button_actions": self._string_list(raw_item.get("button_actions"))
-                or self._string_list(raw_item.get("actions")),
-            }
-            if any(value for value in page.values() if value):
-                pages.append(page)
-        return pages
 
     def _first_string_from_paths(self, payload: dict[str, Any], paths: tuple[str, ...]) -> str:
         for path in paths:
@@ -1547,6 +1243,15 @@ class RequirementCollectorService:
             structured_requirement_model,
             response_language,
         )
+        pm_methodology_state = self.build_pm_methodology_state(
+            structured_requirement_model,
+            response_language,
+        )
+        ic_substrate_evidence_state = self.build_ic_substrate_evidence_state(
+            session,
+            structured_requirement_model,
+            response_language,
+        )
         return {
             "assistant_message": assistant_text,
             "assistant_thinking": thinking_text,
@@ -1554,6 +1259,8 @@ class RequirementCollectorService:
             "structured_requirement_model": structured_requirement_model,
             "structured_requirement_sync_status": "ready",
             "conversation_chain_state": conversation_chain_state,
+            "pm_methodology_state": pm_methodology_state,
+            "ic_substrate_evidence_state": ic_substrate_evidence_state,
             "session_id": session.id,
             "message_count": len(session.messages),
         }
@@ -1575,11 +1282,11 @@ class RequirementCollectorService:
             self._update_session_title_from_message(session_id, display_message or user_message, response_language)
         session = self._require_session(session_id)
 
-        system_prompt = self._pm_prompt(session, response_language)
-        llm_messages = self._build_llm_messages(system_prompt, session.messages)
         assistant_text_parts: list[str] = []
         thinking_parts: list[str] = []
 
+        system_prompt = self._pm_prompt(session, response_language)
+        llm_messages = self._build_llm_messages(system_prompt, session.messages)
         for item in self.llm_client.stream_chat(llm_messages):
             text = item.get("text", "")
             if not text:
@@ -1599,7 +1306,7 @@ class RequirementCollectorService:
         if content_embedded_thinking:
             thinking_text = f"{thinking_text}\n{content_embedded_thinking}".strip()
         if not assistant_text:
-            raise RuntimeError("LLM returned empty streamed content.")
+            raise LLMError("LLM returned empty streamed content.")
         formatted_assistant_text = self._ensure_choice_question_format(assistant_text, response_language)
         if formatted_assistant_text != assistant_text:
             assistant_delta = (
@@ -1616,21 +1323,12 @@ class RequirementCollectorService:
         if thinking_text:
             yield {"event": "thinking_done", "thinking": thinking_text}
         yield {"event": "assistant_done", "session_id": session.id, "message_count": len(session.messages)}
-        structured_requirement_model = self._build_and_cache_structured_requirement_model(session, response_language)
-        conversation_chain_state = self.build_conversation_chain_state(
-            session,
-            structured_requirement_model,
-            response_language,
-        )
         yield {
-            "event": "summary",
-            "summary": structured_requirement_model,
-            "structured_requirement_model": structured_requirement_model,
-            "structured_requirement_sync_status": "ready",
-            "conversation_chain_state": conversation_chain_state,
+            "event": "done",
+            "session_id": session.id,
             "message_count": len(session.messages),
+            "structured_requirement_sync_status": "stale",
         }
-        yield {"event": "done", "session_id": session.id, "message_count": len(session.messages)}
 
     def build_session_summary(self, session_id: str, language: str = "zh") -> dict[str, Any]:
         return self.build_structured_requirement_model(session_id, language)
@@ -1660,6 +1358,77 @@ class RequirementCollectorService:
             force_refresh=force_refresh,
         )
 
+    def build_pm_methodology_state(
+        self,
+        structured_requirement_model: dict[str, Any] | None,
+        language: str = "zh",
+    ) -> dict[str, Any]:
+        return build_pm_methodology_state_payload(
+            structured_requirement_model,
+            self._normalize_language(language),
+        )
+
+    def build_ic_substrate_evidence_state(
+        self,
+        session: Session | None,
+        structured_requirement_model: dict[str, Any] | None,
+        language: str = "zh",
+    ) -> dict[str, Any]:
+        normalized_language = self._normalize_language(language)
+        model = normalize_structured_requirement_model(structured_requirement_model)
+        gate = self._ic_substrate_readiness_evidence_gate(session, model)
+        if session is None or not gate.get("enabled"):
+            return build_ic_substrate_evidence_state_payload(
+                gate,
+                model,
+                "",
+                "",
+                normalized_language,
+            )
+
+        chain_state = self.build_conversation_chain_state(session, model, normalized_language)
+        department = (
+            str(gate.get("department_specific_evidence", "")).strip()
+            or str(chain_state.get("intent_track", "")).strip()
+            or self._ic_substrate_intent_track_from_structured_model(model)
+            or str(chain_state.get("current_track", "")).strip()
+        )
+        product_shape = (
+            str(chain_state.get("intent_product_shape", "")).strip()
+            or self._ic_substrate_product_shape_from_model_or_template(session, model, normalized_language)
+        )
+        return build_ic_substrate_evidence_state_payload(
+            gate,
+            model,
+            department,
+            product_shape,
+            normalized_language,
+        )
+
+    def _ic_substrate_product_shape_from_model_or_template(
+        self,
+        session: Session,
+        structured_requirement_model: dict[str, Any],
+        language: str,
+    ) -> str:
+        product_context = structured_requirement_model.get("product_context", {})
+        functional_requirements = structured_requirement_model.get("functional_requirements", {})
+        template = self._resolve_business_template(session, language) or {}
+        shape_context = {
+            "software_type": product_context.get("software_type", "") if isinstance(product_context, dict) else "",
+            "background": structured_requirement_model.get("background", {}),
+            "scope": structured_requirement_model.get("scope", {}),
+            "functional_requirements": functional_requirements,
+            "page_and_interaction": structured_requirement_model.get("page_and_interaction", {}),
+            "template_id": template.get("template_id", ""),
+            "template_name": template.get("template_name", ""),
+            "business_domain": template.get("business_domain", ""),
+            "description": template.get("description", ""),
+            "tags": template.get("tags", []),
+            "applicable_scenarios": template.get("applicable_scenarios", []),
+        }
+        return self._ic_substrate_product_shape_from_text(json.dumps(shape_context, ensure_ascii=False))
+
     def get_structured_requirement_snapshot(
         self,
         session_id: str,
@@ -1682,22 +1451,42 @@ class RequirementCollectorService:
                 normalized_language,
             )
             if canonical_model is not None:
+                conversation_chain_state = self.build_conversation_chain_state(
+                    session,
+                    canonical_model,
+                    normalized_language,
+                )
                 return {
                     "structured_requirement_model": canonical_model,
                     "structured_requirement_sync_status": "missing",
                     "message_count": message_count,
-                    "conversation_chain_state": self.build_conversation_chain_state(
+                    "conversation_chain_state": conversation_chain_state,
+                    "pm_methodology_state": self.build_pm_methodology_state(
+                        canonical_model,
+                        normalized_language,
+                    ),
+                    "ic_substrate_evidence_state": self.build_ic_substrate_evidence_state(
                         session,
                         canonical_model,
                         normalized_language,
                     ),
                 }
             empty_model = self._empty_structured_requirement_model()
+            conversation_chain_state = self.build_conversation_chain_state(
+                session,
+                empty_model,
+                normalized_language,
+            )
             return {
                 "structured_requirement_model": empty_model,
                 "structured_requirement_sync_status": "ready" if message_count == 0 else "missing",
                 "message_count": message_count,
-                "conversation_chain_state": self.build_conversation_chain_state(
+                "conversation_chain_state": conversation_chain_state,
+                "pm_methodology_state": self.build_pm_methodology_state(
+                    empty_model,
+                    normalized_language,
+                ),
+                "ic_substrate_evidence_state": self.build_ic_substrate_evidence_state(
                     session,
                     empty_model,
                     normalized_language,
@@ -1714,11 +1503,21 @@ class RequirementCollectorService:
         if canonical_model is not None:
             cached_model = self._with_canonical_collection_status(cached_model, canonical_model)
         sync_status = "ready" if cached_message_count == message_count else "stale"
+        conversation_chain_state = self.build_conversation_chain_state(
+            session,
+            cached_model,
+            normalized_language,
+        )
         return {
             "structured_requirement_model": cached_model,
             "structured_requirement_sync_status": sync_status,
             "message_count": message_count,
-            "conversation_chain_state": self.build_conversation_chain_state(
+            "conversation_chain_state": conversation_chain_state,
+            "pm_methodology_state": self.build_pm_methodology_state(
+                cached_model,
+                normalized_language,
+            ),
+            "ic_substrate_evidence_state": self.build_ic_substrate_evidence_state(
                 session,
                 cached_model,
                 normalized_language,
@@ -2037,7 +1836,6 @@ class RequirementCollectorService:
             progress,
             language,
         )
-
         for item in self.llm_client.stream_chat(llm_messages, temperature=0.2):
             text = item.get("text", "")
             if not text:
@@ -2058,7 +1856,7 @@ class RequirementCollectorService:
             thinking_text = f"{thinking_text}\n{content_embedded_thinking}".strip()
 
         if not doc_markdown:
-            raise RuntimeError("LLM returned empty streamed PRD document.")
+            raise LLMError("LLM returned empty streamed PRD document.")
 
         appended_doc_markdown = self._append_ic_substrate_prd_evidence_appendix(
             doc_markdown,
@@ -2120,19 +1918,41 @@ class RequirementCollectorService:
             return prd_doc_path, prd_doc_path.name
         return None
 
+    def _ensure_saved_prd_v0_document_for_handoff(
+        self,
+        session: Session,
+        language: str,
+    ) -> tuple[Path, str] | None:
+        existing = self.get_saved_prd_document(session.id)
+        if existing is not None:
+            return existing
+
+        conversation_messages = self._chat_history_messages(session.messages)
+        if not self._session_matches_ic_substrate_fast_path(session, language):
+            return None
+        structured_requirement_model = self.build_structured_requirement_model(session.id, language)
+        progress = self._structured_requirement_progress(structured_requirement_model)
+        if not progress.get("ready_to_generate"):
+            return None
+
+        result = self.build_prd_document(session.id, language, save_history=True)
+        if result.get("status") not in {"draft_with_assumptions", "ok"}:
+            return None
+        return self.get_saved_prd_document(session.id)
+
     def build_implementation_context(self, session_id: str, language: str = "zh") -> dict[str, Any]:
         session = self.get_session(session_id)
         if session is None:
             raise KeyError("Session not found.")
 
         prd_result = self.get_saved_prd_document(session_id)
+        if prd_result is None:
+            prd_result = self._ensure_saved_prd_v0_document_for_handoff(session, language)
         design_result = self.get_saved_design_document(session_id)
 
         missing_documents: list[str] = []
         if prd_result is None:
             missing_documents.append("prd")
-        if design_result is None:
-            missing_documents.append("design")
 
         if missing_documents:
             return {
@@ -2143,9 +1963,12 @@ class RequirementCollectorService:
             }
 
         prd_path, prd_filename = prd_result
-        design_path, design_filename = design_result
         prd_absolute_path = str(prd_path.resolve())
-        design_absolute_path = str(design_path.resolve())
+        design_absolute_path = ""
+        design_filename = ""
+        if design_result is not None:
+            design_path, design_filename = design_result
+            design_absolute_path = str(design_path.resolve())
         message_count = self._message_count(session.messages)
         structured_requirement_model = (
             self._get_latest_cached_structured_requirement_model(
@@ -2169,10 +1992,16 @@ class RequirementCollectorService:
                     "filename": prd_filename,
                     "path": prd_absolute_path,
                 },
-                "design": {
-                    "filename": design_filename,
-                    "path": design_absolute_path,
-                },
+                **(
+                    {
+                        "design": {
+                            "filename": design_filename,
+                            "path": design_absolute_path,
+                        }
+                    }
+                    if design_result is not None
+                    else {}
+                ),
             },
             "implementation_prompt": self._build_implementation_prompt(
                 session_id=session_id,
@@ -2191,13 +2020,13 @@ class RequirementCollectorService:
             raise KeyError("Session not found.")
 
         prd_result = self.get_saved_prd_document(session_id)
+        if prd_result is None:
+            prd_result = self._ensure_saved_prd_v0_document_for_handoff(session, language)
         design_result = self.get_saved_design_document(session_id)
 
         missing_documents: list[str] = []
         if prd_result is None:
             missing_documents.append("prd")
-        if design_result is None:
-            missing_documents.append("design")
 
         if missing_documents:
             return {
@@ -2210,7 +2039,9 @@ class RequirementCollectorService:
 
         normalized_language = self._normalize_language(language)
         prd_path, prd_filename = prd_result
-        design_path, design_filename = design_result
+        design_filename = ""
+        if design_result is not None:
+            _, design_filename = design_result
         message_count = self._message_count(session.messages)
         structured_requirement_model = (
             self._get_latest_cached_structured_requirement_model(
@@ -2223,6 +2054,12 @@ class RequirementCollectorService:
         ic_substrate_evidence = self._ic_substrate_readiness_evidence_gate(
             session,
             structured_requirement_model,
+        )
+        prd_download_url = self._legacy_document_download_url(session_id, PRD_MESSAGE_KIND)
+        design_download_url = (
+            self._legacy_document_download_url(session_id, DESIGN_MESSAGE_KIND)
+            if design_result is not None
+            else ""
         )
         implementation_prompt = self._build_implementation_prompt(
             session_id=session_id,
@@ -2248,15 +2085,21 @@ class RequirementCollectorService:
                     "kind": "prd",
                     "filename": prd_filename,
                     "mime_type": "text/markdown; charset=utf-8",
-                    "download_url": self._legacy_document_download_url(session_id, PRD_MESSAGE_KIND),
+                    "download_url": prd_download_url,
                 },
-                {
-                    "kind": "design",
-                    "filename": design_filename,
-                    "mime_type": "text/markdown; charset=utf-8",
-                    "download_url": self._legacy_document_download_url(session_id, DESIGN_MESSAGE_KIND),
-                },
-            ],
+            ]
+            + (
+                [
+                    {
+                        "kind": "design",
+                        "filename": design_filename,
+                        "mime_type": "text/markdown; charset=utf-8",
+                        "download_url": design_download_url,
+                    }
+                ]
+                if design_result is not None
+                else []
+            ),
             "ic_substrate_evidence": ic_substrate_evidence,
             "expires_at": expires_at,
         }
@@ -2322,19 +2165,25 @@ class RequirementCollectorService:
         if not conversation_messages:
             return self._empty_structured_requirement_model()
 
-        raw_model = self.llm_client.chat(
-            [
-                {
-                    "role": "system",
-                    "content": self._structured_requirement_model_prompt(session, language),
-                },
-                {
-                    "role": "user",
-                    "content": json.dumps(conversation_messages, ensure_ascii=False),
-                },
-            ],
-            temperature=0.1,
-        )
+        try:
+            raw_model = self.llm_client.chat(
+                [
+                    {
+                        "role": "system",
+                        "content": self._structured_requirement_model_prompt(session, language),
+                    },
+                    {
+                        "role": "user",
+                        "content": json.dumps(conversation_messages, ensure_ascii=False),
+                    },
+                ],
+                temperature=0.1,
+            )
+        except LLMError:
+            # The structured-requirement model is an analysis sidecar, not the primary
+            # reply/document output. If this secondary LLM call fails, degrade to an empty
+            # model instead of crashing session load / summary refresh.
+            return self._empty_structured_requirement_model()
         return self._safe_parse_structured_requirement_model(raw_model)
 
     def _build_and_cache_structured_requirement_model(
@@ -2597,8 +2446,9 @@ class RequirementCollectorService:
         canonical_model: dict[str, Any],
     ) -> dict[str, Any]:
         localized_model = normalize_structured_requirement_model(model)
-        canonical_status = normalize_structured_requirement_model(canonical_model)["collection_status"]
-        localized_model["collection_status"] = canonical_status
+        canonical = normalize_structured_requirement_model(canonical_model)
+        localized_model["collection_status"] = canonical["collection_status"]
+        localized_model["open_questions"] = canonical["open_questions"]
         localized_model = self._preserve_previous_requesting_department(localized_model, canonical_model)
         return localized_model
 
@@ -2676,6 +2526,7 @@ class RequirementCollectorService:
             prompt_template=self._normalize_prompt_template(record.get("prompt_template", PROMPT_TEMPLATE_PERSONAL_PROJECT)),
             applied_template_id=str(record.get("applied_template_id", "")).strip(),
             applied_template_name=str(record.get("applied_template_name", "")).strip(),
+            start_function=self._normalize_start_function(record.get("start_function", START_FUNCTION_FROM_SCRATCH)),
             created_at=record["created_at"],
             updated_at=record.get("updated_at", record["created_at"]),
             messages=self._hydrate_message_payloads(
@@ -2810,6 +2661,7 @@ class RequirementCollectorService:
                 "- 当用户说“做系统/看板/工具”但没说清形态时，优先确认首版软件形态：dashboard、workflow/case tracking、data query、report/export、alerting、admin console 或跨部门 cockpit；不要直接追完整制造流程。\n"
                 "- 软件形态是后端隐形路由，不要要求用户在前端选择；如果用户已经暗示 dashboard、workflow/case tracking、report/export、data query、alerting 或 admin console，就按该形态问一个更专业的问题。\n"
                 "- 每轮只问一个专业问题，但问题里可以给 2-5 个业务选项帮助用户快速确认，例如部门/owner 分组、lot / panel / unit 粒度、现行指标口径、现行状态流转或责任边界。\n"
+                "- Go Coding readiness gate：即使用户只给一句模糊的软件想法，也不能直接开放 Go Coding；先用一个最高价值问题补齐业务动作、使用者/owner、数据源、集成/写回边界或验收证据中最关键的缺口。只有结构化需求 ready_to_generate=true 时，才提示生成文档并打开 Go Coding。\n"
                 "- 硬性约束：每轮只能有一个问句，不要用“另外/同时/以及/还需要”追加第二个问题；如果两个口径都缺，先问更影响链路边界的那个。\n"
                 "- 硬性约束：在用户确认前，TDI 只能写作 TDI，不要写成 TDI（技术/异常/导入/接口）或任何括号解释。\n"
                 "- 硬性约束：部门首问的选项说明里也不能展开 TDI；只能写 Production/Quality/TDI 这些部门名，不要把 TDI 解释成技术导入、异常处理、接口集成或其他含义。\n"
@@ -2835,6 +2687,7 @@ class RequirementCollectorService:
                 "- Wenn der Nutzer System/Dashboard/Tool sagt, aber die Produktform unklar ist, zuerst die First-Version Softwareform klaeren: dashboard, workflow/case tracking, data query, report/export, alerting, admin console oder cross-department cockpit.\n"
                 "- Softwareform ist ein verborgenes Backend-Routing, keine Frontend-Auswahl. Wenn der Nutzer dashboard, workflow/case tracking, report/export, data query, alerting oder admin console andeutet, eine fachlich passende PM-Frage stellen.\n"
                 "- Pro Runde genau eine professionelle Frage stellen; 2-5 fachliche Optionen sind erlaubt, wenn sie dem Nutzer beim schnellen Einordnen helfen.\n"
+                "- Go Coding readiness gate: Auch bei einer vagen Software-Idee Go Coding nicht direkt anbieten. Stelle eine high-value Frage zur wichtigsten Luecke in business action, user/owner, source of truth, integration/writeback boundary oder acceptance evidence. Go Coding erst anbieten, wenn structured requirement ready_to_generate=true ist.\n"
                 "- Harte Regel: TDI bis zur Nutzerbestaetigung nur als TDI schreiben, ohne Klammererklaerung oder implizite Bedeutung in Department-Optionen.\n"
                 "- Harte Regel: Keine TDI case states, SLA-Zahlen, Owner-Rollen, Approval Levels, Production route/station/yield formulas, Quality inspection points/defect taxonomy/spec limits/MRB/CAPA states, Finance cost formulas, Equipment OEE/MTBF/MTTR formulas, EHS SLA oder Planning-Regeln erfinden.\n"
                 "- Keine unbestaetigten Station-Abkuerzungen, Prozessschritte, Equipmentnamen, Lieferanten, Systemmarken oder internen Begriffe einfuehren; Begriffe wie FVI, AOI, E-test, AVI, SAP, EAP, SPC, MES, QMS oder ERP nur verwenden, wenn Nutzer oder Quelle sie bestaetigt.\n"
@@ -2855,6 +2708,7 @@ class RequirementCollectorService:
                 "- Apabila pengguna menyebut system/dashboard/tool tetapi bentuk produk belum jelas, sahkan dahulu first-version software shape: dashboard, workflow/case tracking, data query, report/export, alerting, admin console atau cross-department cockpit.\n"
                 "- Software shape ialah routing backend tersembunyi, bukan pilihan frontend. Jika pengguna sudah membayangkan dashboard, workflow/case tracking, report/export, data query, alerting atau admin console, tanya satu soalan PM yang lebih khusus untuk shape itu.\n"
                 "- Tanya tepat satu soalan profesional setiap pusingan; 2-5 pilihan bisnes boleh diberi jika membantu pengguna mengesahkan dengan cepat.\n"
+                "- Go Coding readiness gate: walaupun pengguna hanya beri idea software kabur, jangan terus tawarkan Go Coding. Tanya satu soalan high-value untuk gap paling penting dalam business action, user/owner, source of truth, integration/writeback boundary atau acceptance evidence. Tawarkan Go Coding hanya apabila structured requirement ready_to_generate=true.\n"
                 "- Peraturan keras: tulis TDI hanya sebagai TDI sehingga pengguna mengesahkan maksudnya; jangan tambah penerangan dalam kurungan atau membayangkan makna dalam pilihan jabatan.\n"
                 "- Peraturan keras: jangan reka TDI case states, nombor SLA, owner roles, approval levels, Production route/station/yield formulas, Quality inspection points/defect taxonomy/spec limits/MRB/CAPA states, Finance cost formulas, Equipment OEE/MTBF/MTTR formulas, EHS SLA atau Planning rules.\n"
                 "- Jangan masukkan station abbreviation, process step, equipment name, supplier, system brand atau istilah dalaman yang belum disahkan; istilah seperti FVI, AOI, E-test, AVI, SAP, EAP, SPC, MES, QMS atau ERP hanya boleh digunakan jika pengguna atau sumber jelas mengesahkan.\n"
@@ -2874,6 +2728,7 @@ class RequirementCollectorService:
             "- When the user says system/dashboard/tool but has not clarified the product shape, first confirm whether the first version is a dashboard, workflow/case tracker, data query, report/export, alerting, admin console, or cross-department cockpit. Do not jump directly into the whole manufacturing process.\n"
             "- Software shape is hidden backend routing, not a frontend choice. If the user already implies dashboard, workflow/case tracking, report/export, data query, alerting, or admin console, ask one more expert PM question for that shape.\n"
             "- Ask one professional question per turn, but include 2-5 domain options when helpful, such as department/owner groups, lot / panel / unit grain, current metric definitions, current state flow, or ownership boundaries.\n"
+            "- Go Coding readiness gate: even when the user gives one vague software idea, do not offer Go Coding directly. Ask one high-value question for the most important gap among business action, user/owner, source of truth, integration/writeback boundary, or acceptance evidence. Offer Go Coding only when structured requirement ready_to_generate=true.\n"
             "- Hard constraint: each turn may contain only one question. Do not append a second question with \"also\", \"and\", \"in addition\", or similar wording; if two definitions are missing, ask the one that affects the boundary most.\n"
             "- Hard constraint: until the user confirms the meaning, write TDI only as TDI. Do not add any parenthetical expansion such as technology, exception, introduction, or interface.\n"
             "- Hard constraint: do not expand TDI inside department-first option descriptions either. Write only Production/Quality/TDI department names; do not explain TDI as technology introduction, exception handling, interface integration, or any other meaning.\n"
@@ -2912,20 +2767,38 @@ class RequirementCollectorService:
     ) -> dict[str, Any]:
         normalized_language = self._normalize_language(language)
         template = self._resolve_business_template(session, normalized_language)
-        if template is None and not session.applied_template_name:
+        model = normalize_structured_requirement_model(structured_requirement_model)
+        matches_ic_substrate = self._session_matches_ic_substrate_expert_chain(
+            session,
+            normalized_language,
+            model,
+        )
+        if template is None and not session.applied_template_name and not matches_ic_substrate:
             return {"enabled": False}
 
-        template_context = template or {
-            "template_id": session.applied_template_id,
-            "template_name": session.applied_template_name,
-        }
-        mode = "ic_substrate" if self._template_matches_ic_substrate_focus(template_context) else "template"
+        if template is not None:
+            template_context = template
+        elif session.applied_template_name:
+            template_context = {
+                "template_id": session.applied_template_id,
+                "template_name": session.applied_template_name,
+            }
+        else:
+            template_context = {
+                "template_id": "ic_substrate_inferred_fast_path",
+                "template_name": "IC Substrate inferred expert chain",
+                "business_domain": "IC Substrate",
+            }
+        mode = (
+            "ic_substrate"
+            if matches_ic_substrate or self._template_matches_ic_substrate_focus(template_context)
+            else "template"
+        )
         nodes = (
             self._ic_substrate_chain_nodes(normalized_language)
             if mode == "ic_substrate"
             else self._generic_template_chain_nodes(normalized_language)
         )
-        model = normalize_structured_requirement_model(structured_requirement_model)
         collection_status = model.get("collection_status", {})
 
         current_index = 0
@@ -2941,9 +2814,8 @@ class RequirementCollectorService:
         intent_focus = ""
         intent_product_shape = ""
         if mode == "ic_substrate":
-            intent_track = self._ic_substrate_intent_track_from_latest_user_message(session)
-            if not intent_track:
-                intent_track = self._ic_substrate_intent_track_from_structured_model(model)
+            model_intent_track = self._ic_substrate_intent_track_from_structured_model(model)
+            intent_track = model_intent_track or self._ic_substrate_intent_track_from_latest_user_message(session)
             intent_focus = self._ic_substrate_intent_focus_from_latest_user_message(session)
             intent_product_shape = self._ic_substrate_product_shape_from_latest_user_message(session)
             has_user_messages = self._session_has_user_messages(session)
@@ -3505,13 +3377,13 @@ class RequirementCollectorService:
         if self._normalize_language(language) == "zh":
             playbooks = {
                 "production": {
-                    "decision": "Finished Lot 完工判定、WIP/hold/release 处置、返工/报废责任、瓶颈站点、产出与周期改善优先级",
+                    "decision": "Finished Lot 完工判定、WIP/hold/release 处置、返工/报废责任、瓶颈站点、产出与周期改善优先级、standard-cost/cost simulation",
                     "kpi": "yield、output、WIP aging、scrap、rework、hold aging、cycle time、throughput、move queue；名称和公式以现场现行口径为准",
                     "master": "product family、plant、line、route、operation/station、lot/panel/unit、hold reason、rework loop、owner；不要自造 route 或站点名",
                     "workflow": "lot release -> move-in/out -> hold/release -> rework/scrap -> Finished Lot 判定 -> 产量/质量/仓储对账确认；状态名由用户提供",
                     "source": "生产记录、站点流转、WIP/hold/报废/返工记录、质量 release、入库或交接记录；系统名和表名由用户确认",
                     "acceptance": "Production owner、Quality owner、必要时 Warehouse/Planning owner 对 Finished Lot 判定点、数量、状态、时间窗和对账差异 sign-off",
-                    "expert_checks": "yield 必须问 numerator/denominator、FPY/final yield/lot yield 差异、rework/scrap/hold 是否纳入；WIP aging 必须问 clock start/stop、pause 条件、cutoff timezone；Finished Lot 必须问质量 release、入库/交接和对账差异如何处理",
+                    "expert_checks": "yield 必须问 numerator/denominator、FPY/final yield/lot yield 差异、rework/scrap/hold 是否纳入；成本模拟必须问 standard-cost formula owner、Activity Rate/MOH 来源、Processing Time 来源、Yield 分母、Panel Utilization 规则和 SAP/Finance 写回边界；WIP aging 必须问 clock start/stop、pause 条件、cutoff timezone；Finished Lot 必须问质量 release、入库/交接和对账差异如何处理",
                     "ladder": "先问首版业务动作（排产/派工、WIP hold、Finished Lot、产量节拍、效率复盘）；再问 lot/panel/unit 与 route/station/time window；再问状态名、owner、异常处置；最后问 source of truth、对账、刷新和验收证据",
                 },
                 "tdi": {
@@ -3552,13 +3424,13 @@ class RequirementCollectorService:
 
         playbooks = {
             "production": {
-                "decision": "Finished Lot completion, WIP/hold/release disposition, bottleneck station, rework/scrap responsibility, output and cycle-time improvement priority",
+                "decision": "Finished Lot completion, WIP/hold/release disposition, bottleneck station, rework/scrap responsibility, output and cycle-time improvement priority, standard-cost/cost simulation",
                 "kpi": "yield, output, WIP aging, scrap, rework, hold aging, cycle time, throughput, move queue using the site's current names and formulas",
                 "master": "product family, plant, line, route, operation/station, lot/panel/unit, hold reason, rework loop, owner; do not invent route or station names",
                 "workflow": "lot release -> move-in/out -> hold/release -> rework/scrap -> Finished Lot decision -> production/quality/warehouse reconciliation, with user-provided state names",
                 "source": "production records, station movement, WIP/hold/scrap/rework records, quality release, warehouse or handoff records; user confirms system/table names",
                 "acceptance": "Production, Quality, and when needed Warehouse/Planning owners sign off Finished Lot decision point, quantities, states, time window, and reconciliation gaps",
-                "expert_checks": "for yield, confirm numerator/denominator, FPY/final yield/lot yield differences, and whether rework/scrap/hold is included; for WIP aging, confirm clock start/stop, pause conditions, and cutoff timezone; for Finished Lot, confirm quality release, warehouse/handoff, and reconciliation-gap handling",
+                "expert_checks": "for yield, confirm numerator/denominator, FPY/final yield/lot yield differences, and whether rework/scrap/hold is included; for cost simulation, confirm standard-cost formula owner, Activity Rate/MOH source, Processing Time source, Yield denominator, Panel Utilization rule, and SAP/Finance writeback boundary; for WIP aging, confirm clock start/stop, pause conditions, and cutoff timezone; for Finished Lot, confirm quality release, warehouse/handoff, and reconciliation-gap handling",
                 "ladder": "first ask the v1 business action such as scheduling/dispatch, WIP hold, Finished Lot, output rhythm, or efficiency review; then lot/panel/unit with route/station/time window; then state names, owners, and exception handling; finally source of truth, reconciliation, refresh, and acceptance evidence",
             },
             "tdi": {
@@ -3602,7 +3474,7 @@ class RequirementCollectorService:
         normalized_language = self._normalize_language(language)
         if normalized_language == "zh":
             product_shapes = {
-                "production": "生产看板、WIP/hold/release tracking、Finished Lot 判定、良率/吞吐/周期分析、异常告警、交接对账",
+                "production": "生产看板、排产/预测 simulation、capacity loading、WIP/hold/release tracking、Finished Lot 判定、良率/吞吐/周期分析、standard-cost/cost simulation、异常告警、交接对账",
                 "tdi": "case tracking、handoff dashboard、SLA aging、审批/验证流、异常告警、数据回写对账",
                 "quality": "质量看板、缺陷下钻、MRB/CAPA case tracking、release sign-off、报表导出、异常告警",
                 "general": "通用业务看板、workflow/case tracking、data query、report/export、alerting、admin console、跨部门 cockpit",
@@ -3620,7 +3492,7 @@ class RequirementCollectorService:
             return product_shapes.get(key, "dashboard、workflow/case tracking、report/export、alerting、admin console")
         if normalized_language == "de":
             product_shapes = {
-                "production": "Production Dashboard, WIP/hold/release Tracking, Finished Lot Entscheidung, Yield/Throughput/Cycle-Time Analyse, Exception Alerting, Handoff-Reconciliation",
+                "production": "Production Dashboard, scheduling/forecast simulation, capacity loading, WIP/hold/release Tracking, Finished Lot Entscheidung, Yield/Throughput/Cycle-Time Analyse, standard-cost/cost simulation, Exception Alerting, Handoff-Reconciliation",
                 "tdi": "case tracking, handoff dashboard, SLA aging, approval/verification flow, exception alerting, data writeback reconciliation",
                 "quality": "Quality Dashboard, Defect Drill-down, MRB/CAPA case tracking, Release Sign-off, Report Export, Exception Alerting",
                 "general": "General business dashboard, workflow/case tracking, data query, report/export, alerting, admin console, cross-department cockpit",
@@ -3638,7 +3510,7 @@ class RequirementCollectorService:
             return product_shapes.get(key, "dashboard, workflow/case tracking, report/export, alerting, admin console")
         if normalized_language == "ms":
             product_shapes = {
-                "production": "production dashboard, WIP/hold/release tracking, Finished Lot decision, yield/throughput/cycle-time analysis, abnormal alerting, handoff reconciliation",
+                "production": "production dashboard, scheduling/forecast simulation, capacity loading, WIP/hold/release tracking, Finished Lot decision, yield/throughput/cycle-time analysis, standard-cost/cost simulation, abnormal alerting, handoff reconciliation",
                 "tdi": "case tracking, handoff dashboard, SLA aging, approval/verification flow, abnormal alerting, data writeback reconciliation",
                 "quality": "quality dashboard, defect drill-down, MRB/CAPA case tracking, release sign-off, report export, abnormal alerting",
                 "general": "general business dashboard, workflow/case tracking, data query, report/export, alerting, admin console, cross-department cockpit",
@@ -3656,7 +3528,7 @@ class RequirementCollectorService:
             return product_shapes.get(key, "dashboard, workflow/case tracking, report/export, alerting, admin console")
 
         product_shapes = {
-            "production": "production dashboard, WIP/hold/release tracking, Finished Lot decision, yield/throughput/cycle-time analysis, abnormal alerting, handoff reconciliation",
+            "production": "production dashboard, scheduling/forecast simulation, capacity loading, WIP/hold/release tracking, Finished Lot decision, yield/throughput/cycle-time analysis, standard-cost/cost simulation, abnormal alerting, handoff reconciliation",
             "tdi": "case tracking, handoff dashboard, SLA aging, approval/verification flow, abnormal alerting, data writeback reconciliation",
             "quality": "quality dashboard, defect drill-down, MRB/CAPA case tracking, release sign-off, report export, abnormal alerting",
             "general": "general business dashboard, workflow/case tracking, data query, report/export, alerting, admin console, cross-department cockpit",
@@ -4133,7 +4005,49 @@ class RequirementCollectorService:
         normalized = text.lower()
         explicit_keywords = {
             "production": ("production", "生产", "产线"),
-            "tdi": ("tdi",),
+            "tdi": (
+                "tdi",
+                "case/sla",
+                "case sla",
+                "case tracker",
+                "case tracking",
+                "case handoff",
+                "request intake",
+                "triage",
+                "sla",
+                "工程需求",
+                "需求单",
+                "需求流程",
+                "case追踪",
+                "case 跟踪",
+                "case流程",
+                "case 流程",
+                "跨部门 handoff",
+                "跨部门交接",
+                "跨部门移交",
+                "handoff",
+                "验证闭环",
+                "验证进度",
+                "验证看板",
+                "验证计划",
+                "工程验证",
+                "doe",
+                "validation",
+                "qualification",
+                "trial lot",
+                "engineering data",
+                "工程数据",
+                "数据映射",
+                "recipe和spec",
+                "recipe/spec",
+                "spec参数",
+                "参数对比",
+                "参数查询",
+                "对比查询",
+                "试验",
+                "试验批",
+                "closure",
+            ),
             "quality": ("quality", "品质", "质量"),
             "general": ("general", "通用", "其他", "其它", "其他部门", "别的部门", "不确定", "跨部门"),
             "planning": ("planning", "pmc", "计划"),
@@ -4168,249 +4082,110 @@ class RequirementCollectorService:
                 "质量",
                 "检测",
                 "检验",
+                "inspection",
+                "inspection coverage",
+                "sampling",
+                "aoi",
+                "fvi",
+                "e-test",
+                "coverage",
+                "false call",
+                "missed defect",
+                "检验覆盖率",
+                "检测覆盖率",
+                "覆盖率",
+                "抽样",
+                "全检",
+                "漏检",
+                "误判",
                 "defect",
                 "缺陷",
+                "缺陷pareto",
+                "缺陷分布",
+                "不良原因",
+                "不良分布",
+                "不良看板",
                 "mrb",
                 "capa",
                 "pareto",
                 "root cause",
+            ),
+            "tdi": (
+                "tdi",
+                "case/sla",
+                "case tracker",
+                "handoff",
+                "验证闭环",
+                "验证进度",
+                "验证看板",
+                "验证计划",
+                "工程验证",
+                "doe",
+                "validation",
+                "qualification",
+                "trial lot",
+                "engineering data",
+                "工程数据",
+                "数据映射",
+                "recipe和spec",
+                "recipe/spec",
+                "spec参数",
+                "参数对比",
+                "参数查询",
+                "对比查询",
+                "试验",
+                "试验批",
             ),
         }
         return any(keyword in normalized for keyword in strong_keywords.get(track.strip().lower(), ()))
 
+    def _ic_substrate_track_from_template(self, template: dict[str, Any] | None) -> str:
+        """Infer department track from an applied business template's metadata."""
+        if not isinstance(template, dict):
+            return ""
+        for field in ("business_domain", "template_category", "template_key", "template_id"):
+            track = self._ic_substrate_intent_track_from_text(str(template.get(field, "")))
+            if track:
+                return track
+        return ""
+
     def _ic_substrate_intent_track_from_text(self, text: str) -> str:
-        text = text.lower()
-        if not text:
+        """Detect department track from free text using domain_pack business_objects."""
+        lowered = (text or "").lower()
+        if not lowered:
             return ""
 
-        keyword_groups = {
-            "production": (
-                "production",
-                "生产",
-                "产线",
-                "线别",
-                "工序",
-                "站点",
-                "finished lot",
-                "lot",
-                "panel",
-                "wip",
-                "move-in",
-                "move out",
-                "move-out",
-                "出站",
-                "入库",
-                "throughput",
-                "cycle time",
-            ),
-            "tdi": ("tdi",),
-            "quality": (
-                "quality",
-                "品质",
-                "质量",
-                "检测",
-                "检验",
-                "defect",
-                "缺陷",
-                "mrb",
-                "capa",
-                "pareto",
-                "root cause",
-                "retest",
-                "rework",
-                "scrap",
-                "判定",
-                "报废",
-                "返工",
-            ),
-            "general": (
-                "general",
-                "通用",
-                "其他",
-                "其它",
-                "其他部门",
-                "别的部门",
-                "other department",
-                "others",
-                "unclear owner",
-                "不确定",
-                "暂不确定",
-                "还不确定",
-                "跨部门",
-            ),
-            "planning": (
-                "planning",
-                "pmc",
-                "计划",
-                "排产",
-                "产能",
-                "capacity",
-                "schedule",
-                "scheduling",
-                "dispatch",
-                "交期",
-                "commit",
-                "demand",
-                "forecast",
-                "wip aging",
-                "优先级",
-            ),
-            "engineering": (
-                "engineering",
-                "process",
-                "工艺",
-                "工程",
-                "recipe",
-                "parameter",
-                "spec",
-                "ecn",
-                "eco",
-                "ecr",
-                "change control",
-                "doe",
-                "qualification",
-                "npi",
-                "新产品",
-                "新工艺",
-            ),
-            "equipment": (
-                "equipment",
-                "maintenance",
-                "设备",
-                "机台",
-                "保养",
-                "维修",
-                "down",
-                "downtime",
-                "oee",
-                "mtbf",
-                "mttr",
-                "稼动",
-                "spare",
-                "备件",
-            ),
-            "material": (
-                "material",
-                "procurement",
-                "purchasing",
-                "材料",
-                "物料",
-                "采购",
-                "供应商",
-                "supplier",
-                "来料",
-                "iqc",
-                "inventory",
-                "库存",
-                "bom",
-                "料号",
-                "替代料",
-            ),
-            "warehouse": (
-                "warehouse",
-                "logistics",
-                "shipping",
-                "shipment",
-                "仓库",
-                "物流",
-                "出货",
-                "发货",
-                "包装",
-                "carrier",
-                "库存周转",
-                "成品仓",
-            ),
-            "customer": (
-                "customer",
-                "program",
-                "sales",
-                "fae",
-                "客户",
-                "项目",
-                "销售",
-                "客诉",
-                "complaint",
-                "rma",
-                "8d",
-                "订单",
-                "forecast",
-                "交付",
-                "commit",
-            ),
-            "finance": (
-                "finance",
-                "cost",
-                "财务",
-                "成本",
-                "报价",
-                "margin",
-                "scrap cost",
-                "rework cost",
-                "loss amount",
-                "损失金额",
-                "报废成本",
-                "返工成本",
-                "cost center",
-            ),
-            "ehs": (
-                "ehs",
-                "safety",
-                "环保",
-                "安全",
-                "环境",
-                "chemical",
-                "hazard",
-                "incident",
-                "waste",
-                "permit",
-                "合规",
-                "危化",
-            ),
-            "it_data": (
-                "it/data",
-                "it data",
-                "it 数据",
-                "it 部门",
-                "data governance",
-                "数据治理",
-                "master data",
-                "主数据",
-                "权限",
-                "sso",
-                "audit",
-                "接口",
-                "报表平台",
-                "数据平台",
-                "系统集成",
-            ),
-            "management": (
-                "management",
-                "ops excellence",
-                "经营",
-                "管理层",
-                "老板",
-                "war room",
-                "daily meeting",
-                "kpi governance",
-                "月会",
-                "周会",
-                "例会",
-                "行动项",
-                "action item",
-            ),
+        # Department aliases (display names + common abbreviations)
+        department_aliases = {
+            "production": ("production", "生产", "prod", "manufacturing", "fertigung", "pengeluaran"),
+            "quality": ("quality", "qdm", "qa", "qc", "质量", "品质", "qualitaet", "kualiti"),
+            "tdi": ("tdi", "工艺", "engineering data", "technology development", "teknologi"),
         }
-        scores = {
-            track: sum(1 for keyword in keywords if keyword in text)
-            for track, keywords in keyword_groups.items()
-        }
-        best_track, best_score = max(scores.items(), key=lambda item: item[1])
-        if best_score <= 0:
+        for track, aliases in department_aliases.items():
+            if any(alias in lowered for alias in aliases):
+                return track
+
+        # Fall back to scanning domain_pack business_objects
+        from .ic_substrate_domain import load_ic_substrate_domain_pack
+        pack = load_ic_substrate_domain_pack()
+        departments = pack.get("departments", {}) if isinstance(pack, dict) else {}
+        scores: dict[str, int] = {}
+        for dept_key, dept_info in departments.items():
+            if dept_key == "general":
+                continue
+            if not isinstance(dept_info, dict):
+                continue
+            objects = dept_info.get("business_objects") or []
+            if not isinstance(objects, list):
+                continue
+            score = sum(1 for obj in objects if isinstance(obj, str) and obj.lower() in lowered)
+            if score:
+                scores[dept_key] = score
+        if not scores:
             return ""
-        if sum(1 for score in scores.values() if score == best_score) > 1:
-            return ""
-        if self._ic_substrate_is_department(best_track):
-            return best_track
-        return "general"
+        # Pick the department with the strongest evidence
+        best_track = max(scores.items(), key=lambda item: item[1])[0]
+        return best_track if self._ic_substrate_is_department(best_track) else ""
 
     def _ic_substrate_intent_focus_from_latest_user_message(self, session: Session) -> str:
         user_texts = self._user_message_texts(session)
@@ -4445,335 +4220,121 @@ class RequirementCollectorService:
             return ""
 
         latest_shape = self._ic_substrate_product_shape_from_text(user_texts[-1])
-        if latest_shape:
+        if latest_shape and latest_shape != "dashboard":
             return latest_shape
 
+        for previous_text in reversed(user_texts[:-1]):
+            prior_shape = self._ic_substrate_product_shape_from_text(previous_text)
+            if prior_shape and prior_shape != "dashboard":
+                return prior_shape
+        if latest_shape:
+            return latest_shape
         for previous_text in reversed(user_texts[:-1]):
             prior_shape = self._ic_substrate_product_shape_from_text(previous_text)
             if prior_shape:
                 return prior_shape
         return ""
 
+    def _ic_substrate_department_from_product_shape(self, product_shape: str) -> str:
+        shape = product_shape.strip().lower()
+        shape_departments = {
+            "planning_simulation": "production",
+            "wip_status_dashboard": "production",
+            "dispatch_priority_expedite_tracker": "production",
+            "lot_hold_release_tracker": "production",
+            "finished_lot_handoff_dashboard": "production",
+            "cycle_time_bottleneck_dashboard": "production",
+            "production_cost_simulation": "production",
+            "production_delivery_commit_risk_dashboard": "production",
+            "production_equipment_downtime_oee_dashboard": "production",
+            "production_material_shortage_readiness_dashboard": "production",
+            "yield_dashboard": "quality",
+            "quality_spc_process_capability_dashboard": "quality",
+            "quality_iqc_supplier_lot_issue_tracker": "quality",
+            "defect_pareto_dashboard": "quality",
+            "inspection_coverage_dashboard": "quality",
+            "quality_release_evidence_dashboard": "quality",
+            "quality_mrb_disposition_tracker": "quality",
+            "scrap_rework_responsibility_tracker": "quality",
+            "quality_capa_8d_closure_tracker": "quality",
+            "validation_tracker": "tdi",
+            "tdi_npi_handoff_readiness_tracker": "tdi",
+            "tdi_trial_lot_issue_tracker": "tdi",
+            "engineering_change_approval_tracker": "tdi",
+            "engineering_data_query": "tdi",
+        }
+        return shape_departments.get(shape, "")
+
     def _ic_substrate_product_shape_from_text(self, text: str) -> str:
-        normalized = text.lower()
-        if not normalized:
+        """Match a product_shape key from domain_pack.json against free text.
+
+        Uses both the shape key (e.g. 'planning_simulation') and its label
+        (e.g. 'Planning simulation') as anchors. Picks the longest match
+        so multi-word labels beat single-word keys.
+        """
+        lowered = (text or "").lower()
+        if not lowered:
             return ""
 
-        shape_keywords = (
-            (
-                "workflow_tracker",
-                (
-                    "workflow",
-                    "case tracking",
-                    "tracking",
-                    "流程",
-                    "状态流转",
-                    "状态",
-                    "审批",
-                    "闭环",
-                    "待办",
-                    "task",
-                    "action item",
-                    "mrb",
-                    "capa",
-                ),
-            ),
-            (
-                "report_export",
-                (
-                    "report",
-                    "报表",
-                    "export",
-                    "download",
-                    "导出",
-                    "下载",
-                    "日报",
-                    "周报",
-                    "月报",
-                    "推送",
-                    "email",
-                    "meeting pack",
-                ),
-            ),
-            (
-                "data_query",
-                (
-                    "query",
-                    "查询",
-                    "search",
-                    "检索",
-                    "data query",
-                    "明细",
-                    "detail",
-                    "drill",
-                    "下钻",
-                    "追溯",
-                    "genealogy",
-                    "lineage",
-                ),
-            ),
-            (
-                "alerting",
-                (
-                    "alert",
-                    "alarm",
-                    "notification",
-                    "notify",
-                    "告警",
-                    "报警",
-                    "通知",
-                    "预警",
-                    "异常",
-                    "threshold",
-                    "阈值",
-                    "escalation",
-                    "升级",
-                ),
-            ),
-            (
-                "admin_tool",
-                (
-                    "admin",
-                    "console",
-                    "配置",
-                    "维护",
-                    "权限",
-                    "role",
-                    "permission",
-                    "master data",
-                    "主数据",
-                    "setting",
-                    "settings",
-                ),
-            ),
-            (
-                "dashboard",
-                (
-                    "dashboard",
-                    "cockpit",
-                    "看板",
-                    "大屏",
-                    "图表",
-                    "chart",
-                    "trend",
-                    "趋势",
-                    "monitor",
-                    "监控",
-                    "scorecard",
-                    "kpi",
-                ),
-            ),
-        )
-        scores = {
-            shape: sum(1 for keyword in keywords if keyword in normalized)
-            for shape, keywords in shape_keywords
+        from .ic_substrate_domain import load_ic_substrate_domain_pack
+        pack = load_ic_substrate_domain_pack()
+        shapes = pack.get("product_shapes", {}) if isinstance(pack, dict) else {}
+
+        aliases: dict[str, str] = {
+            "workflow": "workflow_tracker",
+            "case tracker": "workflow_tracker",
+            "scheduling": "planning_simulation",
+            "schedule": "planning_simulation",
+            "forecast": "planning_simulation",
+            "forecasting": "planning_simulation",
+            "capacity loading": "planning_simulation",
+            "report": "report_export",
+            "export": "report_export",
+            "query": "data_query",
+            "search": "data_query",
+            "alert": "alerting",
+            "alarm": "alerting",
+            "admin": "admin_tool",
+            "console": "admin_tool",
+            "dashboard": "dashboard",
+            "tracker": "workflow_tracker",
         }
-        best_shape, best_score = max(scores.items(), key=lambda item: item[1])
-        if best_score <= 0:
+        candidates: list[tuple[int, str]] = []
+        for key, info in shapes.items():
+            if not isinstance(info, dict):
+                continue
+            key_lower = key.lower().replace("_", " ")
+            label = str(info.get("label") or "").lower()
+            anchors = [key_lower, label]
+            for anchor, mapped_key in aliases.items():
+                if mapped_key == key:
+                    anchors.append(anchor)
+            for anchor in anchors:
+                if anchor and anchor in lowered:
+                    candidates.append((len(anchor), key))
+        if not candidates:
             return ""
-        if sum(1 for score in scores.values() if score == best_score) > 1:
-            return ""
-        return best_shape
+        candidates.sort(reverse=True)
+        return candidates[0][1]
 
     def _ic_substrate_intent_focus_from_text(self, text: str) -> str:
-        text = text.lower()
-        if not text:
+        """Detect a soft focus hint from glossary seed terms.
+
+        Returns the first matching glossary term (lowercased) or empty string.
+        Used only as a routing hint, not as ground truth.
+        """
+        lowered = (text or "").lower()
+        if not lowered:
             return ""
-
-        data_integration_keywords = (
-            "interface",
-            "integration",
-            "api",
-            "接口",
-            "集成",
-            "数据源",
-            "source",
-            "mes",
-            "qms",
-            "etl",
-            "table",
-            "字段",
-            "mapping",
-            "回写",
-            "master data",
-            "主数据",
-            "lineage",
-            "对账",
-        )
-        if any(keyword in text for keyword in data_integration_keywords):
-            return "data_integration"
-
-        report_export_keywords = (
-            "report",
-            "报表",
-            "export",
-            "download",
-            "导出",
-            "下载",
-            "推送",
-            "email",
-            "邮件",
-            "meeting pack",
-        )
-        if any(keyword in text for keyword in report_export_keywords):
-            return "export_reporting"
-
-        focus_keywords = (
-            (
-                "drilldown_analysis",
-                (
-                    "drill",
-                    "下钻",
-                    "pareto",
-                    "root cause",
-                    "根因",
-                    "genealogy",
-                    "追溯",
-                    "维度",
-                    "分析",
-                ),
-            ),
-            (
-                "alert_exception",
-                (
-                    "alert",
-                    "alarm",
-                    "告警",
-                    "报警",
-                    "异常",
-                    "exception",
-                    "ooc",
-                    "out of control",
-                    "阈值",
-                    "threshold",
-                    "hold",
-                    "release",
-                ),
-            ),
-            (
-                "workflow_state",
-                (
-                    "workflow",
-                    "flow",
-                    "流程",
-                    "状态",
-                    "state",
-                    "approval",
-                    "approve",
-                    "审批",
-                    "owner",
-                    "责任人",
-                    "sla",
-                    "mrb",
-                    "capa",
-                    "case",
-                    "闭环",
-                ),
-            ),
-            (
-                "data_integration",
-                (
-                    "interface",
-                    "integration",
-                    "api",
-                    "接口",
-                    "集成",
-                    "数据源",
-                    "source",
-                    "mes",
-                    "qms",
-                    "etl",
-                    "table",
-                    "字段",
-                    "mapping",
-                    "回写",
-                    "master data",
-                    "主数据",
-                    "lineage",
-                    "对账",
-                ),
-            ),
-            (
-                "metric_definition",
-                (
-                    "metric",
-                    "kpi",
-                    "yield",
-                    "良率",
-                    "公式",
-                    "计算",
-                    "分母",
-                    "分子",
-                    "fpy",
-                    "throughput",
-                    "cycle time",
-                    "wip",
-                    "scrap",
-                    "rework",
-                    "cost",
-                    "成本",
-                    "loss",
-                    "损失",
-                    "金额",
-                    "cost center",
-                    "downtime",
-                    "oee",
-                    "mtbf",
-                    "mttr",
-                    "inventory",
-                    "库存",
-                ),
-            ),
-            (
-                "dashboard_view",
-                (
-                    "dashboard",
-                    "看板",
-                    "报表",
-                    "chart",
-                    "图表",
-                    "trend",
-                    "趋势",
-                    "页面",
-                    "view",
-                    "visual",
-                    "monitor",
-                    "监控",
-                ),
-            ),
-            (
-                "export_reporting",
-                (
-                    "export",
-                    "download",
-                    "导出",
-                    "下载",
-                    "email",
-                    "邮件",
-                    "daily",
-                    "weekly",
-                    "日报",
-                    "周报",
-                    "推送",
-                ),
-            ),
-            (
-                "permission_role",
-                (
-                    "permission",
-                    "access",
-                    "权限",
-                    "角色",
-                    "role",
-                    "viewer",
-                    "editor",
-                    "审批人",
-                ),
-            ),
-        )
-        for focus, keywords in focus_keywords:
-            if any(keyword in text for keyword in keywords):
-                return focus
+        from .ic_substrate_domain import load_ic_substrate_domain_pack
+        pack = load_ic_substrate_domain_pack()
+        terms = pack.get("glossary_seed_terms", []) if isinstance(pack, dict) else []
+        if not isinstance(terms, list):
+            return ""
+        for term in terms:
+            term_lower = str(term or "").lower()
+            if term_lower and term_lower in lowered:
+                return term_lower
         return ""
 
     def _ic_substrate_preferred_node_for_intent(self, intent_track: str, intent_focus: str) -> str:
@@ -5323,24 +4884,21 @@ class RequirementCollectorService:
         return guidance_by_focus.get(focus, "")
 
     def _conversation_chain_state_for_prompt(self, session: Session, language: str) -> str:
-        if not session.applied_template_id and not session.applied_template_name:
-            return ""
-
         normalized_language = self._normalize_language(language)
-        message_count = self._message_count(session.messages)
-        structured_requirement_model = self._get_cached_localized_structured_requirement_model(
-            session.id,
+        structured_requirement_model = self._latest_structured_requirement_model_for_prompt(
+            session,
             normalized_language,
-            message_count,
         )
-        if structured_requirement_model is None:
-            structured_requirement_model = self._get_cached_canonical_structured_requirement_model(
-                session.id,
-                message_count,
+        if (
+            not session.applied_template_id
+            and not session.applied_template_name
+            and not self._session_matches_ic_substrate_expert_chain(
+                session,
                 normalized_language,
+                structured_requirement_model,
             )
-        if structured_requirement_model is None:
-            structured_requirement_model = self._empty_structured_requirement_model()
+        ):
+            return ""
 
         chain_state = self.build_conversation_chain_state(
             session,
@@ -5378,6 +4936,11 @@ class RequirementCollectorService:
             structured_requirement_model,
             normalized_language,
         )
+        fast_prd_guidance = self._fast_prd_discovery_guidance_for_prompt(
+            session,
+            structured_requirement_model,
+            normalized_language,
+        )
 
         if normalized_language == "zh":
             state_text = (
@@ -5405,6 +4968,8 @@ class RequirementCollectorService:
                 state_text += "\n" + evidence_gap_guidance
             if runtime_guardrails:
                 state_text += "\n" + runtime_guardrails
+            if fast_prd_guidance:
+                state_text += "\n" + fast_prd_guidance
             if convergence_guidance:
                 state_text += "\n" + convergence_guidance
             return state_text
@@ -5435,6 +5000,8 @@ class RequirementCollectorService:
                 state_text += "\n" + evidence_gap_guidance
             if runtime_guardrails:
                 state_text += "\n" + runtime_guardrails
+            if fast_prd_guidance:
+                state_text += "\n" + fast_prd_guidance
             if convergence_guidance:
                 state_text += "\n" + convergence_guidance
             return state_text
@@ -5465,6 +5032,8 @@ class RequirementCollectorService:
                 state_text += "\n" + evidence_gap_guidance
             if runtime_guardrails:
                 state_text += "\n" + runtime_guardrails
+            if fast_prd_guidance:
+                state_text += "\n" + fast_prd_guidance
             if convergence_guidance:
                 state_text += "\n" + convergence_guidance
             return state_text
@@ -5494,9 +5063,94 @@ class RequirementCollectorService:
             state_text += "\n" + evidence_gap_guidance
         if runtime_guardrails:
             state_text += "\n" + runtime_guardrails
+        if fast_prd_guidance:
+            state_text += "\n" + fast_prd_guidance
         if convergence_guidance:
             state_text += "\n" + convergence_guidance
         return state_text
+
+    def _latest_structured_requirement_model_for_prompt(
+        self,
+        session: Session,
+        language: str,
+    ) -> dict[str, Any]:
+        normalized_language = self._normalize_language(language)
+        message_count = self._message_count(session.messages)
+        structured_requirement_model = self._get_latest_cached_structured_requirement_model(
+            session.id,
+            normalized_language,
+            message_count,
+        )
+        if structured_requirement_model is None:
+            structured_requirement_model = self._get_latest_cached_structured_requirement_model(
+                session.id,
+                STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
+                message_count,
+            )
+        return structured_requirement_model or self._empty_structured_requirement_model()
+
+    def _pm_methodology_state_for_prompt(self, session: Session, language: str) -> str:
+        normalized_language = self._normalize_language(language)
+        structured_requirement_model = self._latest_structured_requirement_model_for_prompt(
+            session,
+            normalized_language,
+        )
+        state = self.build_pm_methodology_state(
+            structured_requirement_model,
+            normalized_language,
+        )
+        checks = state.get("checks")
+        if not isinstance(checks, list):
+            return ""
+        actionable_checks = [
+            check
+            for check in checks
+            if isinstance(check, dict)
+            and check.get("status") != "ready"
+            and (check.get("evidence") or check.get("status") != "missing")
+        ]
+        if not actionable_checks:
+            return ""
+
+        limited_checks = actionable_checks[:3]
+        if normalized_language == "zh":
+            lines = [
+                "PM 方法论状态：",
+                f"- 方法论证据分：{state.get('score', 0)}%",
+                f"- 建议优先追问方法：{state.get('recommended_next_method', '') or '无'}",
+                "- 当前最影响 PRD 质量的方法论缺口：",
+            ]
+            for check in limited_checks:
+                lines.append(
+                    f"  - {check.get('method', '')} / {check.get('label', '')}: "
+                    f"{check.get('next_question', '')}"
+                )
+            lines.extend(
+                [
+                    "- 使用规则：这些方法论维度主要用于生成文档时补全，不要为它们单独向用户追问；缺失时在文档中用合理默认假设填入并标记为待确认。",
+                    "- 只有当某个方法论缺口同时也是核心需求字段（objective/scope/users/scenarios/features/rules/integrations/acceptance）的缺口时才追问，且每次只问一个，优先最阻塞 PRD/验收质量的那个。",
+                ]
+            )
+            return "\n".join(lines)
+
+        lines = [
+            "PM methodology state:",
+            f"- Method evidence score: {state.get('score', 0)}%",
+            f"- Recommended next method: {state.get('recommended_next_method', '') or 'none'}",
+            "- Current PM methodology gaps that most affect PRD quality:",
+        ]
+        for check in limited_checks:
+            lines.append(
+                f"  - {check.get('method', '')} / {check.get('label', '')}: "
+                f"{check.get('next_question', '')}"
+            )
+        lines.extend(
+            [
+                "- Use these dimensions mainly to enrich the generated document; do NOT raise separate questions for them. When missing, fill the document with reasonable default assumptions marked as pending confirmation.",
+                "- Only ask about a methodology gap when it is also a missing core requirement field (objective/scope/users/scenarios/features/rules/integrations/acceptance), and still ask exactly one question per turn.",
+            ]
+        )
+        return "\n".join(lines)
 
     def _requirement_convergence_guidance_for_prompt(
         self,
@@ -5547,6 +5201,64 @@ class RequirementCollectorService:
                 return "Peraturan penutupan: Semua keperluan telah disahkan. Seterusnya cadangkan penjanaan dokumen kecuali pengguna menambah skop baharu."
             return "Convergence rule: All requirements are confirmed. Suggest generating documents next unless the user adds new scope."
         return ""
+
+    def _fast_prd_discovery_guidance_for_prompt(
+        self,
+        session: Session,
+        structured_requirement_model: dict[str, Any],
+        language: str,
+    ) -> str:
+        """Keep discovery concise while gating Go Coding on structured readiness."""
+        if session.start_function == START_FUNCTION_IMPROVE_DRAFT:
+            return ""
+
+        progress = self._structured_requirement_progress(structured_requirement_model)
+        coverage = self._safe_int(progress.get("collection_coverage_percentage"))
+        confirmed = self._safe_int(progress.get("confirmed_count"))
+        total = self._safe_int(progress.get("total_count"))
+        conflicts = self._safe_int(progress.get("conflict_count"))
+        if progress.get("fully_confirmed"):
+            return ""
+
+        if language == "zh":
+            return (
+                "Go Coding readiness discovery：目标是用专家链路收集足够需求信息，而不是提前产出半成品文档。\n"
+                "- 从零开始时，不要只反问。每次回复先给 2-3 个短句：已理解、推荐理解、当前最大缺口。\n"
+                "- response budget：正文最多 5 lines；每轮只问 1 个最高杠杆问题，不要输出长段落、完整 PRD 或多题清单。\n"
+                "- 不要承诺用户现在可以打开 Go Coding；只有 structured requirement ready_to_generate=true 时，才提示生成文档并打开 Go Coding。\n"
+                "- 未确认信息可作为待确认假设辅助追问，但不得当成事实，也不得作为绕过 readiness 的理由。\n"
+                "- 如果信息已经足够，不要继续开新问题；收口为确认/生成文档/Go Coding 的下一步。\n"
+                f"- 当前结构化覆盖率 {coverage}%，已确认 {confirmed}/{total}，conflict_count={conflicts}。如果未 ready，只问最阻塞文档质量的一个缺口。"
+            )
+        if language == "de":
+            return (
+                "Go Coding readiness discovery: Nutze die Expertenkette, um genug Requirements zu sammeln, nicht um ein fruehes Teildokument zu erzwingen.\n"
+                "- Beim Start from scratch nicht nur Rueckfragen stellen. Jede Antwort nennt kurz: verstanden, empfohlene Interpretation, groesste Luecke.\n"
+                "- response budget: maximal 5 lines; pro Runde genau 1 high-leverage Frage, keine langen Abschnitte, kein vollstaendiges PRD, keine Frage-Liste.\n"
+                "- Versprich Go Coding erst, wenn structured requirement ready_to_generate=true ist; dann Dokumente erzeugen und Go Coding oeffnen.\n"
+                "- Annahmen helfen beim Nachfragen, sind aber nie bestaetigte Fakten und duerfen readiness nicht umgehen.\n"
+                "- Wenn die Informationen reichen, keine neue Discovery starten; auf Bestaetigung, Dokumenterzeugung und Go Coding konvergieren.\n"
+                f"- Aktuelle Abdeckung {coverage}%, bestaetigt {confirmed}/{total}, conflict_count={conflicts}. Wenn nicht ready, frage nur die eine groesste Qualitaetsluecke."
+            )
+        if language == "ms":
+            return (
+                "Go Coding readiness discovery: gunakan expert chain untuk kumpul maklumat cukup, bukan memaksa dokumen separuh siap.\n"
+                "- Untuk start from scratch, jangan hanya bertanya. Setiap jawapan ringkaskan: difahami, tafsiran dicadang, gap terbesar.\n"
+                "- response budget: maksimum 5 lines; setiap pusingan hanya 1 soalan high-leverage, tiada perenggan panjang, PRD penuh atau senarai soalan.\n"
+                "- Jangan janji Go Coding sebelum structured requirement ready_to_generate=true; apabila ready, jana dokumen dan buka Go Coding.\n"
+                "- Andaian boleh bantu discovery tetapi bukan fakta sah dan tidak boleh memintas readiness.\n"
+                "- Jika maklumat sudah cukup, jangan buka discovery baharu; tutup kepada pengesahan, dokumen dan Go Coding.\n"
+                f"- Liputan semasa {coverage}%, disahkan {confirmed}/{total}, conflict_count={conflicts}. Jika belum ready, tanya satu gap kualiti paling penting sahaja."
+            )
+        return (
+            "Go Coding readiness discovery: use the expert chain to collect enough requirements, not to force an early partial document.\n"
+            "- For start from scratch, do not only ask back. Each reply briefly states: understood, recommended interpretation, biggest gap.\n"
+            "- response budget: keep the main reply within 5 lines; ask exactly 1 high-leverage question per round. Do not write long paragraphs, a full PRD, or a list of questions.\n"
+            "- Do not promise Go Coding until structured requirement ready_to_generate=true; once ready, suggest generating documents and opening Go Coding.\n"
+            "- Assumptions may guide discovery, but they are not confirmed facts and must not bypass readiness.\n"
+            "- If information is sufficient, stop opening new discovery and converge on confirmation, document generation, and Go Coding.\n"
+            f"- Current collection coverage is {coverage}%, confirmed {confirmed}/{total}, conflict_count={conflicts}. If not ready, ask only the single largest quality gap."
+        )
 
     def _skill_style_ai_pm_method_prompt(self, language: str | None = None) -> str:
         normalized_language = self._normalize_language(language)
@@ -6434,6 +6146,7 @@ class RequirementCollectorService:
             progress,
             draft_mode,
             session,
+            language,
         )
         return [
             {"role": "system", "content": self._design_doc_prompt(session, language)},
@@ -6462,6 +6175,7 @@ class RequirementCollectorService:
         progress: dict[str, Any],
         draft_mode: str,
         session: Session | None = None,
+        language: str = "zh",
     ) -> dict[str, Any]:
         model = normalize_structured_requirement_model(structured_requirement_model)
         collection_status = model.get("collection_status", {})
@@ -6501,6 +6215,7 @@ class RequirementCollectorService:
             "pending_confirmation_items": pending_confirmation_items,
             "conflict_items": conflict_items,
             "missing_items": missing_items,
+            "pm_methodology_state": self.build_pm_methodology_state(model, language),
             "mandatory_document_rules": [
                 "Use confirmed_items as facts.",
                 "Treat pending_confirmation_items as draft assumptions or explicit open questions.",
@@ -6654,6 +6369,7 @@ class RequirementCollectorService:
             progress,
             "quality_gate_blocked",
             session,
+            language,
         )
         pending_items = gate["pending_confirmation_items"]
         conflict_items = gate["conflict_items"]
@@ -6677,6 +6393,7 @@ class RequirementCollectorService:
             pending_title = "待确认项"
             conflict_title = "冲突项"
             missing_title = "缺失项"
+            pm_methodology_title = "PM 方法论缺口"
             evidence_title = "IC Substrate 专家证据缺口"
             next_step = "下一步：请在对话中确认上述问题；确认完成后再生成正式文档。"
             empty = "无"
@@ -6698,6 +6415,7 @@ class RequirementCollectorService:
             pending_title = "Offene Bestaetigungen"
             conflict_title = "Konflikte"
             missing_title = "Fehlende Punkte"
+            pm_methodology_title = "PM Methodik-Luecken"
             evidence_title = "IC Substrate Expert Evidence Gaps"
             next_step = "Naechster Schritt: Bestaetige diese Punkte im Dialog und erzeuge danach das formale Dokument."
             empty = "Keine"
@@ -6719,6 +6437,7 @@ class RequirementCollectorService:
             pending_title = "Item menunggu pengesahan"
             conflict_title = "Konflik"
             missing_title = "Item belum lengkap"
+            pm_methodology_title = "Jurang metodologi PM"
             evidence_title = "Jurang evidence pakar IC Substrate"
             next_step = "Langkah seterusnya: sahkan item ini dalam perbualan, kemudian jana dokumen rasmi."
             empty = "Tiada"
@@ -6740,6 +6459,7 @@ class RequirementCollectorService:
             pending_title = "Pending Confirmation"
             conflict_title = "Conflicts"
             missing_title = "Missing Items"
+            pm_methodology_title = "PM Methodology Gaps"
             evidence_title = "IC Substrate Expert Evidence Gaps"
             next_step = "Next step: confirm these items in the conversation, then generate the formal document."
             empty = "None"
@@ -6783,6 +6503,27 @@ class RequirementCollectorService:
                 missing_lines = [f"- {empty}"]
             return [*lines, *missing_lines, ""]
 
+        def format_pm_methodology_gaps() -> list[str]:
+            pm_state = gate.get("pm_methodology_state")
+            if not isinstance(pm_state, dict):
+                return []
+            checks = pm_state.get("checks")
+            if not isinstance(checks, list):
+                return []
+            missing_lines = []
+            for raw_check in checks:
+                if not isinstance(raw_check, dict) or raw_check.get("ready"):
+                    continue
+                label = str(raw_check.get("label", raw_check.get("key", ""))).strip()
+                method = str(raw_check.get("method", "")).strip()
+                next_question = str(raw_check.get("next_question", "")).strip()
+                label_text = f"{label} ({method})" if method else label
+                suffix = f": {next_question}" if next_question else ""
+                missing_lines.append(f"- {label_text}{suffix}")
+            if not missing_lines:
+                missing_lines = [f"- {empty}"]
+            return [f"## {pm_methodology_title}", *missing_lines, ""]
+
         return "\n".join(
             [
                 f"# {title}",
@@ -6801,6 +6542,7 @@ class RequirementCollectorService:
                 f"## {missing_title}",
                 *format_names(missing_items),
                 "",
+                *format_pm_methodology_gaps(),
                 *format_ic_substrate_evidence_gaps(),
                 f"> {next_step}",
             ]
@@ -7236,15 +6978,23 @@ class RequirementCollectorService:
         base_prompt = PM_SYSTEM_PROMPT_ZH if language == "zh" else PM_SYSTEM_PROMPT
         prompt_parts = [base_prompt]
         prompt_parts.append(self._skill_style_ai_pm_method_prompt(language))
+        methodology_state_addendum = self._pm_methodology_state_for_prompt(session, language)
+        if methodology_state_addendum:
+            prompt_parts.append(methodology_state_addendum)
         template_addendum = self._business_template_pm_addendum(session, language)
         if template_addendum:
             prompt_parts.append(template_addendum)
-            chain_state_addendum = self._conversation_chain_state_for_prompt(session, language)
-            if chain_state_addendum:
-                prompt_parts.append(chain_state_addendum)
         elif normalized == PROMPT_TEMPLATE_PERSONAL_PROJECT:
             addendum = PERSONAL_PROJECT_PM_ADDENDUM_ZH_V2 if language == "zh" else PERSONAL_PROJECT_PM_ADDENDUM_V2
             prompt_parts.append(addendum)
+            if self._session_matches_ic_substrate_expert_chain(session, language):
+                prompt_parts.append(self._ic_substrate_conversation_chain_addendum(language))
+        chain_state_addendum = self._conversation_chain_state_for_prompt(session, language)
+        if chain_state_addendum:
+            prompt_parts.append(chain_state_addendum)
+        draft_completion_addendum = self._draft_completion_pm_addendum(session, language)
+        if draft_completion_addendum:
+            prompt_parts.append(draft_completion_addendum)
         prompt_parts.append(DEFAULT_TECH_STACK_POLICY_ZH if language == "zh" else DEFAULT_TECH_STACK_POLICY)
         prompt_parts.append(self._language_output_instruction(language))
         return "\n\n".join(part for part in prompt_parts if part)
@@ -7305,40 +7055,75 @@ class RequirementCollectorService:
     ) -> str:
         normalized = self._normalize_language(language)
         template = IMPLEMENTATION_PROMPT_TEMPLATE_BY_LANGUAGE.get(normalized, IMPLEMENTATION_PROMPT_TEMPLATE_EN)
+        design_instruction = self._implementation_design_instruction(design_path, normalized)
         prompt = template.format(
             session_id=session_id,
             session_title=session_title or "Untitled Session",
             prd_path=prd_path,
             design_path=design_path,
+            design_instruction=design_instruction,
         )
         if not ic_substrate_evidence:
-            return prompt
+            return prompt.strip()
 
         if normalized == "zh":
             evidence_note = (
-                "IC Substrate handoff evidence:\n"
-                "- The handoff payload may include `ic_substrate_evidence` with readiness checks such as entry_owner, business_action, object_grain, workflow_state_owner, data_reconciliation, acceptance_evidence, and uncertainty_handling.\n"
-                "- 实现前请先读取该 evidence package；ready 项可作为实现证据，missing 项必须进入 README/ASSUMPTIONS/Open Questions，不要自造公式、站点、系统名、状态、SLA 或 owner。"
+                "IC Substrate 交接证据：\n"
+                "- handoff payload 可能包含 `ic_substrate_evidence`，含 entry_owner、business_action、object_grain、workflow_state_owner、data_reconciliation、acceptance_evidence、uncertainty_handling 等就绪检查。\n"
+                "- ready 项可作为实现证据；missing 项必须写入 README/ASSUMPTIONS/Open Questions。不要自造公式、站点、系统名、状态、SLA 或 owner。\n"
+                "- 保留 source of truth 与集成/写回边界；未经业务 owner 与 IT 明确批准前，不要实现生产写回、自动化或 release/disposition 等动作。"
             )
         elif normalized == "de":
             evidence_note = (
                 "IC Substrate handoff evidence:\n"
-                "- The handoff payload may include `ic_substrate_evidence` with readiness checks such as entry_owner, business_action, object_grain, workflow_state_owner, data_reconciliation, acceptance_evidence, and uncertainty_handling.\n"
-                "- Vor der Implementierung dieses Evidence Package lesen. Ready-Items sind Implementierungsevidenz; missing Items gehoeren in README/ASSUMPTIONS/Open Questions. Keine Formeln, Stationen, Systeme, States, SLAs oder Owner erfinden."
+                "- The handoff payload may include `ic_substrate_evidence` with checks such as entry_owner, business_action, object_grain, workflow_state_owner, data_reconciliation, acceptance_evidence, and uncertainty_handling.\n"
+                "- Treat ready checks as implementation evidence; put missing checks into README/ASSUMPTIONS/Open Questions. Do not invent formulas, stations, systems, states, SLAs, or owners.\n"
+                "- Preserve the source of truth and integration/writeback boundary; do not implement production writeback, automation, or release/disposition actions until business owner and IT approval is explicit."
             )
         elif normalized == "ms":
             evidence_note = (
                 "IC Substrate handoff evidence:\n"
-                "- The handoff payload may include `ic_substrate_evidence` with readiness checks such as entry_owner, business_action, object_grain, workflow_state_owner, data_reconciliation, acceptance_evidence, and uncertainty_handling.\n"
-                "- Baca evidence package ini sebelum implementasi. Item ready boleh digunakan sebagai evidence; item missing mesti masuk README/ASSUMPTIONS/Open Questions. Jangan reka formula, station, system, state, SLA atau owner."
+                "- The handoff payload may include `ic_substrate_evidence` with checks such as entry_owner, business_action, object_grain, workflow_state_owner, data_reconciliation, acceptance_evidence, and uncertainty_handling.\n"
+                "- Treat ready checks as implementation evidence; put missing checks into README/ASSUMPTIONS/Open Questions. Do not invent formulas, stations, systems, states, SLAs, or owners.\n"
+                "- Preserve the source of truth and integration/writeback boundary; do not implement production writeback, automation, or release/disposition actions until business owner and IT approval is explicit."
             )
         else:
             evidence_note = (
                 "IC Substrate handoff evidence:\n"
-                "- The handoff payload may include `ic_substrate_evidence` with readiness checks such as entry_owner, business_action, object_grain, workflow_state_owner, data_reconciliation, acceptance_evidence, and uncertainty_handling.\n"
-                "- Read that evidence package before implementation. Treat ready checks as implementation evidence; put missing checks into README/ASSUMPTIONS/Open Questions. Do not invent formulas, stations, systems, states, SLAs, or owners."
+                "- The handoff payload may include `ic_substrate_evidence` with checks such as entry_owner, business_action, object_grain, workflow_state_owner, data_reconciliation, acceptance_evidence, and uncertainty_handling.\n"
+                "- Treat ready checks as implementation evidence; put missing checks into README/ASSUMPTIONS/Open Questions. Do not invent formulas, stations, systems, states, SLAs, or owners.\n"
+                "- Preserve the source of truth and integration/writeback boundary; do not implement production writeback, automation, or release/disposition actions until business owner and IT approval is explicit."
             )
-        return f"{prompt}\n\n{evidence_note}"
+        return f"{prompt}\n\n{evidence_note}".strip()
+
+    def _implementation_design_instruction(self, design_path: str, language: str) -> str:
+        if design_path:
+            if language == "zh":
+                return f"2. 系统设计文档：{design_path}"
+            if language == "de":
+                return f"2. Systemdesign-Dokument: {design_path}"
+            if language == "ms":
+                return f"2. Dokumen reka bentuk sistem: {design_path}"
+            return f"2. System design document: {design_path}"
+        if language == "zh":
+            return (
+                "2. 暂无系统设计文档。No system design document is available yet；请以需求文档为唯一产品依据，"
+                "选择最小可运行技术方案，并把架构、数据模型、接口、字段和剩余技术假设写入 README 或 ASSUMPTIONS.md。"
+            )
+        if language == "de":
+            return (
+                "2. No system design document is available yet. Nutze das Requirement-Dokument als einzige Produktquelle, "
+                "waehle die kleinste lauffaehige technische Loesung und dokumentiere Architektur, Datenmodell, APIs, Felder und technische Annahmen in README oder ASSUMPTIONS.md."
+            )
+        if language == "ms":
+            return (
+                "2. No system design document is available yet. Gunakan dokumen keperluan sebagai satu-satunya sumber produk, "
+                "pilih penyelesaian teknikal paling kecil yang boleh berjalan, dan rekod seni bina, model data, API, field serta andaian teknikal dalam README atau ASSUMPTIONS.md."
+            )
+        return (
+            "2. No system design document is available yet. Use the requirements document as the only product source of truth, "
+            "choose the smallest runnable technical approach, and record architecture, data model, APIs, fields, and remaining technical assumptions in README or ASSUMPTIONS.md."
+        )
 
     def _normalize_language(self, language: str | None) -> str:
         normalized = str(language or "").strip().lower()
@@ -7349,12 +7134,6 @@ class RequirementCollectorService:
     def _language_for_user_message(self, language: str | None, user_message: str) -> str:
         _ = user_message
         return self._normalize_language(language)
-
-    def _normalize_template_start_mode(self, value: str | None) -> str:
-        normalized = str(value or "").strip().lower()
-        if normalized in {TEMPLATE_START_MODE_GUIDED, TEMPLATE_START_MODE_EXAMPLE}:
-            return normalized
-        raise ValueError("Field `template_start_mode` must be `guided` or `example`.")
 
     def _parse_datetime(self, raw_value: Any) -> datetime | None:
         try:
@@ -7435,6 +7214,64 @@ class RequirementCollectorService:
             "Reply with A, B, C, or write your correction directly."
         )
 
+    def _normalize_start_function(self, start_function: str | None) -> str:
+        normalized = str(start_function or START_FUNCTION_FROM_SCRATCH).strip().lower()
+        if normalized in START_FUNCTION_VALUES:
+            return normalized
+        raise ValueError(
+            f"Unsupported start_function `{start_function}`. "
+            f"Supported: {', '.join(sorted(START_FUNCTION_VALUES))}."
+        )
+
+    def _draft_completion_pm_addendum(self, session: Session, language: str | None = None) -> str:
+        if session.start_function != START_FUNCTION_IMPROVE_DRAFT:
+            return ""
+
+        normalized_language = self._normalize_language(language)
+        if normalized_language == "zh":
+            return (
+                "半成品需求书完善模式：\n"
+                "- 用户不是从零开始，而是上传或粘贴了半成品需求书；先利用附件和对话里已有内容，不要重复询问已经明确的信息。\n"
+                "- 每次回复先简短归纳：已明确、推断但待确认、缺失、冲突。只保留和 PRD 质量有关的高信号内容。\n"
+                "- 下一问只追一个最影响 PRD 产出质量的缺口，优先级为：业务目标/范围、使用者与 owner、核心场景、业务规则、数据源/口径、流程状态、验收标准、out-of-scope。\n"
+                "- Draft completion：不要引入快速半成品文档概念；用附件 + 专家链路补齐最关键缺口。只有 structured requirement ready_to_generate=true 时，才提示生成文档并打开 Go Coding。\n"
+                "- 附件推断永远是待确认，不得写成已确认事实；如果附件与用户口径冲突，直接指出冲突并请用户确认一个版本。\n"
+                "- 对 Production/Quality/TDI 仍使用对应专家链路，但问题必须围绕补齐 draft 缺口，而不是重新做流程审计。\n"
+                "- 最后一段必须给 A/B/C 选项，帮助用户快速确认、修正或暂存该缺口。"
+            )
+        if normalized_language == "de":
+            return (
+                "Draft-Completion-Modus:\n"
+                "- Der Nutzer startet nicht bei null, sondern verbessert einen vorhandenen Requirement-Draft; nutze vorhandene Anhangs- und Dialoginhalte und frage klare Punkte nicht erneut.\n"
+                "- Jede Antwort fasst kurz zusammen: bestaetigt, abgeleitet aber zu bestaetigen, fehlend, Konflikt.\n"
+                "- Die naechste Frage schliesst genau die eine Luecke, die die PRD-Qualitaet am meisten blockiert: Ziel/Scope, Nutzer/Owner, Kernscenario, Regel, Datenquelle/Definition, Workflow-State, Acceptance oder Out-of-scope.\n"
+                "- Draft completion: kein fruehes Teildokument versprechen; nutze Anhang + Expertenkette, um die wichtigste Luecke zu schliessen. Go Coding erst anbieten, wenn structured requirement ready_to_generate=true ist.\n"
+                "- Anhangsableitungen sind immer pending confirmation, nie bestaetigte Fakten.\n"
+                "- Fuer Production/Quality/TDI bleibt die Expertenkette aktiv, aber sie dient der Draft-Lueckenschliessung statt einer neuen Prozessauditierung.\n"
+                "- Der letzte Absatz muss A/B/C Optionen zur schnellen Bestaetigung, Korrektur oder Pending-Markierung enthalten."
+            )
+        if normalized_language == "ms":
+            return (
+                "Mod melengkapkan draft requirement:\n"
+                "- Pengguna bukan bermula dari kosong; gunakan kandungan lampiran dan perbualan sedia ada, jangan tanya semula perkara yang sudah jelas.\n"
+                "- Setiap jawapan ringkaskan secara pendek: sudah jelas, inferens perlu disahkan, masih kurang, konflik.\n"
+                "- Soalan seterusnya hanya menutup satu gap yang paling menghalang kualiti PRD: business goal/scope, user/owner, core scenario, business rule, data source/definition, workflow state, acceptance atau out-of-scope.\n"
+                "- Draft completion: jangan janji dokumen separuh siap awal; gunakan lampiran + expert chain untuk menutup gap paling penting. Tawarkan Go Coding hanya apabila structured requirement ready_to_generate=true.\n"
+                "- Inferens daripada lampiran sentiasa pending confirmation, bukan fakta sah.\n"
+                "- Untuk Production/Quality/TDI, kekalkan expert chain tetapi fokus pada melengkapkan gap draft, bukan audit proses baharu.\n"
+                "- Perenggan akhir mesti ada pilihan A/B/C untuk sahkan, betulkan atau simpan pending."
+            )
+        return (
+            "Draft completion mode:\n"
+            "- The user is not starting from scratch; they are improving an existing draft requirement. Use attachment and conversation content first, and do not re-ask facts already present.\n"
+            "- In each reply, briefly separate: confirmed, inferred but pending confirmation, missing, and conflicts. Keep only PRD-quality-relevant signal.\n"
+            "- Ask exactly one next question that closes the biggest PRD-quality gap: business goal/scope, user/owner, core scenario, business rule, data source/definition, workflow state, acceptance criteria, or out-of-scope.\n"
+            "- Draft completion: do not promise an early partial document; use the attachment plus expert chain to close the biggest gap. Offer Go Coding only when structured requirement ready_to_generate=true.\n"
+            "- Attachment-derived content is pending confirmation, never confirmed fact. If it conflicts with the user's wording, name the conflict and ask which version wins.\n"
+            "- Production/Quality/TDI expert chains still apply, but use them to close draft gaps instead of restarting a process audit.\n"
+            "- The final paragraph must include A/B/C options so the user can confirm, correct, or keep the gap pending."
+        )
+
     def _normalize_prompt_template(self, prompt_template: str | None) -> str:
         normalized = str(prompt_template or "").strip().lower()
         if normalized == PROMPT_TEMPLATE_STANDARD:
@@ -7486,6 +7323,7 @@ class RequirementCollectorService:
             "summary": structured_requirement_model,
             "structured_requirement_model": structured_requirement_model,
             "status": status,
+            "prd_v0_ready": False,
         }
 
     def _persist_generated_document(
@@ -7550,7 +7388,12 @@ class RequirementCollectorService:
     ) -> tuple[Path, str]:
         directory = self._document_directory(document_kind)
         directory.mkdir(parents=True, exist_ok=True)
-        download_filename = self._build_document_download_filename(document_kind, language, created_at)
+        download_filename = self._build_document_download_filename(
+            document_kind,
+            language,
+            created_at,
+            doc_markdown,
+        )
         versioned_path = (directory / download_filename).resolve()
         versioned_path.write_text(doc_markdown, encoding="utf-8")
         self._latest_document_path(session_id, document_kind).write_text(doc_markdown, encoding="utf-8")
@@ -7577,6 +7420,7 @@ class RequirementCollectorService:
         document_kind: str,
         language: str,
         created_at: datetime,
+        doc_markdown: str = "",
     ) -> str:
         normalized_language = self._normalize_language(language)
         document_label = DOCUMENT_FILENAME_LABELS.get(document_kind, DOCUMENT_FILENAME_LABELS[DESIGN_MESSAGE_KIND]).get(
@@ -7871,7 +7715,11 @@ class RequirementCollectorService:
         parsed = self._parse_json_from_model_output(raw_model)
         if parsed is None:
             fallback = self._empty_structured_requirement_model()
-            fallback["open_questions"] = [f"Structured requirement parse failed. Raw output: {raw_model}"]
+            # Strip <think> blocks before echoing raw LLM output back into the model.
+            # Otherwise model reasoning leaks into open_questions and then into the PRD.
+            safe_raw, _ = self._split_thinking(raw_model or "")
+            safe_raw = safe_raw.strip() or "<no parseable content>"
+            fallback["open_questions"] = [f"Structured requirement parse failed. Raw output: {safe_raw}"]
             return fallback
 
         return normalize_structured_requirement_model(parsed)
@@ -8010,6 +7858,7 @@ class RequirementCollectorService:
             progress,
             draft_mode,
             session,
+            language,
         )
         return [
             {"role": "system", "content": self._prd_doc_prompt(session, language)},
@@ -8081,10 +7930,17 @@ class RequirementCollectorService:
         confirmation_percentage = (
             round((confirmed_count / total_count) * 100) if total_count else 0
         )
+        open_question_count = len(self._string_list(structured_requirement_model.get("open_questions")))
+        pending_question_count = 0
+        for item in collection_status.values():
+            if isinstance(item, dict):
+                pending_question_count += len(self._string_list(item.get("pending_questions")))
+        blocking_question_count = open_question_count + pending_question_count
         fully_confirmed = (
             total_count > 0
             and confirmed_count == total_count
             and conflict_count == 0
+            and blocking_question_count == 0
         )
         total_weight = sum(
             STRUCTURED_REQUIREMENT_PROGRESS_WEIGHTS.get(key, 1.0)
@@ -8100,20 +7956,13 @@ class RequirementCollectorService:
             readiness_percentage = 100
         elif conflict_count:
             readiness_percentage = min(readiness_percentage, 69)
-        elif pending_confirmation_count:
+        elif pending_confirmation_count or blocking_question_count:
             readiness_percentage = min(readiness_percentage, 94)
         core_requirements_confirmed = all(
             statuses_by_name.get(key) == "confirmed"
             for key in STRUCTURED_REQUIREMENT_GENERATION_CORE_KEYS
         )
-        ready_to_generate = (
-            total_count > 0
-            and collection_coverage_percentage == 100
-            and conflict_count == 0
-            and core_requirements_confirmed
-            and confirmation_percentage >= STRUCTURED_REQUIREMENT_GENERATION_MIN_CONFIRMATION
-            and readiness_percentage >= STRUCTURED_REQUIREMENT_GENERATION_MIN_READINESS
-        )
+        ready_to_generate = fully_confirmed
 
         return {
             "total_count": total_count,
@@ -8126,5 +7975,195 @@ class RequirementCollectorService:
             "confirmation_percentage": confirmation_percentage,
             "fully_confirmed": fully_confirmed,
             "core_requirements_confirmed": core_requirements_confirmed,
+            "open_question_count": open_question_count,
+            "pending_question_count": pending_question_count,
+            "blocking_question_count": blocking_question_count,
             "ready_to_generate": ready_to_generate,
         }
+
+    def _can_generate_v0_prd(
+        self,
+        progress: dict[str, Any],
+        conversation_messages: list[dict[str, Any]],
+    ) -> bool:
+        """Return True when the conversation is enough for a PRD V0, even before Final readiness."""
+        conflict_count = self._safe_int(progress.get("conflict_count"))
+        if conflict_count > 0:
+            return False
+
+        user_seed_texts = self._prd_v0_requirement_seed_texts(conversation_messages)
+        user_text = "\n".join(user_seed_texts).strip()
+        if len(user_text) < PRD_V0_MINIMUM_USER_SEED_LENGTH:
+            return False
+
+        collection_coverage_percentage = self._safe_int(progress.get("collection_coverage_percentage"))
+        collected_count = self._safe_int(progress.get("collected_count"))
+        return (
+            collection_coverage_percentage >= 20
+            or collected_count >= 1
+            or len(user_text) >= PRD_V0_MINIMUM_USER_SEED_LENGTH
+        )
+
+    def _session_matches_ic_substrate_fast_path(self, session: Session, language: str) -> bool:
+        template = self._resolve_business_template(session, language)
+        if template is not None:
+            return self._template_matches_ic_substrate_focus(template)
+        if session.applied_template_name:
+            return self._template_matches_ic_substrate_focus({"template_name": session.applied_template_name})
+        latest_department = self._ic_substrate_intent_track_from_latest_user_message(session)
+        if latest_department in {"production", "quality", "tdi"}:
+            return True
+        product_shape = self._ic_substrate_product_shape_from_latest_user_message(session)
+        shape_department = self._ic_substrate_department_from_product_shape(product_shape)
+        return shape_department in {"production", "quality", "tdi"}
+
+    def _session_matches_ic_substrate_expert_chain(
+        self,
+        session: Session,
+        language: str,
+        structured_requirement_model: dict[str, Any] | None = None,
+    ) -> bool:
+        normalized_language = self._normalize_language(language)
+        if self._session_matches_ic_substrate_fast_path(session, normalized_language):
+            return True
+
+        model = (
+            normalize_structured_requirement_model(structured_requirement_model)
+            if structured_requirement_model is not None
+            else self._latest_structured_requirement_model_for_prompt(session, normalized_language)
+        )
+        model_department = self._ic_substrate_intent_track_from_structured_model(model)
+        if model_department in {"production", "quality", "tdi"}:
+            return True
+
+        product_shape = self._ic_substrate_product_shape_from_model_or_template(
+            session,
+            model,
+            normalized_language,
+        )
+        shape_department = self._ic_substrate_department_from_product_shape(product_shape)
+        return shape_department in {"production", "quality", "tdi"}
+
+    def _prd_v0_requirement_seed_texts(self, conversation_messages: list[dict[str, Any]]) -> list[str]:
+        return [
+            text
+            for message in conversation_messages
+            if message.get("role") == "user"
+            for text in [str(message.get("content", "")).strip()]
+            if self._is_prd_v0_requirement_seed(text)
+        ]
+
+    def _is_prd_v0_requirement_seed(self, content: str) -> bool:
+        """A short choice-only A/B/C route reply is not enough to produce a quality PRD V0."""
+        text = str(content or "").strip()
+        if len(text) < PRD_V0_MINIMUM_USER_SEED_LENGTH:
+            return False
+        return not (
+            self._is_prd_v0_choice_only_reply(text)
+            or self._is_prd_v0_non_requirement_reply(text)
+        )
+
+    def _is_prd_v0_choice_only_reply(self, content: str) -> bool:
+        text = str(content or "").strip()
+        if self._has_prd_v0_seed_slot_marker(text):
+            return False
+        return (
+            len(text) <= 160
+            and "\n" not in text
+            and re.match(r"^[ABC]\s*[\.)、:：-]\s+\S[\s\S]*$", text, re.IGNORECASE) is not None
+        )
+
+    def _has_prd_v0_seed_slot_marker(self, content: str) -> bool:
+        normalized = str(content or "").strip().lower()
+        return any(
+            marker in normalized
+            for marker in [
+                "first action:",
+                "owner/user:",
+                "owner:",
+                "user:",
+                "source:",
+                "business_action",
+                "primary_user_or_owner",
+                "source_of_truth",
+                "integration_writeback_boundary",
+                "acceptance_evidence",
+                "source of truth:",
+                "kpi/acceptance:",
+                "acceptance:",
+                "boundary:",
+                "首版动作",
+                "使用者",
+                "主要用户",
+                "数据源",
+                "验收证据",
+                "写回边界",
+                "集成/写回边界",
+            ]
+        )
+
+    def _is_prd_v0_non_requirement_reply(self, content: str) -> bool:
+        text = re.sub(r"[\s。.!！?？,，;；:：、~-]+", " ", str(content or "").strip().lower()).strip()
+        if not text or len(text) > 60:
+            return False
+
+        requirement_signals = [
+            "做",
+            "系统",
+            "软件",
+            "看板",
+            "报表",
+            "查询",
+            "追踪",
+            "提醒",
+            "dashboard",
+            "tracker",
+            "alert",
+            "query",
+            "report",
+            "system",
+            "app",
+            "build",
+        ]
+        if any(signal in text for signal in requirement_signals):
+            return False
+
+        generic_uncertainty_markers = [
+            "我不知道",
+            "不知道",
+            "不清楚",
+            "没想好",
+            "随便",
+            "都可以",
+            "not sure",
+            "i do not know",
+            "i don't know",
+            "i dont know",
+            "no idea",
+            "whatever",
+            "anything",
+            "keine ahnung",
+            "weiss nicht",
+            "egal",
+            "tidak tahu",
+            "tak tahu",
+            "terserah",
+        ]
+        generic_acknowledgements = {
+            "ok",
+            "okay",
+            "yes",
+            "no",
+            "thanks",
+            "thank you",
+            "好的",
+            "收到",
+            "可以",
+            "行",
+            "ja",
+            "nein",
+            "ya",
+            "tidak",
+            "boleh",
+        }
+        return text in generic_acknowledgements or any(marker in text for marker in generic_uncertainty_markers)

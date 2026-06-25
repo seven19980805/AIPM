@@ -29,6 +29,9 @@ Important rules:
 20) pending_questions should contain short, concrete follow-up questions only when the item is not confirmed.
 21) Keep collection_status.status values exactly as the English enum tokens in the schema. Do not translate those enum values.
 22) product_context should capture the product-manager handoff facts when stated: requesting department, business owner, first-version software type, primary user, decision/action supported, and acceptance owner.
+23) Assistant suggestions, assistant summaries, assistant-generated draft PRDs, and generated document text are not user confirmation. They may explain candidate assumptions, but they must not upgrade collection_status to "confirmed".
+24) A/B/C user replies confirm only the specific option text immediately offered by the assistant, not later assistant elaborations or inferred document content.
+25) If any item still has pending_questions, or if open_questions contains delivery-relevant gaps, that item is not fully ready for document generation / Go Coding.
 
 Output JSON schema:
 {

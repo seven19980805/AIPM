@@ -186,21 +186,39 @@ def _attachment_inline_data(filename: str, file_bytes: bytes) -> list[dict[str, 
     return []
 
 
-def _attachment_analysis_prompt(filename: str, extracted_text: str, inline_data: list[dict[str, object]]) -> str:
+def _attachment_analysis_prompt(
+    filename: str,
+    extracted_text: str,
+    inline_data: list[dict[str, object]],
+    language: str = "zh",
+    visual_unavailable_note: str = "",
+) -> str:
     media_names = [str(item.get("filename", "")) for item in inline_data if item.get("filename")]
     media_note = "\n".join(f"- {name}" for name in media_names) or "- None"
+    output_language = {
+        "zh": "Chinese",
+        "de": "German",
+        "ms": "Bahasa Melayu",
+        "en": "English",
+    }.get(language, "Chinese")
+    unavailable_section = (
+        f"\nVisual analysis fallback note: {visual_unavailable_note}\n"
+        if visual_unavailable_note
+        else ""
+    )
     return (
         "You are an expert AI product manager helping users turn business attachments into software requirements.\n"
-        "Analyze the attachment content and any images/charts provided. Focus on what a PM should ask next.\n\n"
+        "Analyze the attachment content and any images/charts provided. Focus on PRD completion gaps and what a PM should ask next.\n\n"
         f"File name: {filename}\n"
         f"Visual parts provided to the model:\n{media_note}\n\n"
+        f"{unavailable_section}"
         "Extracted text and chart XML text, if any:\n"
         f"{extracted_text or '(No readable text extracted.)'}\n\n"
-        "Return a concise Chinese summary with these sections:\n"
-        "1. 附件里已经明确的业务目标/场景\n"
-        "2. 可能涉及的软件形态（dashboard/workflow/report/data query/alert/admin）\n"
-        "3. 图表或图片里能看出的 KPI、维度、流程、字段或异常点\n"
-        "4. 还需要 AI PM 下一轮追问的一个最关键问题\n"
+        f"Return a concise {output_language} summary with these sections:\n"
+        "1. Already clear facts for the PRD\n"
+        "2. Inferred but pending-confirmation assumptions\n"
+        "3. Missing or conflicting PRD gaps\n"
+        "4. The single most important next AI PM question\n"
         "Do not invent exact numbers or internal system names if they are not visible."
     )
 
@@ -233,7 +251,7 @@ def extract_attachment_text(filename: str, file_bytes: bytes) -> dict[str, objec
         kind = "spreadsheet"
 
     text, truncated = _truncate_attachment_text(raw_text)
-    if not text and kind not in {"pdf", "image"}:
+    if not text and kind not in {"pdf", "image", "presentation"}:
         raise ValueError("No readable text was found in this attachment.")
     return {
         "filename": filename,
@@ -244,21 +262,111 @@ def extract_attachment_text(filename: str, file_bytes: bytes) -> dict[str, objec
     }
 
 
-def analyze_attachment_with_gemini(filename: str, file_bytes: bytes) -> dict[str, object]:
+def _attachment_visual_fallback_text(filename: str, language: str, reason: str) -> str:
+    if language == "zh":
+        return (
+            f"附件 {filename} 包含图片、PDF 或图表内容，但当前模型未能完成视觉分析。"
+            "我会先基于可抽取文字继续梳理；图片里的字段、数值、流程或图表含义需要你下一步确认。"
+            f"\n\n降级原因：{reason}"
+        )
+    if language == "de":
+        return (
+            f"Der Anhang {filename} enthaelt Bilder, PDF- oder Chart-Inhalte, aber das aktuelle Modell konnte sie nicht visuell analysieren. "
+            "Ich nutze zuerst den extrahierbaren Text; Felder, Zahlen, Prozesse oder Chart-Bedeutungen aus Bildern muessen bestaetigt werden."
+            f"\n\nFallback-Grund: {reason}"
+        )
+    if language == "ms":
+        return (
+            f"Lampiran {filename} mengandungi imej, PDF atau carta, tetapi model semasa tidak dapat menganalisis visual tersebut. "
+            "Saya akan gunakan teks yang boleh diekstrak dahulu; field, nombor, proses atau maksud carta dalam imej perlu disahkan."
+            f"\n\nSebab fallback: {reason}"
+        )
+    return (
+        f"The attachment {filename} contains image, PDF, or chart content, but the current model could not analyze the visual parts. "
+        "I will continue from extracted text first; fields, numbers, process steps, or chart meaning in images need user confirmation."
+        f"\n\nFallback reason: {reason}"
+    )
+
+
+def _attachment_text_with_visual_note(
+    filename: str,
+    extraction: dict[str, object],
+    language: str,
+    reason: str,
+) -> str:
+    fallback_text = _attachment_visual_fallback_text(filename, language, reason)
+    extracted_text = str(extraction.get("text", "")).strip()
+    if not extracted_text:
+        return fallback_text
+    if language == "zh":
+        return f"{fallback_text}\n\n已保留可抽取文字：\n{extracted_text}"
+    if language == "de":
+        return f"{fallback_text}\n\nExtrahierbarer Text wurde beibehalten:\n{extracted_text}"
+    if language == "ms":
+        return f"{fallback_text}\n\nTeks yang boleh diekstrak dikekalkan:\n{extracted_text}"
+    return f"{fallback_text}\n\nExtracted text preserved:\n{extracted_text}"
+
+
+def _analyze_attachment_text_only(
+    filename: str,
+    extraction: dict[str, object],
+    language: str,
+    visual_unavailable_note: str = "",
+) -> str:
+    extracted_text = str(extraction.get("text", "")).strip()
+    if not extracted_text:
+        return _attachment_visual_fallback_text(filename, language, visual_unavailable_note or "No readable text was extracted.")
+
+    service = _get_service()
+    prompt = _attachment_analysis_prompt(
+        filename,
+        extracted_text,
+        [],
+        language=language,
+        visual_unavailable_note=visual_unavailable_note,
+    )
+    return service.llm_client.chat([{"role": "user", "content": prompt}], temperature=0.2)
+
+
+def analyze_attachment_with_model(filename: str, file_bytes: bytes, language: str = "zh") -> dict[str, object]:
     extraction = extract_attachment_text(filename, file_bytes)
     inline_data = _attachment_inline_data(filename, file_bytes)
+    normalized_language = language if language in {"en", "de", "zh", "ms"} else "zh"
     if not inline_data:
-        extraction["multimodal"] = False
+        try:
+            extraction["text"] = _analyze_attachment_text_only(filename, extraction, normalized_language)
+            extraction["analysis_note"] = "Analyzed from extracted text only."
+        except LLMError as exc:
+            extraction["analysis_note"] = f"Text-only attachment analysis unavailable: {exc}"
         extraction["visual_count"] = 0
-        extraction["analysis_note"] = "No supported visual parts were available for multimodal analysis."
+        extraction["multimodal"] = False
         return extraction
 
     service = _get_service()
-    prompt = _attachment_analysis_prompt(filename, str(extraction.get("text", "")), inline_data)
-    analysis = service.llm_client.chat_multimodal(prompt, inline_data, temperature=0.2)
-    extraction["text"] = analysis
-    extraction["multimodal"] = True
     extraction["visual_count"] = len(inline_data)
+    prompt = _attachment_analysis_prompt(
+        filename,
+        str(extraction.get("text", "")),
+        inline_data,
+        language=normalized_language,
+    )
+    try:
+        analysis = service.llm_client.chat_multimodal(prompt, inline_data, temperature=0.2)
+        extraction["text"] = analysis
+        extraction["multimodal"] = True
+    except LLMError as exc:
+        fallback_note = str(exc)
+        try:
+            extraction["text"] = _analyze_attachment_text_only(
+                filename,
+                extraction,
+                normalized_language,
+                visual_unavailable_note=fallback_note,
+            )
+        except LLMError:
+            extraction["text"] = _attachment_text_with_visual_note(filename, extraction, normalized_language, fallback_note)
+        extraction["analysis_note"] = f"Visual analysis fell back to text-only mode: {fallback_note}"
+        extraction["multimodal"] = False
     return extraction
 
 
@@ -267,6 +375,8 @@ def _structured_requirement_response(
     structured_requirement_model: dict[str, object],
     sync_status: str = "ready",
     conversation_chain_state: dict[str, object] | None = None,
+    pm_methodology_state: dict[str, object] | None = None,
+    ic_substrate_evidence_state: dict[str, object] | None = None,
 ):
     response = {
         "session_id": session_id,
@@ -276,6 +386,10 @@ def _structured_requirement_response(
     }
     if conversation_chain_state is not None:
         response["conversation_chain_state"] = conversation_chain_state
+    if pm_methodology_state is not None:
+        response["pm_methodology_state"] = pm_methodology_state
+    if ic_substrate_evidence_state is not None:
+        response["ic_substrate_evidence_state"] = ic_substrate_evidence_state
     return response
 
 
@@ -286,6 +400,7 @@ def create_session():
     template_id = str(payload.get("template_id", "")).strip() or None
     template_start_mode = str(payload.get("template_start_mode", "guided")).strip().lower()
     starter_department = str(payload.get("starter_department", "")).strip()
+    start_function = str(payload.get("start_function", "from_scratch")).strip().lower()
     language = _request_language()
     try:
         session = service.create_session(
@@ -293,6 +408,7 @@ def create_session():
             language=language,
             template_start_mode=template_start_mode,
             starter_department=starter_department,
+            start_function=start_function,
         )
     except KeyError:
         return jsonify({"error": "Business template not found."}), HTTPStatus.NOT_FOUND
@@ -307,6 +423,7 @@ def create_session():
                 "prompt_template": session.prompt_template,
                 "applied_template_id": session.applied_template_id,
                 "applied_template_name": session.applied_template_name,
+                "start_function": session.start_function,
                 "created_at": session.created_at,
                 "updated_at": session.updated_at,
                 "messages": session.messages,
@@ -314,6 +431,8 @@ def create_session():
                 "structured_requirement_model": structured_requirement_snapshot["structured_requirement_model"],
                 "structured_requirement_sync_status": structured_requirement_snapshot["structured_requirement_sync_status"],
                 "conversation_chain_state": structured_requirement_snapshot["conversation_chain_state"],
+                "pm_methodology_state": structured_requirement_snapshot["pm_methodology_state"],
+                "ic_substrate_evidence_state": structured_requirement_snapshot["ic_substrate_evidence_state"],
             }
         ),
         HTTPStatus.CREATED,
@@ -362,12 +481,11 @@ def analyze_attachment():
         return jsonify({"error": "Field `file` is required."}), HTTPStatus.BAD_REQUEST
 
     file_bytes = file.read()
+    language = str(request.form.get("language", request.args.get("language", "zh"))).strip().lower()
     try:
-        result = analyze_attachment_with_gemini(file.filename, file_bytes)
+        result = analyze_attachment_with_model(file.filename, file_bytes, language)
     except (ValueError, zipfile.BadZipFile) as exc:
         return jsonify({"error": str(exc)}), HTTPStatus.BAD_REQUEST
-    except LLMError as exc:
-        return jsonify({"error": str(exc)}), HTTPStatus.BAD_GATEWAY
     return jsonify(result)
 
 
@@ -389,6 +507,7 @@ def get_session(session_id: str):
             "prompt_template": session.prompt_template,
             "applied_template_id": session.applied_template_id,
             "applied_template_name": session.applied_template_name,
+            "start_function": session.start_function,
             "created_at": session.created_at,
             "updated_at": session.updated_at,
             "messages": session.messages,
@@ -396,6 +515,8 @@ def get_session(session_id: str):
             "structured_requirement_model": structured_requirement_snapshot["structured_requirement_model"],
             "structured_requirement_sync_status": structured_requirement_snapshot["structured_requirement_sync_status"],
             "conversation_chain_state": structured_requirement_snapshot["conversation_chain_state"],
+            "pm_methodology_state": structured_requirement_snapshot["pm_methodology_state"],
+            "ic_substrate_evidence_state": structured_requirement_snapshot["ic_substrate_evidence_state"],
         }
     )
 
@@ -431,6 +552,7 @@ def update_session_prompt_template(session_id: str):
             "prompt_template": session.prompt_template,
             "applied_template_id": session.applied_template_id,
             "applied_template_name": session.applied_template_name,
+            "start_function": session.start_function,
             "created_at": session.created_at,
             "updated_at": session.updated_at,
             "messages": session.messages,
@@ -510,6 +632,15 @@ def get_summary(session_id: str):
             structured_requirement_model,
             language,
         )
+        pm_methodology_state = service.build_pm_methodology_state(
+            structured_requirement_model,
+            language,
+        )
+        ic_substrate_evidence_state = service.build_ic_substrate_evidence_state(
+            session,
+            structured_requirement_model,
+            language,
+        )
     except KeyError:
         return jsonify({"error": "Session not found."}), HTTPStatus.NOT_FOUND
     except LLMError as exc:
@@ -520,6 +651,8 @@ def get_summary(session_id: str):
             structured_requirement_model,
             "ready",
             conversation_chain_state,
+            pm_methodology_state,
+            ic_substrate_evidence_state,
         )
     )
 
@@ -538,6 +671,15 @@ def get_structured_requirement(session_id: str):
             structured_requirement_model,
             language,
         )
+        pm_methodology_state = service.build_pm_methodology_state(
+            structured_requirement_model,
+            language,
+        )
+        ic_substrate_evidence_state = service.build_ic_substrate_evidence_state(
+            session,
+            structured_requirement_model,
+            language,
+        )
     except KeyError:
         return jsonify({"error": "Session not found."}), HTTPStatus.NOT_FOUND
     except LLMError as exc:
@@ -548,6 +690,8 @@ def get_structured_requirement(session_id: str):
             structured_requirement_model,
             "ready",
             conversation_chain_state,
+            pm_methodology_state,
+            ic_substrate_evidence_state,
         )
     )
 
@@ -759,9 +903,14 @@ def create_coding_handoff(session_id: str):
         )
 
     open_url = request.args.get("open_url", "").strip()
+    payload = result.get("payload") if isinstance(result.get("payload"), dict) else {}
     response_payload = {
         "handoff_token": result["handoff_token"],
         "expires_at": result["expires_at"],
+        "documents_ready": payload.get("documents_ready", True),
+        "implementation_prompt": payload.get("implementation_prompt", ""),
+        "documents": payload.get("documents", []),
+        "ic_substrate_evidence": payload.get("ic_substrate_evidence", {}),
     }
     if open_url:
         response_payload["open_url"] = open_url

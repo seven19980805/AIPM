@@ -11,6 +11,7 @@ class SQLiteSessionStore:
     DEFAULT_PROMPT_TEMPLATE = "personal_project"
     DEFAULT_APPLIED_TEMPLATE_ID = ""
     DEFAULT_APPLIED_TEMPLATE_NAME = ""
+    DEFAULT_START_FUNCTION = "from_scratch"
     SESSION_TITLE_MAX_CHARS = 10
     SESSION_TITLE_MAX_ENGLISH_WORDS = 5
     SESSION_TITLE_ELLIPSIS = "..."
@@ -38,6 +39,7 @@ class SQLiteSessionStore:
                     prompt_template TEXT NOT NULL DEFAULT 'personal_project',
                     applied_template_id TEXT NOT NULL DEFAULT '',
                     applied_template_name TEXT NOT NULL DEFAULT '',
+                    start_function TEXT NOT NULL DEFAULT 'from_scratch',
                     structured_requirement_cache TEXT NOT NULL DEFAULT '{}',
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
@@ -133,6 +135,13 @@ class SQLiteSessionStore:
                 ADD COLUMN applied_template_name TEXT NOT NULL DEFAULT ''
                 """
             )
+        if "start_function" not in existing_columns:
+            conn.execute(
+                """
+                ALTER TABLE sessions
+                ADD COLUMN start_function TEXT NOT NULL DEFAULT 'from_scratch'
+                """
+            )
 
     def _ensure_message_columns(self, conn: sqlite3.Connection) -> None:
         existing_columns = {
@@ -176,6 +185,7 @@ class SQLiteSessionStore:
         prompt_template: str = DEFAULT_PROMPT_TEMPLATE,
         applied_template_id: str = DEFAULT_APPLIED_TEMPLATE_ID,
         applied_template_name: str = DEFAULT_APPLIED_TEMPLATE_NAME,
+        start_function: str = DEFAULT_START_FUNCTION,
     ) -> dict[str, Any]:
         with self._connect() as conn:
             conn.execute(
@@ -186,11 +196,12 @@ class SQLiteSessionStore:
                     prompt_template,
                     applied_template_id,
                     applied_template_name,
+                    start_function,
                     structured_requirement_cache,
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     session_id,
@@ -198,6 +209,7 @@ class SQLiteSessionStore:
                     prompt_template,
                     applied_template_id,
                     applied_template_name,
+                    start_function,
                     "{}",
                     created_at,
                     created_at,
@@ -219,6 +231,7 @@ class SQLiteSessionStore:
                     s.prompt_template,
                     s.applied_template_id,
                     s.applied_template_name,
+                    s.start_function,
                     s.created_at,
                     s.updated_at,
                     COUNT(m.id) AS message_count,
@@ -250,6 +263,7 @@ class SQLiteSessionStore:
                     s.prompt_template,
                     s.applied_template_id,
                     s.applied_template_name,
+                    s.start_function,
                     s.created_at,
                     s.updated_at
                 ORDER BY s.updated_at DESC, s.created_at DESC
@@ -269,6 +283,7 @@ class SQLiteSessionStore:
                     "prompt_template": row["prompt_template"] or self.DEFAULT_PROMPT_TEMPLATE,
                     "applied_template_id": row["applied_template_id"] or self.DEFAULT_APPLIED_TEMPLATE_ID,
                     "applied_template_name": row["applied_template_name"] or self.DEFAULT_APPLIED_TEMPLATE_NAME,
+                    "start_function": row["start_function"] or self.DEFAULT_START_FUNCTION,
                     "created_at": row["created_at"],
                     "updated_at": row["updated_at"],
                     "message_count": int(row["message_count"] or 0),
@@ -287,6 +302,7 @@ class SQLiteSessionStore:
                     prompt_template,
                     applied_template_id,
                     applied_template_name,
+                    start_function,
                     structured_requirement_cache,
                     created_at,
                     updated_at
@@ -342,6 +358,7 @@ class SQLiteSessionStore:
             "prompt_template": session_row["prompt_template"] or self.DEFAULT_PROMPT_TEMPLATE,
             "applied_template_id": session_row["applied_template_id"] or self.DEFAULT_APPLIED_TEMPLATE_ID,
             "applied_template_name": session_row["applied_template_name"] or self.DEFAULT_APPLIED_TEMPLATE_NAME,
+            "start_function": session_row["start_function"] or self.DEFAULT_START_FUNCTION,
             "structured_requirement_cache": self._parse_structured_requirement_cache(
                 session_row["structured_requirement_cache"]
             ),
