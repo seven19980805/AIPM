@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 import { structuredRequirementPanelCopy } from './structuredRequirementCopy'
 import type { DocumentQaState } from '../lib/documentQa'
@@ -156,6 +156,13 @@ const canGenerateDocuments = computed(() => progress.value.readyToGenerate)
 const canOpenPanelGoCoding = computed(
   () => progress.value.readyToGenerate && props.hasPrdDocument,
 )
+
+// Secondary advisory cards collapse by default so the readiness gate (Progress) and
+// the structured model stay in view without a tall scroll. The header shows a one-line
+// summary; clicking it expands the full card.
+const documentQaExpanded = ref(false)
+const methodologyExpanded = ref(false)
+const icEvidenceExpanded = ref(false)
 
 const methodologyVisible = computed(() => props.pmMethodologyState.checks.length > 0)
 
@@ -502,7 +509,12 @@ function summarizeText(value: string): string {
     </section>
 
     <section v-if="documentQaVisible && documentQaState" class="requirement-card document-qa-card">
-      <header class="card-head">
+      <button
+        type="button"
+        class="card-head card-head-toggle"
+        :aria-expanded="documentQaExpanded"
+        @click="documentQaExpanded = !documentQaExpanded"
+      >
         <div class="card-title">
           <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M9 11l2 2 4-5"/>
@@ -510,44 +522,62 @@ function summarizeText(value: string): string {
           </svg>
           <h3>Document QA</h3>
         </div>
-        <span class="document-qa-source">{{ documentQaSourceLabel }}</span>
-      </header>
-
-      <div class="document-qa-summary">
-        <div class="document-qa-row">
-          <span>Demo 可交付性</span>
-          <strong>{{ documentQaDemoReadinessText }}</strong>
-        </div>
-        <div class="document-qa-row">
-          <span>生产可用性</span>
-          <strong class="document-qa-status" :class="documentQaProductionClass">
+        <div class="card-head-meta">
+          <span class="card-head-summary document-qa-status" :class="documentQaProductionClass">
             {{ documentQaProductionReadinessText }}
-          </strong>
+          </span>
+          <svg class="card-chevron" :class="{ open: documentQaExpanded }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 9l6 6 6-6"/>
+          </svg>
         </div>
-        <div class="document-qa-row">
-          <span>未决问题</span>
-          <strong>{{ documentQaState.openQuestionCount ?? '-' }}</strong>
-        </div>
-        <div class="document-qa-row">
-          <span>QA 发现</span>
-          <strong>{{ documentQaFindingCount }}</strong>
-        </div>
-      </div>
+      </button>
 
-      <p class="document-qa-note" :class="documentQaProductionClass">
-        {{ documentQaHandoffNote }}
-      </p>
+      <div v-show="documentQaExpanded" class="card-collapsible">
+        <div class="document-qa-summary">
+          <div class="document-qa-row">
+            <span>{{ documentQaSourceLabel }}</span>
+            <strong>{{ documentQaState.documentType }}</strong>
+          </div>
+          <div class="document-qa-row">
+            <span>Demo 可交付性</span>
+            <strong>{{ documentQaDemoReadinessText }}</strong>
+          </div>
+          <div class="document-qa-row">
+            <span>生产可用性</span>
+            <strong class="document-qa-status" :class="documentQaProductionClass">
+              {{ documentQaProductionReadinessText }}
+            </strong>
+          </div>
+          <div class="document-qa-row">
+            <span>未决问题</span>
+            <strong>{{ documentQaState.openQuestionCount ?? '-' }}</strong>
+          </div>
+          <div class="document-qa-row">
+            <span>QA 发现</span>
+            <strong>{{ documentQaFindingCount }}</strong>
+          </div>
+        </div>
 
-      <div v-if="documentQaTopBlockers.length" class="document-qa-blockers">
-        <span>主要阻塞项</span>
-        <ul>
-          <li v-for="blocker in documentQaTopBlockers" :key="blocker">{{ blocker }}</li>
-        </ul>
+        <p class="document-qa-note" :class="documentQaProductionClass">
+          {{ documentQaHandoffNote }}
+        </p>
+
+        <div v-if="documentQaTopBlockers.length" class="document-qa-blockers">
+          <span>主要阻塞项</span>
+          <ul>
+            <li v-for="blocker in documentQaTopBlockers" :key="blocker">{{ blocker }}</li>
+          </ul>
+        </div>
       </div>
     </section>
 
     <section v-if="methodologyVisible" class="requirement-card methodology-card">
-      <header class="card-head">
+      <button
+        type="button"
+        class="card-head card-head-toggle"
+        :aria-expanded="methodologyExpanded"
+        @click="methodologyExpanded = !methodologyExpanded"
+      >
         <div class="card-title">
           <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 3v18"/>
@@ -558,8 +588,15 @@ function summarizeText(value: string): string {
           </svg>
           <h3>{{ copy.methodologyTitle }}</h3>
         </div>
-      </header>
+        <div class="card-head-meta">
+          <span class="card-head-summary">{{ pmMethodologyState.score }}% · {{ methodologyReadyCount }}/{{ pmMethodologyState.checks.length }}</span>
+          <svg class="card-chevron" :class="{ open: methodologyExpanded }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 9l6 6 6-6"/>
+          </svg>
+        </div>
+      </button>
 
+      <div v-show="methodologyExpanded" class="card-collapsible">
       <div class="methodology-summary">
         <div>
           <span>{{ copy.methodologyLabels.score }}</span>
@@ -603,10 +640,16 @@ function summarizeText(value: string): string {
           </div>
         </article>
       </div>
+      </div>
     </section>
 
     <section v-if="icEvidenceVisible" class="requirement-card ic-evidence-card">
-      <header class="card-head">
+      <button
+        type="button"
+        class="card-head card-head-toggle"
+        :aria-expanded="icEvidenceExpanded"
+        @click="icEvidenceExpanded = !icEvidenceExpanded"
+      >
         <div class="card-title">
           <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M4 7h16"/>
@@ -617,8 +660,15 @@ function summarizeText(value: string): string {
           </svg>
           <h3>{{ copy.icEvidenceTitle }}</h3>
         </div>
-      </header>
+        <div class="card-head-meta">
+          <span class="card-head-summary">{{ icSubstrateEvidenceState.readiness_score }}% · {{ icEvidenceReadyCount }}/{{ icSubstrateEvidenceState.checks.length }}</span>
+          <svg class="card-chevron" :class="{ open: icEvidenceExpanded }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 9l6 6 6-6"/>
+          </svg>
+        </div>
+      </button>
 
+      <div v-show="icEvidenceExpanded" class="card-collapsible">
       <div class="methodology-summary ic-evidence-summary">
         <div>
           <span>{{ copy.icEvidenceLabels.score }}</span>
@@ -668,6 +718,7 @@ function summarizeText(value: string): string {
             <p>{{ check.next_question }}</p>
           </div>
         </article>
+      </div>
       </div>
     </section>
 
@@ -819,6 +870,54 @@ function summarizeText(value: string): string {
   height: 20px;
   color: var(--accent);
   flex-shrink: 0;
+}
+
+/* Collapsible secondary cards (Document QA / PM Methodology / IC Evidence) */
+.card-head-toggle {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 12px;
+}
+
+.card-head-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.card-head-toggle:hover .card-chevron {
+  color: var(--accent);
+}
+
+.card-head-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.card-head-summary {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.card-chevron {
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  flex-shrink: 0;
+  transition: transform 0.18s ease;
+}
+
+.card-chevron.open {
+  transform: rotate(180deg);
 }
 
 .card-state {

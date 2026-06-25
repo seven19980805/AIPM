@@ -17,6 +17,7 @@ from .business_template_library import BusinessTemplateLibrary
 from .llm_client import LLMError
 from .ic_substrate_domain import build_ic_substrate_evidence_state as build_ic_substrate_evidence_state_payload
 from .pm_methodology import build_pm_methodology_state as build_pm_methodology_state_payload
+from . import document_qa as document_qa_module
 from .session_store import SQLiteSessionStore
 from .structured_requirement_model import (
     REQUIREMENT_ITEM_KEYS,
@@ -1952,6 +1953,45 @@ class RequirementCollectorService:
             normalized_language,
         )
 
+    def build_document_qa_state(
+        self,
+        session: Session | None,
+        structured_requirement_model: dict[str, Any] | None,
+        language: str = "zh",
+    ) -> dict[str, Any] | None:
+        """Structured Document QA state for the latest generated document.
+
+        Returns ``None`` when no document exists yet (the panel hides the card).
+        The design document is preferred over the PRD to match the frontend's
+        ``latestDocumentQa`` ordering. The card is now driven by this structured
+        payload instead of regex-reparsing the document Markdown.
+        """
+        if session is None:
+            return None
+        model = normalize_structured_requirement_model(structured_requirement_model)
+        progress = self._structured_requirement_progress(model)
+        # Use the generated-document MESSAGE content (the full Markdown the frontend
+        # renders and the user reads, including the QA appendix) — not the on-disk
+        # file, whose stored copy can be a stub. Prefer the design document.
+        design_markdown = self._latest_document_message_markdown(session, DESIGN_MESSAGE_KIND)
+        if design_markdown:
+            return self._document_qa_state(design_markdown, model, progress, DESIGN_MESSAGE_KIND)
+        prd_markdown = self._latest_document_message_markdown(session, PRD_MESSAGE_KIND)
+        if prd_markdown:
+            return self._document_qa_state(prd_markdown, model, progress, PRD_MESSAGE_KIND)
+        return None
+
+    def _latest_document_message_markdown(self, session: Session, kind: str) -> str | None:
+        """Return the content of the latest ``kind`` document message, if any."""
+        messages = getattr(session, "messages", None) or []
+        for message in reversed(messages):
+            if not isinstance(message, dict) or message.get("kind") != kind:
+                continue
+            content = message.get("content")
+            if isinstance(content, str) and content.strip():
+                return content
+        return None
+
     def _ic_substrate_product_shape_from_model_or_template(
         self,
         session: Session,
@@ -2017,6 +2057,11 @@ class RequirementCollectorService:
                         canonical_model,
                         normalized_language,
                     ),
+                    "document_qa_state": self.build_document_qa_state(
+                        session,
+                        canonical_model,
+                        normalized_language,
+                    ),
                 }
             empty_model = self._empty_structured_requirement_model()
             conversation_chain_state = self.build_conversation_chain_state(
@@ -2034,6 +2079,11 @@ class RequirementCollectorService:
                     normalized_language,
                 ),
                 "ic_substrate_evidence_state": self.build_ic_substrate_evidence_state(
+                    session,
+                    empty_model,
+                    normalized_language,
+                ),
+                "document_qa_state": self.build_document_qa_state(
                     session,
                     empty_model,
                     normalized_language,
@@ -2065,6 +2115,11 @@ class RequirementCollectorService:
                 normalized_language,
             ),
             "ic_substrate_evidence_state": self.build_ic_substrate_evidence_state(
+                session,
+                cached_model,
+                normalized_language,
+            ),
+            "document_qa_state": self.build_document_qa_state(
                 session,
                 cached_model,
                 normalized_language,
@@ -6989,6 +7044,27 @@ class RequirementCollectorService:
             return doc_markdown
         return f"{doc_markdown.rstrip()}\n\n{appendix}"
 
+    def _document_qa_state(
+        self,
+        doc_markdown: str,
+        structured_requirement_model: dict[str, Any],
+        progress: dict[str, Any],
+        document_kind: str,
+    ) -> dict[str, Any]:
+        """Structured Document QA findings — the single source of truth.
+
+        Both the Markdown appendix and the API ``document_qa_state`` payload are
+        derived from this dict, so the two can no longer drift apart.
+        """
+        model = normalize_structured_requirement_model(structured_requirement_model)
+        return document_qa_module.build_document_qa_state(
+            doc_markdown,
+            model,
+            progress,
+            is_design=document_kind == DESIGN_MESSAGE_KIND,
+            source_kind=document_kind,
+        )
+
     def _format_document_qa_appendix(
         self,
         doc_markdown: str,
@@ -6997,298 +7073,16 @@ class RequirementCollectorService:
         document_kind: str,
         language: str,
     ) -> str:
-        model = normalize_structured_requirement_model(structured_requirement_model)
-        normalized_language = self._normalize_language(language)
-        open_questions = self._string_list(model.get("open_questions"))
-        classified_questions = {
-            "blocking_for_production": [],
-            "ok_for_demo": [],
-            "implementation_assumptions": [],
-            "needs_review": [],
-        }
-        for question in open_questions:
-            bucket = self._classify_document_open_question(question)
-            classified_questions[bucket].append(question)
-
-        business_rule_findings = self._document_qa_business_rule_findings(model)
-        implementation_findings = self._document_qa_implementation_findings(doc_markdown, document_kind)
-        production_blockers = [
-            *classified_questions["blocking_for_production"],
-            *business_rule_findings,
-        ]
-        if any("real-time" in finding.lower() for finding in implementation_findings):
-            production_blockers.append(
-                "Real-time positioning conflicts with manual/TBD refresh behavior unless the business accepts that trade-off."
-            )
-        if document_kind == DESIGN_MESSAGE_KIND and any("mock" in finding.lower() for finding in implementation_findings):
-            production_blockers.append(
-                "Real MES integration is not yet specified; mock/demo data is only enough for prototype delivery."
-            )
-
-        if production_blockers:
-            production_readiness = "Blocked"
-        elif classified_questions["needs_review"] or implementation_findings:
-            production_readiness = "Needs review"
-        else:
-            production_readiness = "Ready"
-        demo_readiness = "Ready with assumptions" if implementation_findings or open_questions else "Ready"
-
-        if normalized_language == "zh":
-            return self._format_document_qa_appendix_zh(
-                progress,
-                document_kind,
-                demo_readiness,
-                production_readiness,
-                open_questions,
-                classified_questions,
-                business_rule_findings,
-                implementation_findings,
-                production_blockers,
-            )
-        return self._format_document_qa_appendix_en(
+        state = self._document_qa_state(
+            doc_markdown,
+            structured_requirement_model,
             progress,
             document_kind,
-            demo_readiness,
-            production_readiness,
-            open_questions,
-            classified_questions,
-            business_rule_findings,
-            implementation_findings,
-            production_blockers,
         )
-
-    def _classify_document_open_question(self, question: str) -> str:
-        lowered = question.lower()
-        production_keywords = (
-            "mes",
-            "api",
-            "database",
-            "db view",
-            "data access",
-            "integration",
-            "source system",
-            "shift definition",
-            "duration",
-            "start time",
-            "end time",
-            "calendar",
-            "refresh",
-            "frequency",
-            "cadence",
-            "real-time",
-            "poll",
-            "authentication",
-            "auth",
-            "sso",
-            "vpn",
-            "access",
-            "security",
-            "tolerance",
-            "sla",
-            "数据源",
-            "接口",
-            "数据库",
-            "班次",
-            "刷新",
-            "认证",
-            "权限",
+        return document_qa_module.render_document_qa_appendix(
+            state,
+            self._normalize_language(language),
         )
-        demo_keywords = (
-            "visual",
-            "branding",
-            "color",
-            "layout",
-            "sorting",
-            "filter",
-            "copy",
-            "entry point",
-            "menu",
-            "颜色",
-            "布局",
-            "排序",
-            "筛选",
-            "入口",
-        )
-        implementation_keywords = (
-            "technology",
-            "stack",
-            "c#",
-            "sqlite",
-            "mock",
-            "demo",
-            "hosting",
-            "deployment",
-            "技术栈",
-            "部署",
-            "演示",
-        )
-        if any(keyword in lowered for keyword in production_keywords):
-            return "blocking_for_production"
-        if any(keyword in lowered for keyword in implementation_keywords):
-            return "implementation_assumptions"
-        if any(keyword in lowered for keyword in demo_keywords):
-            return "ok_for_demo"
-        return "needs_review"
-
-    def _document_qa_business_rule_findings(self, model: dict[str, Any]) -> list[str]:
-        evidence = " ".join(
-            [
-                *self._string_list(model.get("business_rules")),
-                *self._string_list(model.get("risks_and_notes")),
-                *self._flatten_strings(model.get("functional_requirements")),
-                *self._flatten_strings(model.get("acceptance_criteria")),
-            ]
-        ).lower()
-        findings: list[str] = []
-        simple_plan_actual_rule = (
-            "actual < plan" in evidence
-            or "actual pieces < planned" in evidence
-            or "actual below plan" in evidence
-            or "actual output is below plan" in evidence
-        )
-        time_phased_terms = (
-            "elapsed",
-            "time-phased",
-            "current-time",
-            "current time",
-            "pace",
-            "expected output",
-            "proportional",
-            "by current time",
-            "累计计划",
-            "当前时间",
-            "节拍",
-        )
-        if simple_plan_actual_rule and not any(term in evidence for term in time_phased_terms):
-            findings.append(
-                "Behind-schedule rule may be wrong for mid-shift use: comparing current actual against full-shift plan can mark most lines behind until shift end. Prefer time-phased expected output or MES current-time target."
-            )
-        return findings
-
-    def _document_qa_implementation_findings(self, doc_markdown: str, document_kind: str) -> list[str]:
-        lowered = doc_markdown.lower()
-        findings: list[str] = []
-        if document_kind == DESIGN_MESSAGE_KIND and (
-            "default technology stack" in lowered
-            or "personal project/demo policy" in lowered
-            or "c#" in lowered
-            or "sqlite" in lowered
-            or "vanilla js" in lowered
-        ):
-            findings.append(
-                "Technology stack appears to be a system default or demo assumption; verify it before IT delivery."
-            )
-        if "mock" in lowered or "demo data" in lowered or "fallback demo" in lowered:
-            findings.append(
-                "Mock/demo data is acceptable for prototype validation only; production requires a confirmed source integration."
-            )
-        if "real-time" in lowered and (
-            "manual refresh" in lowered
-            or "refresh frequency | tbd" in lowered
-            or "refresh frequency" in lowered and "tbd" in lowered
-        ):
-            findings.append(
-                "Real-time wording conflicts with manual/TBD refresh behavior; confirm the refresh cadence."
-            )
-        return self._unique_strings(findings)
-
-    def _format_document_qa_appendix_en(
-        self,
-        progress: dict[str, Any],
-        document_kind: str,
-        demo_readiness: str,
-        production_readiness: str,
-        open_questions: list[str],
-        classified_questions: dict[str, list[str]],
-        business_rule_findings: list[str],
-        implementation_findings: list[str],
-        production_blockers: list[str],
-    ) -> str:
-        doc_label = "Design" if document_kind == DESIGN_MESSAGE_KIND else "PRD"
-        return "\n".join(
-            [
-                "## Document QA",
-                "",
-                f"- **Document type**: {doc_label}",
-                f"- **Structured readiness**: {progress.get('readiness_percentage', 0)}% final readiness; "
-                f"{progress.get('collection_coverage_percentage', 0)}% collection coverage; "
-                f"{progress.get('confirmation_percentage', 0)}% confirmation.",
-                f"- **System-counted open questions**: {len(open_questions)}",
-                f"- **Demo readiness**: {demo_readiness}",
-                f"- **Production readiness**: {production_readiness}",
-                "",
-                "### Production Blockers",
-                *self._markdown_bullets(production_blockers),
-                "",
-                "### Open Question Classification",
-                f"- **Blocking for production**: {len(classified_questions['blocking_for_production'])}",
-                *self._markdown_bullets(classified_questions["blocking_for_production"]),
-                f"- **OK for demo / polish later**: {len(classified_questions['ok_for_demo'])}",
-                *self._markdown_bullets(classified_questions["ok_for_demo"]),
-                f"- **Implementation assumptions**: {len(classified_questions['implementation_assumptions'])}",
-                *self._markdown_bullets(classified_questions["implementation_assumptions"]),
-                f"- **Needs review**: {len(classified_questions['needs_review'])}",
-                *self._markdown_bullets(classified_questions["needs_review"]),
-                "",
-                "### Business Rule Sanity Checks",
-                *self._markdown_bullets(business_rule_findings),
-                "",
-                "### Implementation Assumption Checks",
-                *self._markdown_bullets(implementation_findings),
-            ]
-        )
-
-    def _format_document_qa_appendix_zh(
-        self,
-        progress: dict[str, Any],
-        document_kind: str,
-        demo_readiness: str,
-        production_readiness: str,
-        open_questions: list[str],
-        classified_questions: dict[str, list[str]],
-        business_rule_findings: list[str],
-        implementation_findings: list[str],
-        production_blockers: list[str],
-    ) -> str:
-        doc_label = "设计文档" if document_kind == DESIGN_MESSAGE_KIND else "需求文档"
-        return "\n".join(
-            [
-                "## 文档质量检查 / Document QA",
-                "",
-                f"- **文档类型**：{doc_label}",
-                f"- **结构化就绪度**：最终就绪度 {progress.get('readiness_percentage', 0)}%；"
-                f"收集覆盖率 {progress.get('collection_coverage_percentage', 0)}%；"
-                f"确认完成度 {progress.get('confirmation_percentage', 0)}%。",
-                f"- **系统计数的 open questions**：{len(open_questions)}",
-                f"- **Demo readiness**：{demo_readiness}",
-                f"- **Production readiness**：{production_readiness}",
-                "",
-                "### 生产版阻塞项",
-                *self._markdown_bullets(production_blockers),
-                "",
-                "### Open Question 分类",
-                f"- **生产版阻塞**：{len(classified_questions['blocking_for_production'])}",
-                *self._markdown_bullets(classified_questions["blocking_for_production"]),
-                f"- **Demo 可接受 / 后续润色**：{len(classified_questions['ok_for_demo'])}",
-                *self._markdown_bullets(classified_questions["ok_for_demo"]),
-                f"- **实现假设**：{len(classified_questions['implementation_assumptions'])}",
-                *self._markdown_bullets(classified_questions["implementation_assumptions"]),
-                f"- **仍需人工复核**：{len(classified_questions['needs_review'])}",
-                *self._markdown_bullets(classified_questions["needs_review"]),
-                "",
-                "### 业务规则 sanity check",
-                *self._markdown_bullets(business_rule_findings),
-                "",
-                "### 实现假设检查",
-                *self._markdown_bullets(implementation_findings),
-            ]
-        )
-
-    def _markdown_bullets(self, values: list[str]) -> list[str]:
-        cleaned = self._unique_strings([str(value).strip() for value in values if str(value).strip()])
-        if not cleaned:
-            return ["- None"]
-        return [f"- {value}" for value in cleaned]
 
     def _append_ic_substrate_prd_evidence_appendix(
         self,

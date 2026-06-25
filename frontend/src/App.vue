@@ -7,7 +7,7 @@ import RequirementMarkdownPreview from './components/RequirementMarkdownPreview.
 import StructuredRequirementPanel from './components/StructuredRequirementPanel.vue'
 import { extractChoiceReplyOptions, type ChoiceReplyOption } from './lib/choiceReplyOptions'
 import { computeStructuredRequirementProgress } from './lib/structuredRequirementProgress'
-import { parseDocumentQa } from './lib/documentQa'
+import { parseDocumentQa, extractDocumentQaState, type DocumentQaState } from './lib/documentQa'
 import type {
   ChatMessage,
   ChatMessagePayload,
@@ -123,6 +123,8 @@ const structuredRequirementModel = ref<StructuredRequirementModel>(createEmptySt
 const conversationChainState = ref<ConversationChainState>(createEmptyConversationChainState())
 const pmMethodologyState = ref<PMMethodologyState>(createEmptyPMMethodologyState())
 const icSubstrateEvidenceState = ref<ICSubstrateEvidenceState>(createEmptyICSubstrateEvidenceState())
+// Structured Document QA from the API; preferred over reparsing the document Markdown.
+const apiDocumentQaState = ref<DocumentQaState | null>(null)
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 const GO_CODING_URL = resolveExternalUrl(import.meta.env.VITE_GO_CODING_URL, 'http://localhost:8888')
 let structuredRequirementRequestToken = 0
@@ -877,7 +879,13 @@ const composerFastSeedOptions = computed<FastSeedOption[]>(() => {
 })
 const latestPrdDocument = computed(() => findLatestDocumentMessage('prd_doc'))
 const latestDesignDocument = computed(() => findLatestDocumentMessage('design_doc'))
-const latestDocumentQa = computed(() => {
+const latestDocumentQa = computed<DocumentQaState | null>(() => {
+  // Prefer the structured payload from the API (no fragile Markdown reparsing).
+  if (apiDocumentQaState.value) {
+    return apiDocumentQaState.value
+  }
+  // Fallback: parse the just-generated document before the next state refresh
+  // arrives, and for legacy documents whose API state is unavailable.
   const designDocument = latestDesignDocument.value
   if (designDocument) {
     const designQa = parseDocumentQa(designDocument.content, 'design_doc')
@@ -1901,6 +1909,7 @@ function resetStructuredRequirementState() {
   conversationChainState.value = createEmptyConversationChainState()
   pmMethodologyState.value = createEmptyPMMethodologyState()
   icSubstrateEvidenceState.value = createEmptyICSubstrateEvidenceState()
+  apiDocumentQaState.value = null
   structuredRequirementError.value = ''
   loadingStructuredRequirement.value = false
   activeStructuredRequirementSyncCount.value = 0
@@ -1921,6 +1930,10 @@ function applyStructuredRequirementPayload(payload: unknown) {
   if (evidenceState) {
     icSubstrateEvidenceState.value = evidenceState
   }
+
+  // The key is present (object) whenever a document exists, and absent/null only
+  // when there is no generated document yet — so clearing on null is correct.
+  apiDocumentQaState.value = extractDocumentQaState(payload)
 
   const model = extractStructuredRequirementModel(payload)
   if (model) {
@@ -2446,6 +2459,7 @@ async function loadStructuredRequirement(
       structuredRequirementModel.value = createEmptyStructuredRequirementModel()
       pmMethodologyState.value = createEmptyPMMethodologyState()
       icSubstrateEvidenceState.value = createEmptyICSubstrateEvidenceState()
+      apiDocumentQaState.value = null
     }
   } finally {
     if (useBackgroundSync) {

@@ -413,6 +413,7 @@ def _structured_requirement_response(
     conversation_chain_state: dict[str, object] | None = None,
     pm_methodology_state: dict[str, object] | None = None,
     ic_substrate_evidence_state: dict[str, object] | None = None,
+    document_qa_state: dict[str, object] | None = None,
 ):
     response = {
         "session_id": session_id,
@@ -426,6 +427,8 @@ def _structured_requirement_response(
         response["pm_methodology_state"] = pm_methodology_state
     if ic_substrate_evidence_state is not None:
         response["ic_substrate_evidence_state"] = ic_substrate_evidence_state
+    if document_qa_state is not None:
+        response["document_qa_state"] = document_qa_state
     return response
 
 
@@ -469,6 +472,7 @@ def create_session():
                 "conversation_chain_state": structured_requirement_snapshot["conversation_chain_state"],
                 "pm_methodology_state": structured_requirement_snapshot["pm_methodology_state"],
                 "ic_substrate_evidence_state": structured_requirement_snapshot["ic_substrate_evidence_state"],
+                "document_qa_state": structured_requirement_snapshot["document_qa_state"],
             }
         ),
         HTTPStatus.CREATED,
@@ -553,6 +557,7 @@ def get_session(session_id: str):
             "conversation_chain_state": structured_requirement_snapshot["conversation_chain_state"],
             "pm_methodology_state": structured_requirement_snapshot["pm_methodology_state"],
             "ic_substrate_evidence_state": structured_requirement_snapshot["ic_substrate_evidence_state"],
+            "document_qa_state": structured_requirement_snapshot["document_qa_state"],
         }
     )
 
@@ -677,6 +682,11 @@ def get_summary(session_id: str):
             structured_requirement_model,
             language,
         )
+        document_qa_state = service.build_document_qa_state(
+            session,
+            structured_requirement_model,
+            language,
+        )
     except KeyError:
         return jsonify({"error": "Session not found."}), HTTPStatus.NOT_FOUND
     except LLMError as exc:
@@ -689,6 +699,7 @@ def get_summary(session_id: str):
             conversation_chain_state,
             pm_methodology_state,
             ic_substrate_evidence_state,
+            document_qa_state,
         )
     )
 
@@ -711,6 +722,7 @@ def get_structured_requirement(session_id: str):
                     snapshot["conversation_chain_state"],
                     snapshot["pm_methodology_state"],
                     snapshot["ic_substrate_evidence_state"],
+                    snapshot["document_qa_state"],
                 )
             )
 
@@ -732,6 +744,11 @@ def get_structured_requirement(session_id: str):
             structured_requirement_model,
             language,
         )
+        document_qa_state = service.build_document_qa_state(
+            session,
+            structured_requirement_model,
+            language,
+        )
     except KeyError:
         return jsonify({"error": "Session not found."}), HTTPStatus.NOT_FOUND
     except LLMError as exc:
@@ -744,6 +761,7 @@ def get_structured_requirement(session_id: str):
             conversation_chain_state,
             pm_methodology_state,
             ic_substrate_evidence_state,
+            document_qa_state,
         )
     )
 
