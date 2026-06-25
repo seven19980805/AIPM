@@ -105,8 +105,71 @@ export type ConversationChainState = {
   next_question_source?: string
   intent_track?: string
   intent_focus?: string
+  intent_product_shape?: string
   tracks?: string[]
   nodes?: ConversationChainNode[]
+}
+
+export type PMMethodologyCheckStatus = 'ready' | 'partial' | 'missing' | 'conflict'
+
+export type PMMethodologyCheck = {
+  key: string
+  method: string
+  label: string
+  source_methods: string[]
+  status: PMMethodologyCheckStatus
+  ready: boolean
+  evidence: string[]
+  missing: string[]
+  next_question: string
+}
+
+export type PMMethodologyState = {
+  version: string
+  score: number
+  ready_for_pm_review: boolean
+  recommended_next_method: string
+  missing_evidence: string[]
+  checks: PMMethodologyCheck[]
+  prompt_guidance: string[]
+}
+
+export type ICSubstrateEvidenceCheck = {
+  key: string
+  label: string
+  status: PMMethodologyCheckStatus
+  ready: boolean
+  evidence: string[]
+  missing: string[]
+  next_question: string
+}
+
+export type ICSubstrateDomainContext = {
+  business_objects: string[]
+  object_grain: string
+  source_of_truth: string
+  workflow_states: string
+  confirmed_terms: string[]
+  product_shape: string
+  source_of_truth_contract: string[]
+}
+
+export type ICSubstrateEvidenceState = {
+  enabled: boolean
+  version: string
+  department: string
+  department_key: string
+  department_label: string
+  product_shape: string
+  product_shape_label: string
+  readiness_score: number
+  ready_for_expert_review: boolean
+  missing_evidence: string[]
+  checks: ICSubstrateEvidenceCheck[]
+  domain_context: ICSubstrateDomainContext
+  question_ladder: string[]
+  shape_required_dimensions: string[]
+  guardrails: string[]
 }
 
 export type StructuredRequirementResponse = {
@@ -115,10 +178,52 @@ export type StructuredRequirementResponse = {
   structured_requirement_model?: unknown
   structured_requirement_sync_status?: 'ready' | 'stale' | 'missing'
   conversation_chain_state?: unknown
+  pm_methodology_state?: unknown
+  ic_substrate_evidence_state?: unknown
 }
 
 export function createEmptyConversationChainState(): ConversationChainState {
   return { enabled: false }
+}
+
+export function createEmptyPMMethodologyState(): PMMethodologyState {
+  return {
+    version: '',
+    score: 0,
+    ready_for_pm_review: false,
+    recommended_next_method: '',
+    missing_evidence: [],
+    checks: [],
+    prompt_guidance: [],
+  }
+}
+
+export function createEmptyICSubstrateEvidenceState(): ICSubstrateEvidenceState {
+  return {
+    enabled: false,
+    version: '',
+    department: '',
+    department_key: '',
+    department_label: '',
+    product_shape: '',
+    product_shape_label: '',
+    readiness_score: 0,
+    ready_for_expert_review: false,
+    missing_evidence: [],
+    checks: [],
+    domain_context: {
+      business_objects: [],
+      object_grain: '',
+      source_of_truth: '',
+      workflow_states: '',
+      confirmed_terms: [],
+      product_shape: '',
+      source_of_truth_contract: [],
+    },
+    question_ladder: [],
+    shape_required_dimensions: [],
+    guardrails: [],
+  }
 }
 
 export function createEmptyStructuredRequirementModel(): StructuredRequirementModel {
@@ -196,6 +301,7 @@ export function normalizeConversationChainState(payload: unknown): ConversationC
     next_question_source: asString(root.next_question_source),
     intent_track: asString(root.intent_track),
     intent_focus: asString(root.intent_focus),
+    intent_product_shape: asString(root.intent_product_shape),
     tracks: asStringArray(root.tracks),
     nodes: asConversationChainNodes(root.nodes),
   }
@@ -206,6 +312,65 @@ export function extractConversationChainState(payload: unknown): ConversationCha
     return null
   }
   return normalizeConversationChainState(payload.conversation_chain_state)
+}
+
+export function normalizePMMethodologyState(payload: unknown): PMMethodologyState {
+  const root = isRecord(payload) ? payload : {}
+
+  return {
+    version: asString(root.version),
+    score: asNumber(root.score),
+    ready_for_pm_review: Boolean(root.ready_for_pm_review),
+    recommended_next_method: asString(root.recommended_next_method),
+    missing_evidence: asStringArray(root.missing_evidence),
+    checks: asPMMethodologyChecks(root.checks),
+    prompt_guidance: asStringArray(root.prompt_guidance),
+  }
+}
+
+export function extractPMMethodologyState(payload: unknown): PMMethodologyState | null {
+  if (!isRecord(payload) || payload.pm_methodology_state === undefined) {
+    return null
+  }
+  return normalizePMMethodologyState(payload.pm_methodology_state)
+}
+
+export function normalizeICSubstrateEvidenceState(payload: unknown): ICSubstrateEvidenceState {
+  const root = isRecord(payload) ? payload : {}
+  const domainContext = asRecord(root.domain_context)
+
+  return {
+    enabled: Boolean(root.enabled),
+    version: asString(root.version),
+    department: asString(root.department),
+    department_key: asString(root.department_key),
+    department_label: asString(root.department_label),
+    product_shape: asString(root.product_shape),
+    product_shape_label: asString(root.product_shape_label),
+    readiness_score: asNumber(root.readiness_score),
+    ready_for_expert_review: Boolean(root.ready_for_expert_review),
+    missing_evidence: asStringArray(root.missing_evidence),
+    checks: asICSubstrateEvidenceChecks(root.checks),
+    domain_context: {
+      business_objects: asStringArray(domainContext.business_objects),
+      object_grain: asString(domainContext.object_grain),
+      source_of_truth: asString(domainContext.source_of_truth),
+      workflow_states: asString(domainContext.workflow_states),
+      confirmed_terms: asStringArray(domainContext.confirmed_terms),
+      product_shape: asString(domainContext.product_shape),
+      source_of_truth_contract: asStringArray(domainContext.source_of_truth_contract),
+    },
+    question_ladder: asStringArray(root.question_ladder),
+    shape_required_dimensions: asStringArray(root.shape_required_dimensions),
+    guardrails: asStringArray(root.guardrails),
+  }
+}
+
+export function extractICSubstrateEvidenceState(payload: unknown): ICSubstrateEvidenceState | null {
+  if (!isRecord(payload) || payload.ic_substrate_evidence_state === undefined) {
+    return null
+  }
+  return normalizeICSubstrateEvidenceState(payload.ic_substrate_evidence_state)
 }
 
 export function normalizeStructuredRequirementModel(payload: unknown): StructuredRequirementModel {
@@ -348,6 +513,56 @@ function asConversationChainNodes(value: unknown): ConversationChainNode[] {
       }
     })
     .filter((item) => item.track || item.node || item.label)
+}
+
+function asPMMethodologyChecks(value: unknown): PMMethodologyCheck[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((item) => {
+      const raw = asRecord(item)
+      const status = asString(raw.status)
+      return {
+        key: asString(raw.key),
+        method: asString(raw.method),
+        label: asString(raw.label),
+        source_methods: asStringArray(raw.source_methods),
+        status: isPMMethodologyCheckStatus(status) ? status : 'missing',
+        ready: Boolean(raw.ready),
+        evidence: asStringArray(raw.evidence),
+        missing: asStringArray(raw.missing),
+        next_question: asString(raw.next_question),
+      }
+    })
+    .filter((item) => item.key || item.method || item.label)
+}
+
+function asICSubstrateEvidenceChecks(value: unknown): ICSubstrateEvidenceCheck[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((item) => {
+      const raw = asRecord(item)
+      const status = asString(raw.status)
+      return {
+        key: asString(raw.key),
+        label: asString(raw.label),
+        status: isPMMethodologyCheckStatus(status) ? status : 'missing',
+        ready: Boolean(raw.ready),
+        evidence: asStringArray(raw.evidence),
+        missing: asStringArray(raw.missing),
+        next_question: asString(raw.next_question),
+      }
+    })
+    .filter((item) => item.key || item.label)
+}
+
+function isPMMethodologyCheckStatus(value: string): value is PMMethodologyCheckStatus {
+  return value === 'ready' || value === 'partial' || value === 'missing' || value === 'conflict'
 }
 
 function isConversationChainNodeStatus(value: string): value is ConversationChainNodeStatus {

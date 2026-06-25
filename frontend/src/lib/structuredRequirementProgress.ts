@@ -9,6 +9,9 @@ export type StructuredRequirementProgress = {
   collectedCount: number
   pendingConfirmationCount: number
   conflictCount: number
+  openQuestionCount: number
+  pendingQuestionCount: number
+  blockingQuestionCount: number
   readinessPercentage: number
   collectionCoveragePercentage: number
   confirmationPercentage: number
@@ -42,16 +45,6 @@ const REQUIREMENT_WEIGHTS: Record<RequirementProgressKey, number> = {
   acceptance: 1.5,
 }
 
-const CORE_GENERATION_KEYS: RequirementProgressKey[] = [
-  'objective',
-  'scope',
-  'users',
-  'scenarios',
-  'features',
-  'rules',
-  'integrations',
-]
-
 const STATUS_READINESS_POINTS: Record<RequirementCollectionStatus, number> = {
   missing: 0,
   captured: 0.2,
@@ -59,9 +52,6 @@ const STATUS_READINESS_POINTS: Record<RequirementCollectionStatus, number> = {
   confirmed: 1,
   conflict: 0,
 }
-
-const GENERATION_MIN_READINESS_PERCENTAGE = 80
-const GENERATION_MIN_CONFIRMATION_PERCENTAGE = 75
 
 export function computeStructuredRequirementProgress(
   model: StructuredRequirementModel,
@@ -78,6 +68,13 @@ export function computeStructuredRequirementProgress(
   const pendingConfirmationCount = statuses.filter(
     (status) => status !== 'missing' && status !== 'confirmed' && status !== 'conflict',
   ).length
+  const openQuestionCount = model.open_questions.filter((item) => item.trim()).length
+  const pendingQuestionCount = REQUIREMENT_KEYS.reduce(
+    (sum, key) =>
+      sum + (model.collection_status[key]?.pending_questions ?? []).filter((item) => item.trim()).length,
+    0,
+  )
+  const blockingQuestionCount = openQuestionCount + pendingQuestionCount
   const collectionCoveragePercentage = totalCount
     ? Math.round((collectedCount / totalCount) * 100)
     : 0
@@ -87,7 +84,8 @@ export function computeStructuredRequirementProgress(
   const fullyConfirmed =
     totalCount > 0 &&
     confirmedCount === totalCount &&
-    conflictCount === 0
+    conflictCount === 0 &&
+    blockingQuestionCount === 0
   const totalWeight = REQUIREMENT_KEYS.reduce((sum, key) => sum + REQUIREMENT_WEIGHTS[key], 0)
   const earnedWeight = statusByKey.reduce(
     (sum, item) => sum + REQUIREMENT_WEIGHTS[item.key] * STATUS_READINESS_POINTS[item.status],
@@ -99,19 +97,10 @@ export function computeStructuredRequirementProgress(
     readinessPercentage = 100
   } else if (conflictCount > 0) {
     readinessPercentage = Math.min(readinessPercentage, 69)
-  } else if (pendingConfirmationCount > 0) {
+  } else if (pendingConfirmationCount > 0 || blockingQuestionCount > 0) {
     readinessPercentage = Math.min(readinessPercentage, 94)
   }
-  const coreRequirementsConfirmed = CORE_GENERATION_KEYS.every(
-    (key) => model.collection_status[key]?.status === 'confirmed',
-  )
-  const readyToGenerate =
-    totalCount > 0 &&
-    collectionCoveragePercentage === 100 &&
-    conflictCount === 0 &&
-    coreRequirementsConfirmed &&
-    confirmationPercentage >= GENERATION_MIN_CONFIRMATION_PERCENTAGE &&
-    readinessPercentage >= GENERATION_MIN_READINESS_PERCENTAGE
+  const readyToGenerate = fullyConfirmed
 
   return {
     totalCount,
@@ -119,6 +108,9 @@ export function computeStructuredRequirementProgress(
     collectedCount,
     pendingConfirmationCount,
     conflictCount,
+    openQuestionCount,
+    pendingQuestionCount,
+    blockingQuestionCount,
     readinessPercentage,
     collectionCoveragePercentage,
     confirmationPercentage,

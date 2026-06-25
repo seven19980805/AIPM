@@ -5,6 +5,11 @@ import { structuredRequirementPanelCopy } from './structuredRequirementCopy'
 import { computeStructuredRequirementProgress } from '../lib/structuredRequirementProgress'
 import type { LanguageCode } from '../types/session'
 import type {
+  ICSubstrateEvidenceCheck,
+  ICSubstrateEvidenceState,
+  PMMethodologyCheck,
+  PMMethodologyCheckStatus,
+  PMMethodologyState,
   RequirementCollectionItem,
   RequirementCollectionStatus,
   StructuredRequirementFeature,
@@ -16,13 +21,15 @@ const props = withDefaults(
   defineProps<{
     language: LanguageCode
     model: StructuredRequirementModel
+    pmMethodologyState: PMMethodologyState
+    icSubstrateEvidenceState: ICSubstrateEvidenceState
     loading?: boolean
     syncing?: boolean
     generatingDocuments?: boolean
     openingGoCoding?: boolean
     generationDisabled?: boolean
+    generationLabel?: string
     hasPrdDocument?: boolean
-    hasDesignDocument?: boolean
     error?: string
   }>(),
   {
@@ -31,8 +38,8 @@ const props = withDefaults(
     generatingDocuments: false,
     openingGoCoding: false,
     generationDisabled: false,
+    generationLabel: '',
     hasPrdDocument: false,
-    hasDesignDocument: false,
     error: '',
   },
 )
@@ -118,11 +125,75 @@ const requirementRows = computed<RequirementRow[]>(() => {
 
 const progress = computed(() => computeStructuredRequirementProgress(props.model))
 
+const progressTitleText = computed(() => copy.value.progressTitle)
+
 const progressStyle = computed(() => {
   const progressValue = progress.value.readinessPercentage * 3.6
   return {
     background: `conic-gradient(var(--accent) 0deg ${progressValue}deg, #e7eefb ${progressValue}deg 360deg)`,
   }
+})
+
+const progressRingText = computed(() => `${progress.value.readinessPercentage}%`)
+
+const progressCaptionText = computed(() => copy.value.progressLabels.finalReadiness)
+
+const generationActionLabel = computed(() => {
+  if (props.generationLabel) {
+    return props.generationLabel
+  }
+  return copy.value.generateDocuments
+})
+
+const canGenerateDocuments = computed(() => progress.value.readyToGenerate)
+
+const canOpenPanelGoCoding = computed(() => progress.value.readyToGenerate && props.hasPrdDocument)
+
+const methodologyVisible = computed(() => props.pmMethodologyState.checks.length > 0)
+
+const methodologyReadyCount = computed(
+  () => props.pmMethodologyState.checks.filter((check) => check.ready).length,
+)
+
+const methodologyTopChecks = computed(() =>
+  [...props.pmMethodologyState.checks]
+    .sort((left, right) => methodologyStatusPriority(left.status) - methodologyStatusPriority(right.status))
+    .slice(0, 4),
+)
+
+const icEvidenceVisible = computed(
+  () => props.icSubstrateEvidenceState.enabled && props.icSubstrateEvidenceState.checks.length > 0,
+)
+
+const icEvidenceReadyCount = computed(
+  () => props.icSubstrateEvidenceState.checks.filter((check) => check.ready).length,
+)
+
+const icEvidenceTopChecks = computed(() =>
+  [...props.icSubstrateEvidenceState.checks]
+    .sort((left, right) => methodologyStatusPriority(left.status) - methodologyStatusPriority(right.status))
+    .slice(0, 4),
+)
+
+const icEvidenceContextRows = computed(() => {
+  const context = props.icSubstrateEvidenceState.domain_context
+  return [
+    {
+      key: 'objects',
+      label: copy.value.icEvidenceLabels.objects,
+      value: summarizeList(context.business_objects, 3),
+    },
+    {
+      key: 'grain',
+      label: copy.value.icEvidenceLabels.grain,
+      value: summarizeText(context.object_grain),
+    },
+    {
+      key: 'source',
+      label: copy.value.icEvidenceLabels.source,
+      value: summarizeText(context.source_of_truth),
+    },
+  ].filter((item) => item.value)
 })
 
 function buildRow(
@@ -179,6 +250,43 @@ function statusClass(status: RequirementCollectionStatus): string {
     return 'pending'
   }
   return status
+}
+
+function methodologyStatusLabel(status: PMMethodologyCheckStatus): string {
+  return copy.value.methodologyStatus[status] ?? copy.value.methodologyStatus.missing
+}
+
+function methodologyStatusPriority(status: PMMethodologyCheckStatus): number {
+  if (status === 'conflict') {
+    return 0
+  }
+  if (status === 'missing') {
+    return 1
+  }
+  if (status === 'partial') {
+    return 2
+  }
+  return 3
+}
+
+function methodologyEvidenceSummary(check: PMMethodologyCheck): string {
+  if (check.evidence.length) {
+    return summarizeList(check.evidence, 1)
+  }
+  if (check.missing.length) {
+    return summarizeList(check.missing, 2)
+  }
+  return copy.value.notCaptured
+}
+
+function icEvidenceSummary(check: ICSubstrateEvidenceCheck): string {
+  if (check.evidence.length) {
+    return summarizeList(check.evidence, 1)
+  }
+  if (check.missing.length) {
+    return summarizeList(check.missing, 1)
+  }
+  return copy.value.notCaptured
 }
 
 function summarizeScope(inScope: string[], outOfScope: string[]): string {
@@ -243,7 +351,7 @@ function summarizeText(value: string): string {
             <path d="M9 12h6"/>
             <path d="M9 16h4"/>
           </svg>
-          <h3>{{ copy.progressTitle }}</h3>
+          <h3>{{ progressTitleText }}</h3>
         </div>
         <span v-if="syncing" class="sync-badge">{{ copy.syncing }}</span>
       </header>
@@ -252,10 +360,10 @@ function summarizeText(value: string): string {
         <div class="progress-visual">
           <div class="progress-ring" :style="progressStyle">
             <div class="progress-ring-inner">
-              <span>{{ progress.readinessPercentage }}%</span>
+              <span>{{ progressRingText }}</span>
             </div>
           </div>
-          <p class="progress-caption">{{ copy.progressLabels.readiness }}</p>
+          <p class="progress-caption">{{ progressCaptionText }}</p>
         </div>
 
         <div class="progress-meta">
@@ -272,6 +380,10 @@ function summarizeText(value: string): string {
             <strong>{{ progress.pendingConfirmationCount }}</strong>
           </div>
           <div class="progress-row">
+            <span>{{ copy.progressLabels.blockingQuestions }}</span>
+            <strong>{{ progress.blockingQuestionCount }}</strong>
+          </div>
+          <div class="progress-row">
             <span>{{ copy.progressLabels.conflict }}</span>
             <strong>{{ progress.conflictCount }}</strong>
           </div>
@@ -280,24 +392,145 @@ function summarizeText(value: string): string {
 
       <div class="progress-actions">
         <button
-          class="generate-prd-btn"
-          :class="{ ready: progress.readyToGenerate }"
+          v-if="hasPrdDocument"
+          class="go-coding-btn primary"
           type="button"
-          :disabled="loading || generatingDocuments || generationDisabled"
+          :disabled="loading || generatingDocuments || generationDisabled || openingGoCoding || !canOpenPanelGoCoding"
+          @click="emit('go-coding')"
+        >
+          {{ openingGoCoding ? copy.openingGoCoding : copy.goCoding }}
+        </button>
+        <button
+          class="generate-prd-btn"
+          :class="{ ready: progress.readyToGenerate, secondary: hasPrdDocument }"
+          type="button"
+          :disabled="loading || generatingDocuments || generationDisabled || openingGoCoding || !canGenerateDocuments"
           @click="emit('generate-documents')"
         >
-          {{ generatingDocuments ? copy.generatingDocuments : copy.generateDocuments }}
+          {{ generatingDocuments ? copy.generatingDocuments : generationActionLabel }}
         </button>
-        <div v-if="hasPrdDocument && hasDesignDocument" class="document-ready-actions">
-          <button
-            class="go-coding-btn"
-            type="button"
-            :disabled="generationDisabled || openingGoCoding"
-            @click="emit('go-coding')"
-          >
-            {{ openingGoCoding ? copy.openingGoCoding : copy.goCoding }}
-          </button>
+      </div>
+    </section>
+
+    <section v-if="methodologyVisible" class="requirement-card methodology-card">
+      <header class="card-head">
+        <div class="card-title">
+          <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 3v18"/>
+            <path d="M4 8h16"/>
+            <path d="M5 16h14"/>
+            <path d="M7 3h10"/>
+            <path d="M7 21h10"/>
+          </svg>
+          <h3>{{ copy.methodologyTitle }}</h3>
         </div>
+      </header>
+
+      <div class="methodology-summary">
+        <div>
+          <span>{{ copy.methodologyLabels.score }}</span>
+          <strong>{{ pmMethodologyState.score }}%</strong>
+        </div>
+        <div>
+          <span>{{ copy.methodologyLabels.ready }}</span>
+          <strong>{{ methodologyReadyCount }}/{{ pmMethodologyState.checks.length }}</strong>
+        </div>
+        <div>
+          <span>{{ copy.methodologyLabels.missing }}</span>
+          <strong>{{ pmMethodologyState.missing_evidence.length }}</strong>
+        </div>
+      </div>
+
+      <div class="methodology-list">
+        <article
+          v-for="check in methodologyTopChecks"
+          :key="check.key"
+          class="methodology-item"
+          :class="check.status"
+        >
+          <header class="methodology-item-head">
+            <div>
+              <h4>{{ check.label }}</h4>
+              <p>{{ check.method }}</p>
+            </div>
+            <span class="methodology-status" :class="check.status">
+              {{ methodologyStatusLabel(check.status) }}
+            </span>
+          </header>
+          <p class="methodology-evidence">
+            {{ methodologyEvidenceSummary(check) }}
+          </p>
+          <div v-if="!check.ready && check.next_question" class="methodology-question">
+            <span>{{ copy.methodologyLabels.nextQuestion }}</span>
+            <p>{{ check.next_question }}</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section v-if="icEvidenceVisible" class="requirement-card ic-evidence-card">
+      <header class="card-head">
+        <div class="card-title">
+          <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 7h16"/>
+            <path d="M4 12h16"/>
+            <path d="M4 17h16"/>
+            <path d="M8 4v16"/>
+            <path d="M16 4v16"/>
+          </svg>
+          <h3>{{ copy.icEvidenceTitle }}</h3>
+        </div>
+      </header>
+
+      <div class="methodology-summary ic-evidence-summary">
+        <div>
+          <span>{{ copy.icEvidenceLabels.score }}</span>
+          <strong>{{ icSubstrateEvidenceState.readiness_score }}%</strong>
+        </div>
+        <div>
+          <span>{{ copy.icEvidenceLabels.ready }}</span>
+          <strong>{{ icEvidenceReadyCount }}/{{ icSubstrateEvidenceState.checks.length }}</strong>
+        </div>
+        <div>
+          <span>{{ copy.icEvidenceLabels.context }}</span>
+          <strong>{{ icSubstrateEvidenceState.department || copy.notCaptured }}</strong>
+        </div>
+      </div>
+
+      <div v-if="icSubstrateEvidenceState.product_shape_label || icEvidenceContextRows.length" class="ic-context-strip">
+        <div v-if="icSubstrateEvidenceState.product_shape_label">
+          <span>{{ copy.icEvidenceLabels.shape }}</span>
+          <strong>{{ icSubstrateEvidenceState.product_shape_label }}</strong>
+        </div>
+        <div v-for="item in icEvidenceContextRows" :key="item.key">
+          <span>{{ item.label }}</span>
+          <strong>{{ item.value }}</strong>
+        </div>
+      </div>
+
+      <div class="methodology-list">
+        <article
+          v-for="check in icEvidenceTopChecks"
+          :key="check.key"
+          class="methodology-item ic-evidence-item"
+          :class="check.status"
+        >
+          <header class="methodology-item-head">
+            <div>
+              <h4>{{ check.label }}</h4>
+            </div>
+            <span class="methodology-status" :class="check.status">
+              {{ methodologyStatusLabel(check.status) }}
+            </span>
+          </header>
+          <p class="methodology-evidence">
+            {{ icEvidenceSummary(check) }}
+          </p>
+          <div v-if="!check.ready && check.next_question" class="methodology-question">
+            <span>{{ copy.icEvidenceLabels.nextQuestion }}</span>
+            <p>{{ check.next_question }}</p>
+          </div>
+        </article>
       </div>
     </section>
 
@@ -366,15 +599,15 @@ function summarizeText(value: string): string {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 12px;
+  gap: 14px;
   overflow: visible;
 }
 
 .requirement-card {
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #ffffff;
-  box-shadow: var(--shadow-soft, 0 8px 22px rgba(38, 55, 70, 0.08));
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  box-shadow: var(--shadow-soft, 0 2px 8px rgba(38, 55, 70, 0.06));
   overflow: hidden;
   height: auto;
 }
@@ -403,7 +636,7 @@ function summarizeText(value: string): string {
 }
 
 .card-head.compact {
-  padding-bottom: 6px;
+  padding-bottom: 8px;
 }
 
 .card-title {
@@ -415,7 +648,7 @@ function summarizeText(value: string): string {
 
 .card-title h3 {
   margin: 0;
-  font-size: 0.92rem;
+  font-size: 0.86rem;
   line-height: 1.25;
   overflow-wrap: break-word;
 }
@@ -424,11 +657,11 @@ function summarizeText(value: string): string {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
+  padding: 5px 8px;
   border-radius: 8px;
-  background: rgba(37, 99, 235, 0.12);
-  color: #173f9f;
-  font-size: 0.76rem;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 0.7rem;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -443,9 +676,9 @@ function summarizeText(value: string): string {
 }
 
 .card-icon {
-  width: 22px;
-  height: 22px;
-  color: var(--accent-strong);
+  width: 20px;
+  height: 20px;
+  color: var(--accent);
   flex-shrink: 0;
 }
 
@@ -455,24 +688,24 @@ function summarizeText(value: string): string {
   border-radius: 8px;
   border: 1px dashed rgba(37, 99, 235, 0.34);
   color: var(--muted);
-  background: #fbfdfe;
+  background: var(--panel-soft);
   line-height: 1.45;
   font-size: 0.84rem;
 }
 
 .card-state.error {
   border-style: solid;
-  border-color: rgba(220, 38, 38, 0.38);
-  color: #991b1b;
-  background: rgba(220, 38, 38, 0.13);
+  border-color: var(--status-danger-border);
+  color: var(--status-danger-ink);
+  background: var(--status-danger-bg);
 }
 
 .progress-body {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: 82px 1fr;
   align-items: center;
-  gap: 12px;
-  padding: 0 16px 16px;
+  gap: 14px;
+  padding: 2px 16px 16px;
 }
 
 .progress-visual {
@@ -482,25 +715,25 @@ function summarizeText(value: string): string {
 }
 
 .progress-ring {
-  width: 96px;
-  height: 96px;
+  width: 78px;
+  height: 78px;
   border-radius: 50%;
   display: grid;
   place-items: center;
 }
 
 .progress-ring-inner {
-  width: 66px;
-  height: 66px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--panel);
   display: grid;
   place-items: center;
   box-shadow: inset 0 0 0 1px var(--line);
 }
 
 .progress-ring-inner span {
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: 800;
   letter-spacing: 0;
   color: var(--ink);
@@ -509,80 +742,88 @@ function summarizeText(value: string): string {
 .progress-caption {
   margin: 0;
   color: var(--muted);
-  font-size: 0.76rem;
+  font-size: 0.7rem;
   font-weight: 700;
 }
 
 .progress-meta {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .progress-actions {
-  padding: 0 16px 16px;
+  padding: 0 14px 14px;
+  display: grid;
+  gap: 7px;
 }
 
 .generate-prd-btn {
   width: 100%;
-  min-height: 40px;
-  border: 1px solid rgba(37, 99, 235, 0.16);
+  min-height: 38px;
+  border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 11px 14px;
-  background: #ffffff;
+  padding: 9px 12px;
+  background: var(--panel);
   color: var(--accent-strong);
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
 }
 
 .generate-prd-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  border-color: rgba(37, 99, 235, 0.34);
-  box-shadow: 0 10px 18px rgba(38, 55, 70, 0.08);
+  border-color: rgba(0, 94, 184, 0.28);
+  box-shadow: 0 6px 14px rgba(38, 55, 70, 0.08);
 }
 
 .generate-prd-btn.ready {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
-  box-shadow: 0 12px 26px rgba(37, 99, 235, 0.22);
+  box-shadow: 0 6px 14px rgba(0, 94, 184, 0.16);
+}
+
+.generate-prd-btn.secondary {
+  background: var(--panel);
+  color: var(--accent-strong);
+  box-shadow: none;
 }
 
 .generate-prd-btn:disabled {
-  opacity: 0.72;
+  border-color: #d9e1e7;
+  background: #eef2f7;
+  color: #94a3b8;
+  opacity: 1;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
 }
 
-.document-ready-actions {
-  display: grid;
-  gap: 8px;
-  margin-top: 10px;
-}
-
 .go-coding-btn {
   width: 100%;
-  min-height: 40px;
+  min-height: 38px;
   border: 1px solid var(--accent);
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 9px 12px;
   background: var(--accent);
   color: #fff;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
-  box-shadow: 0 12px 26px rgba(37, 99, 235, 0.22);
+  box-shadow: 0 6px 14px rgba(0, 94, 184, 0.16);
 }
 
 .go-coding-btn:hover:not(:disabled) {
   transform: translateY(-1px);
   background: var(--accent-strong);
-  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.24);
+  box-shadow: 0 8px 18px rgba(0, 94, 184, 0.2);
 }
 
 .go-coding-btn:disabled {
-  opacity: 0.72;
+  border-color: #d9e1e7;
+  background: #eef2f7;
+  color: #94a3b8;
+  opacity: 1;
   cursor: not-allowed;
   box-shadow: none;
   transform: none;
@@ -594,56 +835,232 @@ function summarizeText(value: string): string {
   align-items: center;
   gap: 8px;
   color: var(--muted);
-  font-size: 0.84rem;
+  font-size: 0.78rem;
 }
 
 .progress-row strong {
   color: var(--ink);
-  font-size: 0.92rem;
+  font-size: 0.86rem;
+}
+
+.methodology-card {
+  flex: 0 0 auto;
+  width: 100%;
+}
+
+.ic-evidence-card {
+  flex: 0 0 auto;
+  width: 100%;
+}
+
+.methodology-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 0 14px 10px;
+}
+
+.methodology-summary div {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+}
+
+.methodology-summary span,
+.methodology-question span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.methodology-summary strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.ic-context-strip {
+  display: grid;
+  gap: 8px;
+  padding: 0 16px 12px;
+}
+
+.ic-context-strip div {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+}
+
+.ic-context-strip span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.ic-context-strip strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.methodology-list {
+  display: grid;
+  gap: 8px;
+  padding: 0 14px 14px;
+}
+
+.methodology-item {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.methodology-item.missing {
+  border-color: var(--status-warning-border);
+  background: var(--status-warning-bg);
+}
+
+.methodology-item.partial {
+  border-color: var(--status-info-border);
+  background: var(--status-info-bg);
+}
+
+.methodology-item.ready {
+  border-color: var(--status-success-border);
+  background: var(--status-success-bg);
+}
+
+.methodology-item.conflict {
+  border-color: var(--status-danger-border);
+  background: var(--status-danger-bg);
+}
+
+.methodology-item-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.methodology-item-head h4 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.methodology-item-head p,
+.methodology-evidence,
+.methodology-question p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.methodology-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.methodology-status.missing {
+  background: var(--status-warning-bg);
+  color: var(--status-warning-ink);
+}
+
+.methodology-status.partial {
+  background: var(--status-info-bg);
+  color: var(--status-info-ink);
+}
+
+.methodology-status.ready {
+  background: var(--status-success-bg);
+  color: var(--status-success-ink);
+}
+
+.methodology-status.conflict {
+  background: var(--status-danger-bg);
+  color: var(--status-danger-ink);
+}
+
+.methodology-question {
+  margin-top: 9px;
+  padding: 9px 10px;
+  border: 1px solid var(--status-warning-border);
+  border-radius: 8px;
+  background: var(--status-warning-bg);
+}
+
+.ic-evidence-item .methodology-evidence {
+  color: var(--ink);
 }
 
 .card-list-shell {
   flex: 0 0 auto;
   min-height: auto;
   overflow: visible;
-  padding: 0 16px 16px;
+  padding: 0 14px 14px;
 }
 
 .requirement-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .requirement-item-card {
-  padding: 12px;
+  padding: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--panel);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 
 .requirement-item-card.missing {
-  background: #ffffff;
+  background: var(--panel);
 }
 
 .requirement-item-card.captured {
-  border-color: rgba(37, 99, 235, 0.34);
-  background: rgba(37, 99, 235, 0.05);
+  border-color: var(--status-info-border);
+  background: var(--status-info-bg);
 }
 
 .requirement-item-card.pending {
-  border-color: #eadfb9;
-  background: rgba(178, 122, 0, 0.08);
+  border-color: var(--status-warning-border);
+  background: var(--status-warning-bg);
 }
 
 .requirement-item-card.confirmed {
-  border-color: rgba(37, 99, 235, 0.42);
-  background: rgba(37, 99, 235, 0.08);
+  border-color: var(--status-success-border);
+  background: var(--status-success-bg);
 }
 
 .requirement-item-card.conflict {
-  border-color: #efc7c7;
-  background: rgba(220, 38, 38, 0.06);
+  border-color: var(--status-danger-border);
+  background: var(--status-danger-bg);
 }
 
 .requirement-item-head {
@@ -655,16 +1072,16 @@ function summarizeText(value: string): string {
 
 .requirement-item-head h4 {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   line-height: 1.35;
   color: var(--ink);
 }
 
 .requirement-item-content {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   color: var(--ink);
   line-height: 1.55;
-  font-size: 0.84rem;
+  font-size: 0.8rem;
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -673,19 +1090,19 @@ function summarizeText(value: string): string {
 .requirement-item-notes {
   display: grid;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .requirement-note {
   padding: 9px 10px;
   border-radius: 8px;
-  background: #fbfdfe;
+  background: var(--panel-soft);
   border: 1px solid var(--line);
 }
 
 .requirement-note.question {
-  background: rgba(178, 122, 0, 0.08);
-  border-color: #eadfb9;
+  background: var(--status-warning-bg);
+  border-color: var(--status-warning-border);
 }
 
 .requirement-note-label {
@@ -707,38 +1124,120 @@ function summarizeText(value: string): string {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 62px;
-  padding: 5px 9px;
-  border-radius: 999px;
-  font-size: 0.72rem;
+  min-width: 58px;
+  padding: 4px 7px;
+  border-radius: 6px;
+  font-size: 0.68rem;
   font-weight: 700;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .status-pill.missing {
-  background: #f0f3f8;
-  color: #647280;
+  background: var(--status-muted-bg);
+  color: var(--status-muted-ink);
 }
 
 .status-pill.captured {
-  background: rgba(59, 130, 246, 0.14);
-  color: #1e40af;
+  background: var(--status-info-bg);
+  color: var(--status-info-ink);
 }
 
 .status-pill.pending {
-  background: rgba(178, 122, 0, 0.16);
-  color: #674300;
+  background: var(--status-warning-bg);
+  color: var(--status-warning-ink);
 }
 
 .status-pill.confirmed {
-  background: rgba(37, 99, 235, 0.16);
-  color: #1d4ed8;
+  background: var(--status-success-bg);
+  color: var(--status-success-ink);
 }
 
 .status-pill.conflict {
-  background: rgba(220, 38, 38, 0.13);
-  color: #991b1b;
+  background: var(--status-danger-bg);
+  color: var(--status-danger-ink);
+}
+
+:global(.app-shell[data-theme='dark']) .requirement-card,
+:global(.app-shell[data-theme='dark']) .methodology-item,
+:global(.app-shell[data-theme='dark']) .requirement-item-card,
+:global(.app-shell[data-theme='dark']) .methodology-summary div,
+:global(.app-shell[data-theme='dark']) .ic-context-strip div,
+:global(.app-shell[data-theme='dark']) .requirement-note {
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+:global(.app-shell[data-theme='dark']) .card-state,
+:global(.app-shell[data-theme='dark']) .progress-ring-inner {
+  background: var(--panel-strong);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+:global(.app-shell[data-theme='dark']) .requirement-item-card.captured,
+:global(.app-shell[data-theme='dark']) .methodology-item.partial {
+  background: var(--status-info-bg);
+  border-color: var(--status-info-border);
+}
+
+:global(.app-shell[data-theme='dark']) .requirement-item-card.confirmed,
+:global(.app-shell[data-theme='dark']) .methodology-item.ready {
+  background: var(--status-success-bg);
+  border-color: var(--status-success-border);
+}
+
+:global(.app-shell[data-theme='dark']) .requirement-item-card.pending,
+:global(.app-shell[data-theme='dark']) .methodology-item.missing,
+:global(.app-shell[data-theme='dark']) .methodology-question,
+:global(.app-shell[data-theme='dark']) .requirement-note.question {
+  background: var(--status-warning-bg);
+  border-color: var(--status-warning-border);
+}
+
+:global(.app-shell[data-theme='dark']) .requirement-item-card.conflict,
+:global(.app-shell[data-theme='dark']) .methodology-item.conflict {
+  background: var(--status-danger-bg);
+  border-color: var(--status-danger-border);
+}
+
+:global(.app-shell[data-theme='dark']) .card-title h3,
+:global(.app-shell[data-theme='dark']) .progress-ring-inner span,
+:global(.app-shell[data-theme='dark']) .progress-row strong,
+:global(.app-shell[data-theme='dark']) .methodology-summary strong,
+:global(.app-shell[data-theme='dark']) .ic-context-strip strong,
+:global(.app-shell[data-theme='dark']) .methodology-item-head h4,
+:global(.app-shell[data-theme='dark']) .requirement-item-head h4,
+:global(.app-shell[data-theme='dark']) .requirement-item-content,
+:global(.app-shell[data-theme='dark']) .requirement-note p,
+:global(.app-shell[data-theme='dark']) .ic-evidence-item .methodology-evidence {
+  color: var(--ink);
+}
+
+:global(.app-shell[data-theme='dark']) .progress-caption,
+:global(.app-shell[data-theme='dark']) .progress-row,
+:global(.app-shell[data-theme='dark']) .methodology-summary span,
+:global(.app-shell[data-theme='dark']) .methodology-question span,
+:global(.app-shell[data-theme='dark']) .ic-context-strip span,
+:global(.app-shell[data-theme='dark']) .methodology-item-head p,
+:global(.app-shell[data-theme='dark']) .methodology-evidence,
+:global(.app-shell[data-theme='dark']) .methodology-question p,
+:global(.app-shell[data-theme='dark']) .requirement-note-label {
+  color: var(--muted);
+}
+
+:global(.app-shell[data-theme='dark']) .generate-prd-btn.secondary {
+  background: var(--panel-strong);
+  border-color: var(--line);
+  color: var(--accent-strong);
+}
+
+:global(.app-shell[data-theme='dark']) .generate-prd-btn:disabled,
+:global(.app-shell[data-theme='dark']) .go-coding-btn:disabled {
+  background: #1a2736;
+  border-color: #2d4054;
+  color: #6f8296;
 }
 
 @media (max-width: 1200px) {
@@ -749,6 +1248,14 @@ function summarizeText(value: string): string {
 
   .progress-meta {
     width: 100%;
+  }
+
+  .methodology-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .ic-context-strip {
+    grid-template-columns: 1fr;
   }
 }
 
