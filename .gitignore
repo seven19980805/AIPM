@@ -25,6 +25,16 @@ release/
 .playwright-cli/
 .serena/
 app/.DS_Store
-data/*
-tests/
+# Runtime data (generated docs, sqlite). Source data under data/ stays tracked.
+data/prd_docs/
+data/design_docs/
+data/*.sqlite3
+data/*.sqlite3-journal
 recordings/
+
+# Local tooling, exports, and build artifacts
+.claude/
+.playwright-mcp/
+exports/
+manifest.json
+*-audit.png

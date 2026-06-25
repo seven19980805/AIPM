@@ -4,33 +4,29 @@
 
 ## 1. 必跑验收命令
 
-在项目根目录执行：
+在项目根目录执行后端单元测试：
 
 ```bash
-python3 scripts/verify-ic-substrate-expert-contracts.py
+python3 -m unittest discover -s tests
 ```
 
-覆盖静态合同：
+并运行 PM 方法论契约脚本：
+
+```bash
+python3 scripts/verify-pm-methodology-contracts.py
+```
+
+覆盖范围：
 
 - 前端只暴露 `Production / Quality / TDI` 三个 IC Substrate 入口，其他部门归入 General。
 - API、前端、后端均传递 `starter_department`。
 - 四语言输出锁定 `en / de / zh / ms`。
-- 内部模型 JSON 修复、A/B/C fallback、专家 prompt、PRD 证据附录、coding handoff 证据包没有被删。
-
-在安装后端依赖后执行：
-
-```bash
-python3 scripts/verify-ic-substrate-runtime-contracts.py
-```
-
-覆盖运行时合同：
-
-- `Production / Quality / TDI` 开局后，结构化模型会保留对应部门。
-- 下一问 prompt 会优先出现该部门的专家证据缺口。
-- 内部模型缺少 `requesting_department` 时，不会把专家轨道冲掉。
-- `/api/sessions` 和 `/api/sessions/<id>/messages` 首轮 API 链路保持专家轨道。
-- PRD 生成会保留 Markdown，同时追加 IC Substrate 专家证据附录。
+- 部门识别由 `data/ic_substrate/domain_pack.json` 驱动，而不是硬编码关键词。
+- LLM 调用失败时主对话和 PRD 接口直接返回错误，不再回退到本地伪造内容。
+- PRD 生成会保留 Markdown，同时追加 PRD V0 handoff 脚手架。
 - PRD 下载支持 `?format=docx`，返回 Word MIME 和 `.docx` 文件名。
+
+> 注：早期 `verify-ic-substrate-*-contracts.py` 与 `verify-fast-prd-v0-browser.mjs` 校验的是已退役的本地演示链路与硬编码匹配器；上线改造时一并移除。
 
 ## 2. 人工冒烟路径
 

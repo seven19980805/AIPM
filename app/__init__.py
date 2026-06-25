@@ -2,13 +2,6 @@ import logging
 import os
 from pathlib import Path
 
-from flask import Flask, request
-
-from .services.llm_client import LLMConfig, MiniMaxChatClient
-from .services.requirement_collector import RequirementCollectorService
-from .services.asr_client import ASRConfig, DoubaoASRClient
-from .services.session_store import SQLiteSessionStore
-
 
 def _load_dotenv() -> None:
     env_path = Path(__file__).resolve().parent.parent / ".env"
@@ -31,7 +24,14 @@ def _load_dotenv() -> None:
         os.environ.setdefault(key, value)
 
 
-def create_app() -> Flask:
+def create_app():
+    from flask import Flask, request
+
+    from .services.asr_client import ASRConfig, DoubaoASRClient
+    from .services.llm_client import LLMConfig, MiniMaxChatClient
+    from .services.requirement_collector import RequirementCollectorService
+    from .services.session_store import SQLiteSessionStore
+
     _load_dotenv()
     logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
     app = Flask(__name__)
@@ -41,7 +41,14 @@ def create_app() -> Flask:
     app.config["PORT"] = int(os.getenv("PORT", "8000"))
 
     # CORS configuration
-    app.config["CORS_ORIGINS"] = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173,http://localhost:9530").split(",")
+    app.config["CORS_ORIGINS"] = [
+        origin.strip()
+        for origin in os.getenv(
+            "CORS_ORIGINS",
+            "http://localhost:3000,http://localhost:5173,http://localhost:9530",
+        ).split(",")
+        if origin.strip()
+    ]
     app.config["CORS_ALLOW_METHODS"] = "GET, POST, DELETE, OPTIONS"
     app.config["SQLITE_DB_PATH"] = os.getenv(
         "SQLITE_DB_PATH",
@@ -68,25 +75,25 @@ def create_app() -> Flask:
     app.config["ASR_APP_ID"] = os.getenv("ASR_APP_ID", "")
     app.config["ASR_ACCESS_TOKEN"] = os.getenv("ASR_ACCESS_TOKEN", "")
     app.config["ASR_SECRET_KEY"] = os.getenv("ASR_SECRET_KEY", "")
-    app.config["ASR_BASE_URL"] = os.getenv("ASR_BASE_URL", "http://10.125.110.103:8004/v1")
+    app.config["ASR_BASE_URL"] = os.getenv("ASR_BASE_URL", "")
 
     session_store = SQLiteSessionStore(app.config["SQLITE_DB_PATH"])
 
-    llm_client = MiniMaxChatClient(
-        LLMConfig(
-            provider=app.config["LLM_PROVIDER"],
-            base_url=app.config["LLM_BASE_URL"],
-            api_key=app.config["LLM_API_KEY"],
-            model=app.config["LLM_MODEL"],
-            timeout_seconds=app.config["LLM_TIMEOUT_SECONDS"],
-            proxy_url=app.config["LLM_PROXY_URL"],
-            max_retries=app.config["LLM_MAX_RETRIES"],
-            debug_stream=app.config["LLM_DEBUG_STREAM"],
-            google_project_id=app.config["LLM_GCP_PROJECT_ID"],
-            google_location=app.config["LLM_GCP_LOCATION"],
-            google_credentials_path=app.config["LLM_GCP_CREDENTIALS_PATH"],
-        )
+    llm_config = LLMConfig(
+        provider=app.config["LLM_PROVIDER"],
+        base_url=app.config["LLM_BASE_URL"],
+        api_key=app.config["LLM_API_KEY"],
+        model=app.config["LLM_MODEL"],
+        timeout_seconds=app.config["LLM_TIMEOUT_SECONDS"],
+        proxy_url=app.config["LLM_PROXY_URL"],
+        max_retries=app.config["LLM_MAX_RETRIES"],
+        debug_stream=app.config["LLM_DEBUG_STREAM"],
+        google_project_id=app.config["LLM_GCP_PROJECT_ID"],
+        google_location=app.config["LLM_GCP_LOCATION"],
+        google_credentials_path=app.config["LLM_GCP_CREDENTIALS_PATH"],
     )
+    llm_config.validate_for_startup()
+    llm_client = MiniMaxChatClient(llm_config)
     app.extensions["requirement_collector"] = RequirementCollectorService(llm_client, session_store)
     
     # Initialize ASR client
@@ -100,25 +107,35 @@ def create_app() -> Flask:
     )
     app.extensions["asr_client"] = asr_client
 
+    def _allowed_cors_origin() -> str:
+        """Return the Origin header iff it matches the configured allow-list."""
+        origin = request.headers.get("Origin", "")
+        allowed = app.config["CORS_ORIGINS"]
+        return origin if origin and origin in allowed else ""
+
     # Handle OPTIONS requests explicitly
     @app.route("/api/<path:path>", methods=["OPTIONS"])
     def handle_options(path):
         response = app.make_response()
-        origin = request.headers.get("Origin")
-        response.headers["Access-Control-Allow-Origin"] = origin or "*"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-        response.headers["Access-Control-Allow-Methods"] = app.config["CORS_ALLOW_METHODS"]
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+        origin = _allowed_cors_origin()
+        if origin:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Vary"] = "Origin"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+            response.headers["Access-Control-Allow-Methods"] = app.config["CORS_ALLOW_METHODS"]
+            response.headers["Access-Control-Allow-Credentials"] = "true"
         return response
 
     @app.after_request
     def add_api_cors_headers(response):
         if request.path.startswith("/api/"):
-            origin = request.headers.get("Origin")
-            response.headers["Access-Control-Allow-Origin"] = origin or "*"
-            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-            response.headers["Access-Control-Allow-Methods"] = app.config["CORS_ALLOW_METHODS"]
-            response.headers["Access-Control-Allow-Credentials"] = "true"
+            origin = _allowed_cors_origin()
+            if origin:
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Vary"] = "Origin"
+                response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+                response.headers["Access-Control-Allow-Methods"] = app.config["CORS_ALLOW_METHODS"]
+                response.headers["Access-Control-Allow-Credentials"] = "true"
         return response
 
     from .api import api
