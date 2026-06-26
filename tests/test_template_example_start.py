@@ -183,6 +183,18 @@ class TemplateExampleStartTest(unittest.TestCase):
         with self.assertRaises(LLMError):
             list(self.service.stream_system_design_document(session.id, "en", save_history=False))
 
+    def test_extraction_guidance_hard_gates_data_interface_and_formula(self) -> None:
+        # Production-readiness rule: the data interface and each KPI formula must be
+        # captured or explicitly assumed before the data-source/rules areas count as
+        # confirmed (so the Fully-Confirmed gate can't pass on vague answers).
+        for lang in ("en", "zh"):
+            guidance = self.service._structured_requirement_skill_extraction_guidance(lang)
+            lowered = guidance.lower()
+            self.assertIn("pending_confirmation", lowered)
+            self.assertTrue("formula" in lowered or "公式" in guidance)
+            self.assertTrue("assumption" in lowered or "假设" in guidance)
+            self.assertTrue("interface" in lowered or "数据接口" in guidance)
+
     def test_guided_template_session_stays_empty(self) -> None:
         session = self.service.create_session(
             template_id=self.template_id,

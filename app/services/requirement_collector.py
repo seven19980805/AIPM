@@ -6027,7 +6027,8 @@ class RequirementCollectorService:
                 "- 从对话中抽取共享领域语言：业务术语、KPI 名称、状态名、对象粒度、owner、数据源、验收口径。\n"
                 "- 不新增 schema；把术语定义放入 business_rules、data_and_dependencies、risks_and_notes 或 open_questions 的最贴近位置。\n"
                 "- 对推荐答案、假设、待确认术语要保持 pending_confirmation 或 open question，不要升级为 confirmed。\n"
-                "- 如果用户确认了 canonical term、公式、状态、owner 或验收标准，要尽量标成 confirmed，并保留用户原话口径。"
+                "- 如果用户确认了 canonical term、公式、状态、owner 或验收标准，要尽量标成 confirmed，并保留用户原话口径。\n"
+                "- 看板/指标/KPI 类需求的硬门禁：数据源字段（integrations / data_and_dependencies）和 KPI 公式字段（rules / business_rules）在拿到具体数据接口（来源系统 + 视图/API + 主键字段 + 刷新）且每个指标公式（分子/分母、时间窗、排除项）明确、或用户明确接受某条假设之前，最多 pending_confirmation；含糊的“从 MES 取”不算 confirmed。"
             )
         if normalized_language == "de":
             return (
@@ -6035,7 +6036,8 @@ class RequirementCollectorService:
                 "- Extrahiere gemeinsame Fachsprache: Business Terms, KPI-Namen, State Names, Object Grain, Owner, Datenquellen und Acceptance Definitions.\n"
                 "- Schema nicht erweitern; Termdefinitionen in business_rules, data_and_dependencies, risks_and_notes oder open_questions ablegen.\n"
                 "- Empfehlungen, Annahmen und unbestaetigte Begriffe bleiben pending_confirmation oder open question, nicht confirmed.\n"
-                "- Wenn der Nutzer canonical term, Formel, State, Owner oder Acceptance bestaetigt, als confirmed erfassen und Nutzerwortlaut bewahren."
+                "- Wenn der Nutzer canonical term, Formel, State, Owner oder Acceptance bestaetigt, als confirmed erfassen und Nutzerwortlaut bewahren.\n"
+                "- Hard gate for dashboard/metric/KPI requirements: keep the data-source area (integrations / data_and_dependencies) and the KPI-formula area (rules / business_rules) at most pending_confirmation until the concrete data interface (source system + view/API + key fields + refresh) AND each metric's formula (numerator/denominator, time window, exclusions) are captured, OR the user explicitly accepted a stated assumption. A vague 'from MES' is not confirmed."
             )
         if normalized_language == "ms":
             return (
@@ -6043,14 +6045,16 @@ class RequirementCollectorService:
                 "- Ekstrak shared domain language: business terms, KPI names, state names, object grain, owner, data sources dan acceptance definitions.\n"
                 "- Jangan tambah schema; letakkan definisi term di business_rules, data_and_dependencies, risks_and_notes atau open_questions yang paling sesuai.\n"
                 "- Recommended answers, assumptions dan unconfirmed terms kekal pending_confirmation atau open question, bukan confirmed.\n"
-                "- Jika pengguna sahkan canonical term, formula, state, owner atau acceptance criteria, tandakan sebagai confirmed dan kekalkan wording pengguna."
+                "- Jika pengguna sahkan canonical term, formula, state, owner atau acceptance criteria, tandakan sebagai confirmed dan kekalkan wording pengguna.\n"
+                "- Gerbang keras untuk requirement dashboard/metric/KPI: kekalkan area data-source (integrations / data_and_dependencies) dan area formula KPI (rules / business_rules) paling tinggi pending_confirmation sehingga antara muka data konkrit (sistem sumber + view/API + key fields + refresh) DAN formula setiap metrik (numerator/denominator, time window, exclusions) ditangkap, ATAU pengguna terima andaian yang dinyatakan. Jawapan kabur 'dari MES' bukan confirmed."
             )
         return (
             "Skill-style extraction rules:\n"
             "- Extract shared domain language: business terms, KPI names, state names, object grain, owners, data sources, and acceptance definitions.\n"
             "- Do not add schema; place term definitions in the closest existing areas such as business_rules, data_and_dependencies, risks_and_notes, or open_questions.\n"
             "- Keep recommended answers, assumptions, and unconfirmed terms as pending_confirmation or open questions, not confirmed facts.\n"
-            "- When the user confirms a canonical term, formula, state, owner, or acceptance standard, mark the closest requirement area confirmed and preserve the user's wording."
+            "- When the user confirms a canonical term, formula, state, owner, or acceptance standard, mark the closest requirement area confirmed and preserve the user's wording.\n"
+            "- HARD GATE for dashboard/metric/KPI requirements: keep the data-source area (integrations / data_and_dependencies) and the KPI-formula area (rules / business_rules) at most pending_confirmation until the concrete data interface (source system + view/API + key fields + refresh) AND each metric's formula (numerator/denominator, time window, exclusions) are captured, OR the user explicitly accepted a stated assumption. A vague 'from MES' is not confirmed."
         )
 
     def _ic_substrate_structured_extraction_contract(
@@ -6076,7 +6080,8 @@ class RequirementCollectorService:
                 "- business_rules：存放 KPI/公式、状态定义、缺陷分类、放行/关闭规则、SLA 起止点、权限/owner 规则；未确认公式或状态必须写成 draft assumption 或 open question。\n"
                 "- data_and_dependencies：存放 source of truth、对象粒度、字段来源、刷新频率、对账逻辑、历史数据迁移、接口边界；不要自造 MES/QMS/ERP/SAP 表名。\n"
                 "- acceptance_criteria：存放可验收证据，包括主流程、异常流程、数据准确性、导出/下载、跨部门 sign-off、证据留存和关闭条件。\n"
-                "- collection_status：只有用户明确确认的字段才能 confirmed；从模板、AI 推荐或附件推断出的内容最多 pending_confirmation；矛盾内容标 conflict，关键缺口保留 pending_questions。"
+                "- collection_status：只有用户明确确认的字段才能 confirmed；从模板、AI 推荐或附件推断出的内容最多 pending_confirmation；矛盾内容标 conflict，关键缺口保留 pending_questions。\n"
+                "- 生成硬门禁：`integrations`（数据接口）在拿到具体 source-of-truth（来源系统 + 视图/API + 主键/字段 + 刷新频率）或用户明确接受某条假设之前最多 pending_confirmation、不能 confirmed；`rules`（KPI 公式）在每个指标都有具体公式（分子/分母、时间窗、排除项）或明确假设之前不能 confirmed。“从 MES 取”这类含糊回答只能 pending_confirmation。被接受的假设写进 open_questions/business_rules 并标注“ASSUMPTION: …”。"
             )
         if normalized_language == "de":
             return (
@@ -6087,7 +6092,8 @@ class RequirementCollectorService:
                 "- business_rules: store KPI/formula, state definition, defect taxonomy, release/closure rule, SLA start-end, permission/owner rule; unconfirmed formulas or states are draft assumptions or open questions.\n"
                 "- data_and_dependencies: store source of truth, object grain, field source, refresh frequency, reconciliation logic, historical migration, and interface boundary. Do not invent MES/QMS/ERP/SAP table names.\n"
                 "- acceptance_criteria: store verifiable evidence for main flow, exception flow, data accuracy, export/download, cross-functional sign-off, evidence retention, and closure condition.\n"
-                "- collection_status: mark confirmed only when the user explicitly confirms it; template evidence, AI recommendations, or attachment inference are at most pending_confirmation; contradictions are conflict and key gaps keep pending_questions."
+                "- collection_status: mark confirmed only when the user explicitly confirms it; template evidence, AI recommendations, or attachment inference are at most pending_confirmation; contradictions are conflict and key gaps keep pending_questions.\n"
+                "- GENERATION HARD GATE: keep `integrations` (data interface) at most pending_confirmation until a concrete source-of-truth is captured (source system + view/API + key fields + refresh cadence) OR the user explicitly accepts a stated assumption; keep `rules` (KPI formulas) unconfirmed until every metric has a concrete formula (numerator/denominator, time window, exclusions) OR an explicit assumption. Vague answers like 'from MES' stay pending_confirmation. Record accepted assumptions in open_questions/business_rules as 'ASSUMPTION: ...'."
             )
         if normalized_language == "ms":
             return (
@@ -6098,7 +6104,8 @@ class RequirementCollectorService:
                 "- business_rules: simpan KPI/formula, state definition, defect taxonomy, release/closure rule, SLA start-end, permission/owner rule; formula atau state belum sah ialah draft assumption atau open question.\n"
                 "- data_and_dependencies: simpan source of truth, object grain, field source, refresh frequency, reconciliation logic, historical migration dan interface boundary. Jangan reka nama table MES/QMS/ERP/SAP.\n"
                 "- acceptance_criteria: simpan evidence yang boleh diverifikasi untuk main flow, exception flow, data accuracy, export/download, cross-functional sign-off, evidence retention dan closure condition.\n"
-                "- collection_status: confirmed hanya jika pengguna sahkan dengan jelas; template evidence, AI recommendation atau attachment inference paling tinggi pending_confirmation; contradiction ialah conflict dan key gaps kekalkan pending_questions."
+                "- collection_status: confirmed hanya jika pengguna sahkan dengan jelas; template evidence, AI recommendation atau attachment inference paling tinggi pending_confirmation; contradiction ialah conflict dan key gaps kekalkan pending_questions.\n"
+                "- GERBANG KERAS PENJANAAN: kekalkan `integrations` (antara muka data) paling tinggi pending_confirmation sehingga source-of-truth konkrit ditangkap (sistem sumber + view/API + key fields + refresh cadence) ATAU pengguna terima andaian yang dinyatakan; kekalkan `rules` (formula KPI) belum confirmed sehingga setiap metrik ada formula konkrit (numerator/denominator, time window, exclusions) ATAU andaian eksplisit. Jawapan kabur seperti 'dari MES' kekal pending_confirmation. Rekod andaian diterima dalam open_questions/business_rules sebagai 'ASSUMPTION: ...'."
             )
         return (
             "IC Substrate structured extraction contract:\n"
@@ -6108,7 +6115,8 @@ class RequirementCollectorService:
             "- business_rules: store KPI/formula, state definition, defect taxonomy, release/closure rule, SLA start-end, permission/owner rule; unconfirmed formulas or states are draft assumptions or open questions.\n"
             "- data_and_dependencies: store source of truth, object grain, field source, refresh frequency, reconciliation logic, historical migration, and interface boundary. Do not invent MES/QMS/ERP/SAP table names.\n"
             "- acceptance_criteria: store verifiable evidence for main flow, exception flow, data accuracy, export/download, cross-functional sign-off, evidence retention, and closure condition.\n"
-            "- collection_status: mark confirmed only when the user explicitly confirms it; template evidence, AI recommendations, or attachment inference are at most pending_confirmation; contradictions are conflict and key gaps keep pending_questions."
+            "- collection_status: mark confirmed only when the user explicitly confirms it; template evidence, AI recommendations, or attachment inference are at most pending_confirmation; contradictions are conflict and key gaps keep pending_questions.\n"
+            "- GENERATION HARD GATE: keep `integrations` (data interface) at most pending_confirmation until a concrete source-of-truth is captured (source system + view/API + key fields + refresh cadence) OR the user explicitly accepts a stated assumption; keep `rules` (KPI formulas) unconfirmed until every metric has a concrete formula (numerator/denominator, time window, exclusions) OR an explicit assumption. Vague answers like 'from MES' stay pending_confirmation. Record accepted assumptions in open_questions/business_rules as 'ASSUMPTION: ...'."
         )
 
     def _prd_skill_style_document_guidance(self, language: str | None = None) -> str:
@@ -7701,6 +7709,7 @@ class RequirementCollectorService:
                     f"- 阶段=采集中。结构化门禁未过：已确认 {confirmed}/{total}（覆盖 {cov}%、确认 {conf}%）。PM Methodology {score}% 仅作质量参考，不阻断生成。\n"
                     "- 严禁声称“需求已足够/已完整/可以生成文档/可以 Go Coding”，严禁让用户点 Generate 或 Open Vibe Coding；它们只有结构化全部确认后才会亮。\n"
                     "- 本轮只补这一个结构化缺口：只问一个问题，结尾给 A/B/C。不要为方法论分数单独追问。\n"
+                    "- 数据接口与每个 KPI 公式是上线必备项：若当前缺口是数据接口或公式且用户给不出确切值，A/B/C 必须有一项为“采用以下假设并继续”（该假设记入 ASSUMPTIONS）；绝不能因含糊回答（如“从 MES 取”）就标确认。\n"
                     f"- 下一个缺口（{blocker_label}）：{blocker_question}"
                 )
             return (
@@ -7708,6 +7717,7 @@ class RequirementCollectorService:
                 f"- Phase = collecting. Structured gate not passed: {confirmed}/{total} confirmed (coverage {cov}%, confirmation {conf}%). PM Methodology {score}% is an advisory quality score only and does NOT block generation.\n"
                 "- Do NOT claim the requirement is enough/complete/ready, and do NOT tell the user to click Generate or Open Vibe Coding; those unlock only after every structured item is confirmed.\n"
                 "- This turn close exactly one structured gap: one question, end with A/B/C. Do not raise separate questions just to lift the methodology score.\n"
+                "- The data interface and every KPI formula are mandatory for go-live: if the current gap is the data interface or a formula and the user has no exact value, one of the A/B/C options MUST be 'use this stated assumption and continue' (recorded under ASSUMPTIONS); never mark them confirmed on a vague answer like 'from MES'.\n"
                 f"- Next gap ({blocker_label}): {blocker_question}"
             )
 
