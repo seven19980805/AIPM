@@ -593,15 +593,15 @@ const shellCopy = {
     assistantIntroQuality: 'Quality first. I will use the expert chain and ask one focused question at a time; once the requirement is complete enough, generate documents first, then send them to Vibe Coding. Pick v1\'s first improvement; type owner, evidence, or defect source if known. A. Yield / Finished Lot B. SPC / Cpk C. IQC supplier lot',
     assistantIntroTdi: 'TDI first. I will use the expert chain and ask one focused question at a time; once the requirement is complete enough, generate documents first, then send them to Vibe Coding. Pick v1\'s first control point; type owner, SLA, or handoff source if known. A. Request intake / SLA B. Trial lot issue C. NPI handoff',
     composerPlaceholder: 'Ask AIPM anything',
-    composerPlaceholderProduction: 'One sentence is enough: WIP dashboard for planners; source MES/SAP; KPI output/yield.',
-    composerPlaceholderQuality: 'One sentence is enough: defect disposition dashboard for QE; source QIS/MES; owner later.',
-    composerPlaceholderTdi: 'One sentence is enough: TDI case/SLA tracker; source case log; owner later.',
+    composerPlaceholderProduction: 'One sentence is enough: WIP dashboard for planners; data path SQL Server/SAP/Excel upload; KPI output/yield.',
+    composerPlaceholderQuality: 'One sentence is enough: defect disposition dashboard for QE; data path SQL Server/SAP/CSV upload; owner later.',
+    composerPlaceholderTdi: 'One sentence is enough: TDI case/SLA tracker; data path SQL Server/SAP/Excel upload; owner later.',
     fastSeedShapeHint: 'Pick a first scope',
     fastSeedDashboard: 'Dashboard',
     fastSeedTracker: 'Tracker',
     fastSeedAlert: 'Alert',
     fastSeedDataQuery: 'Data query',
-    fastIntakeHint: 'Type your own one sentence or pick a first scope. Try to cover: business action, primary user, source of truth, integration/writeback boundary, acceptance evidence.',
+    fastIntakeHint: 'Type your own one sentence or pick a first scope. Try to cover: business action, primary user, data path (SQL Server, SAP, or Excel/CSV upload), integration/writeback boundary, acceptance evidence.',
     fastStartHint: 'Send a seed to start the expert chain. Generate documents when ready; Go Coding sends the finished document handoff to Vibe Coding.',
     fastStartSendLabel: 'Send seed',
     fastStartGenerateLabel: 'Send & continue',
@@ -628,15 +628,15 @@ const shellCopy = {
     assistantIntroQuality: 'Quality zuerst. Ich nutze die Expertenkette und stelle je Runde eine fokussierte Frage; bei ausreichender Anforderung zuerst Dokumente erzeugen, dann an Vibe Coding uebergeben. Waehle die erste v1 Verbesserung; Owner, Evidence oder Defect-Quelle kannst du direkt ergaenzen. A. Yield / Finished Lot B. SPC / Cpk C. IQC Supplier Lot',
     assistantIntroTdi: 'TDI zuerst. Ich nutze die Expertenkette und stelle je Runde eine fokussierte Frage; bei ausreichender Anforderung zuerst Dokumente erzeugen, dann an Vibe Coding uebergeben. Waehle den ersten v1 Kontrollpunkt; Owner, SLA oder Handoff-Quelle kannst du direkt ergaenzen. A. Request Intake / SLA B. Trial Lot Issue C. NPI Handoff',
     composerPlaceholder: 'Stelle AIPM eine Frage',
-    composerPlaceholderProduction: 'Ein Satz reicht: WIP-Dashboard fuer Planner; Quelle MES/SAP; KPI Output/Yield.',
-    composerPlaceholderQuality: 'Ein Satz reicht: Defect-Disposition-Dashboard fuer QE; Quelle QIS/MES; Owner spaeter.',
-    composerPlaceholderTdi: 'Ein Satz reicht: TDI Case/SLA Tracker; Quelle Case Log; Owner spaeter.',
+    composerPlaceholderProduction: 'Ein Satz reicht: WIP-Dashboard fuer Planner; Datenpfad SQL Server/SAP/Excel Upload; KPI Output/Yield.',
+    composerPlaceholderQuality: 'Ein Satz reicht: Defect-Disposition-Dashboard fuer QE; Datenpfad SQL Server/SAP/CSV Upload; Owner spaeter.',
+    composerPlaceholderTdi: 'Ein Satz reicht: TDI Case/SLA Tracker; Datenpfad SQL Server/SAP/Excel Upload; Owner spaeter.',
     fastSeedShapeHint: 'Ersten Scope waehlen',
     fastSeedDashboard: 'Dashboard',
     fastSeedTracker: 'Tracker',
     fastSeedAlert: 'Alert',
     fastSeedDataQuery: 'Datenabfrage',
-    fastIntakeHint: 'Schreibe einen eigenen Satz oder waehle einen ersten Scope. Decke moeglichst ab: Business Action, Primary User, Source of Truth, Integration/Writeback-Grenze, Acceptance Evidence.',
+    fastIntakeHint: 'Schreibe einen eigenen Satz oder waehle einen ersten Scope. Decke moeglichst ab: Business Action, Primary User, Datenpfad (SQL Server, SAP oder Excel/CSV Upload), Integration/Writeback-Grenze, Acceptance Evidence.',
     fastStartHint: 'Sende einen Seed, um die Expertenkette zu starten. Erst Dokumente erzeugen, danach an Vibe Coding uebergeben.',
     fastStartSendLabel: 'Seed senden',
     fastStartGenerateLabel: 'Senden & fortsetzen',
@@ -663,15 +663,15 @@ const shellCopy = {
     assistantIntroQuality: 'Quality 先走专家链路，每轮只问一个最关键问题；信息足够后先生成文档，文档 OK 后再交接到 Vibe Coding。先选首版改善点；如果知道 owner、证据或缺陷来源，也可以一行补充。A. 良率/Finished Lot B. SPC/Cpk C. IQC 供应商批次',
     assistantIntroTdi: 'TDI 先走专家链路，每轮只问一个最关键问题；信息足够后先生成文档，文档 OK 后再交接到 Vibe Coding。先选首版管控点；如果知道 owner、SLA 或交接来源，也可以一行补充。A. 需求受理/SLA B. Trial lot 异常 C. NPI 交接',
     composerPlaceholder: '问AIPM任何问题',
-    composerPlaceholderProduction: '一句话即可：WIP/lot 状态看板；给生产 planner 用；数据源 MES/SAP。',
-    composerPlaceholderQuality: '一句话即可：缺陷处置看板；给质量工程师用；数据源 QIS/MES。',
-    composerPlaceholderTdi: '一句话即可：TDI case/SLA 追踪；给 owner 用；数据源或审批规则后补。',
+    composerPlaceholderProduction: '一句话即可：WIP/lot 状态看板；给生产 planner 用；数据路径 SQL Server/SAP/Excel 上传。',
+    composerPlaceholderQuality: '一句话即可：缺陷处置看板；给质量工程师用；数据路径 SQL Server/SAP/CSV 上传。',
+    composerPlaceholderTdi: '一句话即可：TDI case/SLA 追踪；给 owner 用；数据路径 SQL Server/SAP/Excel 上传。',
     fastSeedShapeHint: '选择首版形态',
     fastSeedDashboard: '看板',
     fastSeedTracker: '追踪器',
     fastSeedAlert: '提醒',
     fastSeedDataQuery: '数据查询',
-    fastIntakeHint: '可以自己写一句，也可以选首版形态；尽量覆盖：业务动作、主要用户、数据源、集成/写回边界、验收证据。',
+    fastIntakeHint: '可以自己写一句，也可以选首版形态；尽量覆盖：业务动作、主要用户、数据路径（SQL Server、SAP 或 Excel/CSV 上传）、集成/写回边界、验收证据。',
     fastStartHint: '发送种子后进入专家链路；信息足够后先生成文档，文档 OK 后再交接到 Vibe Coding。',
     fastStartSendLabel: '发送种子',
     fastStartGenerateLabel: '发送并继续',
@@ -697,15 +697,15 @@ const shellCopy = {
     assistantIntroQuality: 'Quality dahulu. Saya guna expert chain dan tanya satu soalan fokus setiap pusingan; apabila requirement cukup, jana dokumen dahulu, kemudian handoff ke Vibe Coding. Pilih penambahbaikan v1; tambah owner, evidence atau sumber defect jika tahu. A. Yield / Finished Lot B. SPC / Cpk C. IQC supplier lot',
     assistantIntroTdi: 'TDI dahulu. Saya guna expert chain dan tanya satu soalan fokus setiap pusingan; apabila requirement cukup, jana dokumen dahulu, kemudian handoff ke Vibe Coding. Pilih titik kawalan v1; tambah owner, SLA atau sumber handoff jika tahu. A. Request intake / SLA B. Trial lot issue C. NPI handoff',
     composerPlaceholder: 'Tanya apa sahaja kepada AIPM',
-    composerPlaceholderProduction: 'Satu ayat cukup: dashboard WIP/lot untuk planner; sumber MES/SAP; KPI output/yield.',
-    composerPlaceholderQuality: 'Satu ayat cukup: dashboard defect disposition untuk QE; sumber QIS/MES; owner kemudian.',
-    composerPlaceholderTdi: 'Satu ayat cukup: TDI case/SLA tracker; sumber case log; owner kemudian.',
+    composerPlaceholderProduction: 'Satu ayat cukup: dashboard WIP/lot untuk planner; data path SQL Server/SAP/Excel upload; KPI output/yield.',
+    composerPlaceholderQuality: 'Satu ayat cukup: dashboard defect disposition untuk QE; data path SQL Server/SAP/CSV upload; owner kemudian.',
+    composerPlaceholderTdi: 'Satu ayat cukup: TDI case/SLA tracker; data path SQL Server/SAP/Excel upload; owner kemudian.',
     fastSeedShapeHint: 'Pilih scope pertama',
     fastSeedDashboard: 'Dashboard',
     fastSeedTracker: 'Tracker',
     fastSeedAlert: 'Alert',
     fastSeedDataQuery: 'Query data',
-    fastIntakeHint: 'Tulis satu ayat sendiri atau pilih scope pertama. Cuba rangkum: business action, primary user, source of truth, integration/writeback boundary, acceptance evidence.',
+    fastIntakeHint: 'Tulis satu ayat sendiri atau pilih scope pertama. Cuba rangkum: business action, primary user, data path (SQL Server, SAP atau Excel/CSV upload), integration/writeback boundary, acceptance evidence.',
     fastStartHint: 'Hantar seed untuk mula expert chain. Jana dokumen dahulu, kemudian handoff ke Vibe Coding.',
     fastStartSendLabel: 'Hantar seed',
     fastStartGenerateLabel: 'Hantar & teruskan',
@@ -2661,126 +2661,126 @@ function expertFastSeedDraft(department: string, shape: FastSeedShapeKey): strin
   if (normalizedDepartment.includes('production')) {
     if (shape === 'production_planning') {
       return localized(
-        'Production 首版动作：做 scheduling / forecast planning simulation / 排产预测工作台，追踪 demand/forecast、capacity loading、forecast-to-schedule gap、commit risk 和 dispatch priority；使用者：production planner / Production owner；数据源：planning table、MES/SAP/WIP、capacity model；KPI/验收：capacity loading、commit risk、gap reason、owner review，Production owner 确认。',
-        'Production first action: scheduling / forecast planning simulation for capacity loading, forecast-to-schedule gap, commit risk, demand/forecast, and dispatch priority; owner/user: production planner or Production owner; source: planning table, MES/SAP/WIP, and capacity model; KPI/acceptance: capacity loading, forecast-to-schedule gap, commit risk, gap reason, and owner review.',
-        'Production erste Aktion: Scheduling-/Forecast-Planning-Simulation fuer Capacity Loading, Forecast-to-Schedule Gap, Commit Risk, Demand/Forecast und Dispatch Priority; Owner/User: Production Planner oder Production Owner; Quelle: Planning Table, MES/SAP/WIP und Capacity Model; KPI/Abnahme: Capacity Loading, Forecast-to-Schedule Gap, Commit Risk, Gap Reason und Owner Review.',
-        'Production tindakan pertama: simulasi scheduling / forecast planning untuk capacity loading, forecast-to-schedule gap, commit risk, demand/forecast dan dispatch priority; owner/user: production planner atau Production owner; sumber: planning table, MES/SAP/WIP dan capacity model; KPI/penerimaan: capacity loading, forecast-to-schedule gap, commit risk, gap reason dan owner review.',
+        'Production 首版动作：做 scheduling / forecast planning simulation / 排产预测工作台，追踪 demand/forecast、capacity loading、forecast-to-schedule gap、commit risk 和 dispatch priority；使用者：production planner / Production owner；业务记录：planning table、MES/SAP/WIP、capacity model；KPI/验收：capacity loading、commit risk、gap reason、owner review，Production owner 确认。',
+        'Production first action: scheduling / forecast planning simulation for capacity loading, forecast-to-schedule gap, commit risk, demand/forecast, and dispatch priority; owner/user: production planner or Production owner; business records: planning table, MES/SAP/WIP, and capacity model; KPI/acceptance: capacity loading, forecast-to-schedule gap, commit risk, gap reason, and owner review.',
+        'Production erste Aktion: Scheduling-/Forecast-Planning-Simulation fuer Capacity Loading, Forecast-to-Schedule Gap, Commit Risk, Demand/Forecast und Dispatch Priority; Owner/User: Production Planner oder Production Owner; Business Records: Planning Table, MES/SAP/WIP und Capacity Model; KPI/Abnahme: Capacity Loading, Forecast-to-Schedule Gap, Commit Risk, Gap Reason und Owner Review.',
+        'Production tindakan pertama: simulasi scheduling / forecast planning untuk capacity loading, forecast-to-schedule gap, commit risk, demand/forecast dan dispatch priority; owner/user: production planner atau Production owner; business records: planning table, MES/SAP/WIP dan capacity model; KPI/penerimaan: capacity loading, forecast-to-schedule gap, commit risk, gap reason dan owner review.',
       )
     }
     if (shape === 'production_oee') {
       return localized(
-        'Production 首版动作：做设备停机 OEE 看板，追踪机台 availability、downtime reason 和影响 lot；使用者：生产主管；数据源：设备/maintenance/MES；KPI/验收：OEE/availability、停机原因、lot impact，Production owner 确认。',
-        'Production first action: equipment downtime OEE dashboard tracking availability, downtime reason, and affected lots; owner/user: production supervisor; source: equipment/maintenance/MES records; KPI/acceptance: OEE/availability, downtime reason, lot impact.',
-        'Production erste Aktion: OEE/Downtime Dashboard fuer Anlagenstillstand, verfolgt Availability, Downtime Reason und betroffene Lots; Owner/User: Production Supervisor; Quelle: Equipment/Maintenance/MES Records; KPI/Abnahme: OEE/Availability, Downtime Reason, Lot Impact.',
-        'Production tindakan pertama: dashboard OEE/downtime peralatan untuk jejak availability, sebab downtime dan lot terkesan; owner/user: supervisor production; sumber: rekod equipment/maintenance/MES; KPI/penerimaan: OEE/availability, sebab downtime, impak lot.',
+        'Production 首版动作：做设备停机 OEE 看板，追踪机台 availability、downtime reason 和影响 lot；使用者：生产主管；业务记录：设备/maintenance/MES；KPI/验收：OEE/availability、停机原因、lot impact，Production owner 确认。',
+        'Production first action: equipment downtime OEE dashboard tracking availability, downtime reason, and affected lots; owner/user: production supervisor; business records: equipment/maintenance/MES records; KPI/acceptance: OEE/availability, downtime reason, lot impact.',
+        'Production erste Aktion: OEE/Downtime Dashboard fuer Anlagenstillstand, verfolgt Availability, Downtime Reason und betroffene Lots; Owner/User: Production Supervisor; Business Records: Equipment/Maintenance/MES Records; KPI/Abnahme: OEE/Availability, Downtime Reason, Lot Impact.',
+        'Production tindakan pertama: dashboard OEE/downtime peralatan untuk jejak availability, sebab downtime dan lot terkesan; owner/user: supervisor production; business records: rekod equipment/maintenance/MES; KPI/penerimaan: OEE/availability, sebab downtime, impak lot.',
       )
     }
     if (shape === 'production_shortage') {
       return localized(
-        'Production 首版动作：做缺料风险和 kit readiness 看板，追踪 material availability、shortage reason 和受影响 lot/order；使用者：生产 planner；数据源：BOM/material/inventory/MES；KPI/验收：kit readiness、库存覆盖、受影响订单，Production owner 确认。',
-        'Production first action: material shortage and kit readiness dashboard tracking material availability, shortage reason, and affected lot/order; owner/user: production planner; source: BOM/material/inventory/MES records; KPI/acceptance: kit readiness, inventory coverage, affected orders.',
-        'Production erste Aktion: Material Shortage und Kit-Readiness Dashboard, verfolgt Material Availability, Shortage Reason und betroffene Lots/Orders; Owner/User: Production Planner; Quelle: BOM/Material/Inventory/MES Records; KPI/Abnahme: Kit Readiness, Inventory Coverage, betroffene Orders.',
-        'Production tindakan pertama: dashboard material shortage dan kit readiness untuk jejak material availability, sebab shortage dan lot/order terkesan; owner/user: planner production; sumber: rekod BOM/material/inventory/MES; KPI/penerimaan: kit readiness, inventory coverage, order terkesan.',
+        'Production 首版动作：做缺料风险和 kit readiness 看板，追踪 material availability、shortage reason 和受影响 lot/order；使用者：生产 planner；业务记录：BOM/material/inventory/MES；KPI/验收：kit readiness、库存覆盖、受影响订单，Production owner 确认。',
+        'Production first action: material shortage and kit readiness dashboard tracking material availability, shortage reason, and affected lot/order; owner/user: production planner; business records: BOM/material/inventory/MES records; KPI/acceptance: kit readiness, inventory coverage, affected orders.',
+        'Production erste Aktion: Material Shortage und Kit-Readiness Dashboard, verfolgt Material Availability, Shortage Reason und betroffene Lots/Orders; Owner/User: Production Planner; Business Records: BOM/Material/Inventory/MES Records; KPI/Abnahme: Kit Readiness, Inventory Coverage, betroffene Orders.',
+        'Production tindakan pertama: dashboard material shortage dan kit readiness untuk jejak material availability, sebab shortage dan lot/order terkesan; owner/user: planner production; business records: rekod BOM/material/inventory/MES; KPI/penerimaan: kit readiness, inventory coverage, order terkesan.',
       )
     }
     if (shape === 'production_delivery') {
       return localized(
-        'Production 首版动作：做出货延误和 OTD commit risk 看板，追踪 customer commit date、planned ship date、WIP readiness 和 risk reason；使用者：production planner；数据源：SAP/MES/QIS；KPI/验收：OTD、风险原因、owner action，Production owner 确认。',
-        'Production first action: delivery delay and OTD commit-risk dashboard tracking customer commit date, planned ship date, WIP readiness, and risk reason; owner/user: production planner; source: SAP/MES/QIS records; KPI/acceptance: OTD, risk reason, owner action.',
-        'Production erste Aktion: Delivery Delay und OTD Commit-Risk Dashboard, verfolgt Customer Commit Date, Planned Ship Date, WIP Readiness und Risk Reason; Owner/User: Production Planner; Quelle: SAP/MES/QIS Records; KPI/Abnahme: OTD, Risk Reason, Owner Action.',
-        'Production tindakan pertama: dashboard delivery delay dan OTD commit risk untuk jejak customer commit date, planned ship date, WIP readiness dan risk reason; owner/user: planner production; sumber: rekod SAP/MES/QIS; KPI/penerimaan: OTD, risk reason, owner action.',
+        'Production 首版动作：做出货延误和 OTD commit risk 看板，追踪 customer commit date、planned ship date、WIP readiness 和 risk reason；使用者：production planner；业务记录：SAP/MES/QIS；KPI/验收：OTD、风险原因、owner action，Production owner 确认。',
+        'Production first action: delivery delay and OTD commit-risk dashboard tracking customer commit date, planned ship date, WIP readiness, and risk reason; owner/user: production planner; business records: SAP/MES/QIS records; KPI/acceptance: OTD, risk reason, owner action.',
+        'Production erste Aktion: Delivery Delay und OTD Commit-Risk Dashboard, verfolgt Customer Commit Date, Planned Ship Date, WIP Readiness und Risk Reason; Owner/User: Production Planner; Business Records: SAP/MES/QIS Records; KPI/Abnahme: OTD, Risk Reason, Owner Action.',
+        'Production tindakan pertama: dashboard delivery delay dan OTD commit risk untuk jejak customer commit date, planned ship date, WIP readiness dan risk reason; owner/user: planner production; business records: rekod SAP/MES/QIS; KPI/penerimaan: OTD, risk reason, owner action.',
       )
     }
     if (shape === 'production_cost') {
       return localized(
-        'Production 首版动作：做 standard cost simulation，按 Activity Rate、Processing Time、MOH、Yield 和 Panel Utilization 模拟月度成本；使用者：cost/value engineer；数据源：SAP VC/Excel baseline；KPI/验收：simulated cost、CSI 影响、公式假设，Finance/Production owner 待确认。',
-        'Production first action: standard cost simulation using Activity Rate, Processing Time, MOH, Yield, and Panel Utilization for monthly cost scenarios; owner/user: cost or value engineer; source: SAP VC/Excel baseline; KPI/acceptance: simulated cost, CSI impact, formula assumptions.',
-        'Production erste Aktion: Standard-Cost Simulation mit Activity Rate, Processing Time, MOH, Yield und Panel Utilization fuer monatliche Kostenszenarien; Owner/User: Cost oder Value Engineer; Quelle: SAP VC/Excel Baseline; KPI/Abnahme: Simulated Cost, CSI Impact, Formula Assumptions.',
-        'Production tindakan pertama: standard cost simulation menggunakan Activity Rate, Processing Time, MOH, Yield dan Panel Utilization untuk senario kos bulanan; owner/user: cost atau value engineer; sumber: SAP VC/Excel baseline; KPI/penerimaan: simulated cost, impak CSI, andaian formula.',
+        'Production 首版动作：做 standard cost simulation，按 Activity Rate、Processing Time、MOH、Yield 和 Panel Utilization 模拟月度成本；使用者：cost/value engineer；业务记录：SAP VC/Excel baseline；KPI/验收：simulated cost、CSI 影响、公式假设，Finance/Production owner 待确认。',
+        'Production first action: standard cost simulation using Activity Rate, Processing Time, MOH, Yield, and Panel Utilization for monthly cost scenarios; owner/user: cost or value engineer; business records: SAP VC/Excel baseline; KPI/acceptance: simulated cost, CSI impact, formula assumptions.',
+        'Production erste Aktion: Standard-Cost Simulation mit Activity Rate, Processing Time, MOH, Yield und Panel Utilization fuer monatliche Kostenszenarien; Owner/User: Cost oder Value Engineer; Business Records: SAP VC/Excel Baseline; KPI/Abnahme: Simulated Cost, CSI Impact, Formula Assumptions.',
+        'Production tindakan pertama: standard cost simulation menggunakan Activity Rate, Processing Time, MOH, Yield dan Panel Utilization untuk senario kos bulanan; owner/user: cost atau value engineer; business records: SAP VC/Excel baseline; KPI/penerimaan: simulated cost, impak CSI, andaian formula.',
       )
     }
   }
   if (normalizedDepartment.includes('quality')) {
     if (shape === 'quality_yield') {
       return localized(
-        'Quality 首版动作：做 finished lot yield dashboard / 良率看板，追踪 finished lot、product family、process step、FPY/yield rate、defect rate 和 scrap rate；使用者：质量工程师/Quality manager；数据源：QIS/MES finished-lot 和 measurement 记录；KPI/验收：yield rate、FPY、defect/scrap trend、source priority 和公式假设，Quality owner 确认。',
-        'Quality first action: finished lot yield dashboard tracking finished lot, product family, process step, FPY/yield rate, defect rate, and scrap rate; owner/user: quality engineer or Quality manager; source: QIS/MES finished-lot and measurement records; KPI/acceptance: yield rate, FPY, defect/scrap trend, source priority, and formula assumptions.',
-        'Quality erste Aktion: Finished-Lot Yield Dashboard, verfolgt Finished Lot, Product Family, Process Step, FPY/Yield Rate, Defect Rate und Scrap Rate; Owner/User: Quality Engineer oder Quality Manager; Quelle: QIS/MES Finished-Lot und Measurement Records; KPI/Abnahme: Yield Rate, FPY, Defect/Scrap Trend, Source Priority und Formula Assumptions.',
-        'Quality tindakan pertama: dashboard finished-lot yield untuk jejak finished lot, product family, process step, FPY/yield rate, defect rate dan scrap rate; owner/user: quality engineer atau Quality manager; sumber: rekod finished-lot dan measurement QIS/MES; KPI/penerimaan: yield rate, FPY, trend defect/scrap, source priority dan andaian formula.',
+        'Quality 首版动作：做 finished lot yield dashboard / 良率看板，追踪 finished lot、product family、process step、FPY/yield rate、defect rate 和 scrap rate；使用者：质量工程师/Quality manager；业务记录：QIS/MES finished-lot 和 measurement 记录；KPI/验收：yield rate、FPY、defect/scrap trend、source priority 和公式假设，Quality owner 确认。',
+        'Quality first action: finished lot yield dashboard tracking finished lot, product family, process step, FPY/yield rate, defect rate, and scrap rate; owner/user: quality engineer or Quality manager; business records: QIS/MES finished-lot and measurement records; KPI/acceptance: yield rate, FPY, defect/scrap trend, source priority, and formula assumptions.',
+        'Quality erste Aktion: Finished-Lot Yield Dashboard, verfolgt Finished Lot, Product Family, Process Step, FPY/Yield Rate, Defect Rate und Scrap Rate; Owner/User: Quality Engineer oder Quality Manager; Business Records: QIS/MES Finished-Lot und Measurement Records; KPI/Abnahme: Yield Rate, FPY, Defect/Scrap Trend, Source Priority und Formula Assumptions.',
+        'Quality tindakan pertama: dashboard finished-lot yield untuk jejak finished lot, product family, process step, FPY/yield rate, defect rate dan scrap rate; owner/user: quality engineer atau Quality manager; business records: rekod finished-lot dan measurement QIS/MES; KPI/penerimaan: yield rate, FPY, trend defect/scrap, source priority dan andaian formula.',
       )
     }
     if (shape === 'quality_spc') {
       return localized(
-        'Quality 首版动作：做 SPC control chart / Cpk 看板，追踪参数、UCL/LCL、USL/LSL、control rule violation 和影响 lot；使用者：质量工程师；数据源：QIS/MES measurement；KPI/验收：Cpk、异常规则、control-limit/spec-limit 边界，Quality owner 确认。',
-        'Quality first action: SPC control chart and Cpk dashboard tracking parameter, UCL/LCL, USL/LSL, control-rule violation, and affected lots; owner/user: quality engineer; source: QIS/MES measurement records; KPI/acceptance: Cpk, rule violation, control-limit/spec-limit boundary.',
-        'Quality erste Aktion: SPC Control Chart und Cpk Dashboard, verfolgt Parameter, UCL/LCL, USL/LSL, Control-Rule Violation und betroffene Lots; Owner/User: Quality Engineer; Quelle: QIS/MES Measurement Records; KPI/Abnahme: Cpk, Rule Violation, Control-Limit/Spec-Limit Boundary.',
-        'Quality tindakan pertama: dashboard SPC control chart dan Cpk untuk jejak parameter, UCL/LCL, USL/LSL, control-rule violation dan lot terkesan; owner/user: quality engineer; sumber: rekod measurement QIS/MES; KPI/penerimaan: Cpk, rule violation, sempadan control-limit/spec-limit.',
+        'Quality 首版动作：做 SPC control chart / Cpk 看板，追踪参数、UCL/LCL、USL/LSL、control rule violation 和影响 lot；使用者：质量工程师；业务记录：QIS/MES measurement；KPI/验收：Cpk、异常规则、control-limit/spec-limit 边界，Quality owner 确认。',
+        'Quality first action: SPC control chart and Cpk dashboard tracking parameter, UCL/LCL, USL/LSL, control-rule violation, and affected lots; owner/user: quality engineer; business records: QIS/MES measurement records; KPI/acceptance: Cpk, rule violation, control-limit/spec-limit boundary.',
+        'Quality erste Aktion: SPC Control Chart und Cpk Dashboard, verfolgt Parameter, UCL/LCL, USL/LSL, Control-Rule Violation und betroffene Lots; Owner/User: Quality Engineer; Business Records: QIS/MES Measurement Records; KPI/Abnahme: Cpk, Rule Violation, Control-Limit/Spec-Limit Boundary.',
+        'Quality tindakan pertama: dashboard SPC control chart dan Cpk untuk jejak parameter, UCL/LCL, USL/LSL, control-rule violation dan lot terkesan; owner/user: quality engineer; business records: rekod measurement QIS/MES; KPI/penerimaan: Cpk, rule violation, sempadan control-limit/spec-limit.',
       )
     }
     if (shape === 'quality_iqc') {
       return localized(
-        'Quality 首版动作：做 IQC supplier lot issue 看板，追踪 supplier lot、incoming pass rate、defect taxonomy 和影响 production lot；使用者：IQC/质量工程师；数据源：IQC/QIS/MES/material；KPI/验收：incoming pass rate、supplier lot impact、hold/claim 边界，Quality owner 确认。',
-        'Quality first action: IQC supplier-lot issue dashboard tracking supplier lot, incoming pass rate, defect taxonomy, and affected production lot; owner/user: IQC or quality engineer; source: IQC/QIS/MES/material records; KPI/acceptance: incoming pass rate, supplier-lot impact, hold/claim boundary.',
-        'Quality erste Aktion: IQC Supplier-Lot Issue Dashboard, verfolgt Supplier Lot, Incoming Pass Rate, Defect Taxonomy und betroffene Production Lots; Owner/User: IQC oder Quality Engineer; Quelle: IQC/QIS/MES/Material Records; KPI/Abnahme: Incoming Pass Rate, Supplier-Lot Impact, Hold/Claim Boundary.',
-        'Quality tindakan pertama: dashboard IQC supplier-lot issue untuk jejak supplier lot, incoming pass rate, defect taxonomy dan production lot terkesan; owner/user: IQC atau quality engineer; sumber: rekod IQC/QIS/MES/material; KPI/penerimaan: incoming pass rate, impak supplier lot, sempadan hold/claim.',
+        'Quality 首版动作：做 IQC supplier lot issue 看板，追踪 supplier lot、incoming pass rate、defect taxonomy 和影响 production lot；使用者：IQC/质量工程师；业务记录：IQC/QIS/MES/material；KPI/验收：incoming pass rate、supplier lot impact、hold/claim 边界，Quality owner 确认。',
+        'Quality first action: IQC supplier-lot issue dashboard tracking supplier lot, incoming pass rate, defect taxonomy, and affected production lot; owner/user: IQC or quality engineer; business records: IQC/QIS/MES/material records; KPI/acceptance: incoming pass rate, supplier-lot impact, hold/claim boundary.',
+        'Quality erste Aktion: IQC Supplier-Lot Issue Dashboard, verfolgt Supplier Lot, Incoming Pass Rate, Defect Taxonomy und betroffene Production Lots; Owner/User: IQC oder Quality Engineer; Business Records: IQC/QIS/MES/Material Records; KPI/Abnahme: Incoming Pass Rate, Supplier-Lot Impact, Hold/Claim Boundary.',
+        'Quality tindakan pertama: dashboard IQC supplier-lot issue untuk jejak supplier lot, incoming pass rate, defect taxonomy dan production lot terkesan; owner/user: IQC atau quality engineer; business records: rekod IQC/QIS/MES/material; KPI/penerimaan: incoming pass rate, impak supplier lot, sempadan hold/claim.',
       )
     }
     if (shape === 'quality_mrb') {
       return localized(
-        'Quality 首版动作：做 MRB disposition 待判定物料处置看板，追踪 nonconforming material、quarantine status、disposition path 和 release evidence；使用者：质量工程师；数据源：QIS/MES；KPI/验收：MRB aging、处置路径、放行证据，Quality owner 确认。',
-        'Quality first action: MRB disposition tracker for nonconforming material, quarantine status, disposition path, and release evidence; owner/user: quality engineer; source: QIS/MES records; KPI/acceptance: MRB aging, disposition path, release evidence.',
-        'Quality erste Aktion: MRB Disposition Tracker fuer Nonconforming Material, Quarantine Status, Disposition Path und Release Evidence; Owner/User: Quality Engineer; Quelle: QIS/MES Records; KPI/Abnahme: MRB Aging, Disposition Path, Release Evidence.',
-        'Quality tindakan pertama: MRB disposition tracker untuk nonconforming material, quarantine status, disposition path dan release evidence; owner/user: quality engineer; sumber: rekod QIS/MES; KPI/penerimaan: MRB aging, disposition path, release evidence.',
+        'Quality 首版动作：做 MRB disposition 待判定物料处置看板，追踪 nonconforming material、quarantine status、disposition path 和 release evidence；使用者：质量工程师；业务记录：QIS/MES；KPI/验收：MRB aging、处置路径、放行证据，Quality owner 确认。',
+        'Quality first action: MRB disposition tracker for nonconforming material, quarantine status, disposition path, and release evidence; owner/user: quality engineer; business records: QIS/MES records; KPI/acceptance: MRB aging, disposition path, release evidence.',
+        'Quality erste Aktion: MRB Disposition Tracker fuer Nonconforming Material, Quarantine Status, Disposition Path und Release Evidence; Owner/User: Quality Engineer; Business Records: QIS/MES Records; KPI/Abnahme: MRB Aging, Disposition Path, Release Evidence.',
+        'Quality tindakan pertama: MRB disposition tracker untuk nonconforming material, quarantine status, disposition path dan release evidence; owner/user: quality engineer; business records: rekod QIS/MES; KPI/penerimaan: MRB aging, disposition path, release evidence.',
       )
     }
     if (shape === 'quality_capa') {
       return localized(
-        'Quality 首版动作：做 CAPA 8D closure tracker，追踪 containment action、root cause、corrective action、verification evidence 和 closure evidence；使用者：质量工程师/Quality manager；数据源：QIS/MES/customer complaint；KPI/验收：8D stage、关闭证据、reopen rule，Quality owner 确认。',
-        'Quality first action: CAPA 8D closure tracker for containment action, root cause, corrective action, verification evidence, and closure evidence; owner/user: quality engineer or quality manager; source: QIS/MES/customer complaint records; KPI/acceptance: 8D stage, closure evidence, reopen rule.',
-        'Quality erste Aktion: CAPA 8D Closure Tracker fuer Containment Action, Root Cause, Corrective Action, Verification Evidence und Closure Evidence; Owner/User: Quality Engineer oder Quality Manager; Quelle: QIS/MES/Customer Complaint Records; KPI/Abnahme: 8D Stage, Closure Evidence, Reopen Rule.',
-        'Quality tindakan pertama: CAPA 8D closure tracker untuk containment action, root cause, corrective action, verification evidence dan closure evidence; owner/user: quality engineer atau quality manager; sumber: rekod QIS/MES/customer complaint; KPI/penerimaan: 8D stage, closure evidence, reopen rule.',
+        'Quality 首版动作：做 CAPA 8D closure tracker，追踪 containment action、root cause、corrective action、verification evidence 和 closure evidence；使用者：质量工程师/Quality manager；业务记录：QIS/MES/customer complaint；KPI/验收：8D stage、关闭证据、reopen rule，Quality owner 确认。',
+        'Quality first action: CAPA 8D closure tracker for containment action, root cause, corrective action, verification evidence, and closure evidence; owner/user: quality engineer or quality manager; business records: QIS/MES/customer complaint records; KPI/acceptance: 8D stage, closure evidence, reopen rule.',
+        'Quality erste Aktion: CAPA 8D Closure Tracker fuer Containment Action, Root Cause, Corrective Action, Verification Evidence und Closure Evidence; Owner/User: Quality Engineer oder Quality Manager; Business Records: QIS/MES/Customer Complaint Records; KPI/Abnahme: 8D Stage, Closure Evidence, Reopen Rule.',
+        'Quality tindakan pertama: CAPA 8D closure tracker untuk containment action, root cause, corrective action, verification evidence dan closure evidence; owner/user: quality engineer atau quality manager; business records: rekod QIS/MES/customer complaint; KPI/penerimaan: 8D stage, closure evidence, reopen rule.',
       )
     }
   }
   if (normalizedDepartment.includes('tdi')) {
     if (shape === 'tdi_request_sla') {
       return localized(
-        'TDI 首版动作：做 request intake / case SLA tracker，追踪 request intake、triage priority、owner handoff、SLA aging、approval、verification 和 closure evidence；使用者：TDI owner；数据源：case log / request intake / approval record；KPI/验收：SLA aging、handoff owner、closure evidence、writeback boundary，TDI owner 确认。',
-        'TDI first action: request intake / case SLA tracker for request intake, triage priority, owner handoff, SLA aging, approval, verification, and closure evidence; owner/user: TDI owner; source: case log, request intake, and approval records; KPI/acceptance: SLA aging, handoff owner, closure evidence, and writeback boundary.',
-        'TDI erste Aktion: Request Intake / Case-SLA Tracker fuer Request Intake, Triage Priority, Owner Handoff, SLA Aging, Approval, Verification und Closure Evidence; Owner/User: TDI Owner; Quelle: Case Log, Request Intake und Approval Records; KPI/Abnahme: SLA Aging, Handoff Owner, Closure Evidence und Writeback Boundary.',
-        'TDI tindakan pertama: request intake / case SLA tracker untuk request intake, triage priority, owner handoff, SLA aging, approval, verification dan closure evidence; owner/user: TDI owner; sumber: case log, request intake dan approval record; KPI/penerimaan: SLA aging, handoff owner, closure evidence dan writeback boundary.',
+        'TDI 首版动作：做 request intake / case SLA tracker，追踪 request intake、triage priority、owner handoff、SLA aging、approval、verification 和 closure evidence；使用者：TDI owner；业务记录：case log / request intake / approval record；KPI/验收：SLA aging、handoff owner、closure evidence、writeback boundary，TDI owner 确认。',
+        'TDI first action: request intake / case SLA tracker for request intake, triage priority, owner handoff, SLA aging, approval, verification, and closure evidence; owner/user: TDI owner; business records: case log, request intake, and approval records; KPI/acceptance: SLA aging, handoff owner, closure evidence, and writeback boundary.',
+        'TDI erste Aktion: Request Intake / Case-SLA Tracker fuer Request Intake, Triage Priority, Owner Handoff, SLA Aging, Approval, Verification und Closure Evidence; Owner/User: TDI Owner; Business Records: Case Log, Request Intake und Approval Records; KPI/Abnahme: SLA Aging, Handoff Owner, Closure Evidence und Writeback Boundary.',
+        'TDI tindakan pertama: request intake / case SLA tracker untuk request intake, triage priority, owner handoff, SLA aging, approval, verification dan closure evidence; owner/user: TDI owner; business records: case log, request intake dan approval record; KPI/penerimaan: SLA aging, handoff owner, closure evidence dan writeback boundary.',
       )
     }
     if (shape === 'tdi_trial_lot') {
       return localized(
-        'TDI 首版动作：做 trial lot / engineering run issue tracker，追踪试产异常、blocking decision、owner action 和 closure evidence；使用者：TDI owner；数据源：TDI/MES/PLM/QIS；KPI/验收：issue aging、阻塞状态、关闭证据，TDI owner 确认。',
-        'TDI first action: trial lot / engineering run issue tracker for trial issues, blocking decision, owner action, and closure evidence; owner/user: TDI owner; source: TDI/MES/PLM/QIS records; KPI/acceptance: issue aging, blocking status, closure evidence.',
-        'TDI erste Aktion: Trial-Lot / Engineering-Run Issue Tracker fuer Trial Issues, Blocking Decision, Owner Action und Closure Evidence; Owner/User: TDI Owner; Quelle: TDI/MES/PLM/QIS Records; KPI/Abnahme: Issue Aging, Blocking Status, Closure Evidence.',
-        'TDI tindakan pertama: trial lot / engineering run issue tracker untuk isu trial, blocking decision, owner action dan closure evidence; owner/user: TDI owner; sumber: rekod TDI/MES/PLM/QIS; KPI/penerimaan: issue aging, blocking status, closure evidence.',
+        'TDI 首版动作：做 trial lot / engineering run issue tracker，追踪试产异常、blocking decision、owner action 和 closure evidence；使用者：TDI owner；业务记录：TDI/MES/PLM/QIS；KPI/验收：issue aging、阻塞状态、关闭证据，TDI owner 确认。',
+        'TDI first action: trial lot / engineering run issue tracker for trial issues, blocking decision, owner action, and closure evidence; owner/user: TDI owner; business records: TDI/MES/PLM/QIS records; KPI/acceptance: issue aging, blocking status, closure evidence.',
+        'TDI erste Aktion: Trial-Lot / Engineering-Run Issue Tracker fuer Trial Issues, Blocking Decision, Owner Action und Closure Evidence; Owner/User: TDI Owner; Business Records: TDI/MES/PLM/QIS Records; KPI/Abnahme: Issue Aging, Blocking Status, Closure Evidence.',
+        'TDI tindakan pertama: trial lot / engineering run issue tracker untuk isu trial, blocking decision, owner action dan closure evidence; owner/user: TDI owner; business records: rekod TDI/MES/PLM/QIS; KPI/penerimaan: issue aging, blocking status, closure evidence.',
       )
     }
     if (shape === 'tdi_npi') {
       return localized(
-        'TDI 首版动作：做 NPI product transfer readiness 看板，追踪 recipe/spec package、qualification evidence、Production/Quality sign-off 和 open issue；使用者：TDI owner；数据源：TDI/PLM/MES/QIS；KPI/验收：readiness gate、sign-off、effective lot/revision，TDI owner 确认。',
-        'TDI first action: NPI product-transfer readiness dashboard tracking recipe/spec package, qualification evidence, Production/Quality sign-off, and open issues; owner/user: TDI owner; source: TDI/PLM/MES/QIS records; KPI/acceptance: readiness gate, sign-off, effective lot/revision.',
-        'TDI erste Aktion: NPI Product-Transfer Readiness Dashboard, verfolgt Recipe/Spec Package, Qualification Evidence, Production/Quality Sign-off und Open Issues; Owner/User: TDI Owner; Quelle: TDI/PLM/MES/QIS Records; KPI/Abnahme: Readiness Gate, Sign-off, Effective Lot/Revision.',
-        'TDI tindakan pertama: dashboard NPI product-transfer readiness untuk jejak recipe/spec package, qualification evidence, Production/Quality sign-off dan open issue; owner/user: TDI owner; sumber: rekod TDI/PLM/MES/QIS; KPI/penerimaan: readiness gate, sign-off, effective lot/revision.',
+        'TDI 首版动作：做 NPI product transfer readiness 看板，追踪 recipe/spec package、qualification evidence、Production/Quality sign-off 和 open issue；使用者：TDI owner；业务记录：TDI/PLM/MES/QIS；KPI/验收：readiness gate、sign-off、effective lot/revision，TDI owner 确认。',
+        'TDI first action: NPI product-transfer readiness dashboard tracking recipe/spec package, qualification evidence, Production/Quality sign-off, and open issues; owner/user: TDI owner; business records: TDI/PLM/MES/QIS records; KPI/acceptance: readiness gate, sign-off, effective lot/revision.',
+        'TDI erste Aktion: NPI Product-Transfer Readiness Dashboard, verfolgt Recipe/Spec Package, Qualification Evidence, Production/Quality Sign-off und Open Issues; Owner/User: TDI Owner; Business Records: TDI/PLM/MES/QIS Records; KPI/Abnahme: Readiness Gate, Sign-off, Effective Lot/Revision.',
+        'TDI tindakan pertama: dashboard NPI product-transfer readiness untuk jejak recipe/spec package, qualification evidence, Production/Quality sign-off dan open issue; owner/user: TDI owner; business records: rekod TDI/PLM/MES/QIS; KPI/penerimaan: readiness gate, sign-off, effective lot/revision.',
       )
     }
     if (shape === 'tdi_engineering_change') {
       return localized(
-        'TDI 首版动作：做 engineering change approval tracker，追踪 recipe/spec change、approval stage、validation evidence、effective date/effective lot 和 downstream handoff；使用者：TDI owner；数据源：TDI/PLM/MES；KPI/验收：审批阶段、验证证据、生效边界，TDI owner 确认。',
-        'TDI first action: engineering change approval tracker for recipe/spec change, approval stage, validation evidence, effective date/effective lot, and downstream handoff; owner/user: TDI owner; source: TDI/PLM/MES records; KPI/acceptance: approval stage, validation evidence, effective boundary.',
-        'TDI erste Aktion: Engineering Change Approval Tracker fuer Recipe/Spec Change, Approval Stage, Validation Evidence, Effective Date/Effective Lot und Downstream Handoff; Owner/User: TDI Owner; Quelle: TDI/PLM/MES Records; KPI/Abnahme: Approval Stage, Validation Evidence, Effective Boundary.',
-        'TDI tindakan pertama: engineering change approval tracker untuk recipe/spec change, approval stage, validation evidence, effective date/effective lot dan downstream handoff; owner/user: TDI owner; sumber: rekod TDI/PLM/MES; KPI/penerimaan: approval stage, validation evidence, effective boundary.',
+        'TDI 首版动作：做 engineering change approval tracker，追踪 recipe/spec change、approval stage、validation evidence、effective date/effective lot 和 downstream handoff；使用者：TDI owner；业务记录：TDI/PLM/MES；KPI/验收：审批阶段、验证证据、生效边界，TDI owner 确认。',
+        'TDI first action: engineering change approval tracker for recipe/spec change, approval stage, validation evidence, effective date/effective lot, and downstream handoff; owner/user: TDI owner; business records: TDI/PLM/MES records; KPI/acceptance: approval stage, validation evidence, effective boundary.',
+        'TDI erste Aktion: Engineering Change Approval Tracker fuer Recipe/Spec Change, Approval Stage, Validation Evidence, Effective Date/Effective Lot und Downstream Handoff; Owner/User: TDI Owner; Business Records: TDI/PLM/MES Records; KPI/Abnahme: Approval Stage, Validation Evidence, Effective Boundary.',
+        'TDI tindakan pertama: engineering change approval tracker untuk recipe/spec change, approval stage, validation evidence, effective date/effective lot dan downstream handoff; owner/user: TDI owner; business records: rekod TDI/PLM/MES; KPI/penerimaan: approval stage, validation evidence, effective boundary.',
       )
     }
     if (shape === 'tdi_data_query') {
       return localized(
-        'TDI 首版动作：做 engineering data query workspace，查询 product/revision、route、recipe、spec、parameter 和 ECN/change linkage；使用者：TDI owner；数据源：TDI/PLM/MES；KPI/验收：查询耗时、字段覆盖、只读边界，TDI owner 确认。',
-        'TDI first action: engineering data query workspace for product/revision, route, recipe, spec, parameter, and ECN/change linkage; owner/user: TDI owner; source: TDI/PLM/MES records; KPI/acceptance: query time, field coverage, read-only boundary.',
-        'TDI erste Aktion: Engineering Data Query Workspace fuer Product/Revision, Route, Recipe, Spec, Parameter und ECN/Change Linkage; Owner/User: TDI Owner; Quelle: TDI/PLM/MES Records; KPI/Abnahme: Query Time, Field Coverage, Read-only Boundary.',
-        'TDI tindakan pertama: engineering data query workspace untuk product/revision, route, recipe, spec, parameter dan ECN/change linkage; owner/user: TDI owner; sumber: rekod TDI/PLM/MES; KPI/penerimaan: query time, field coverage, sempadan read-only.',
+        'TDI 首版动作：做 engineering data query workspace，查询 product/revision、route、recipe、spec、parameter 和 ECN/change linkage；使用者：TDI owner；业务记录：TDI/PLM/MES；KPI/验收：查询耗时、字段覆盖、只读边界，TDI owner 确认。',
+        'TDI first action: engineering data query workspace for product/revision, route, recipe, spec, parameter, and ECN/change linkage; owner/user: TDI owner; business records: TDI/PLM/MES records; KPI/acceptance: query time, field coverage, read-only boundary.',
+        'TDI erste Aktion: Engineering Data Query Workspace fuer Product/Revision, Route, Recipe, Spec, Parameter und ECN/Change Linkage; Owner/User: TDI Owner; Business Records: TDI/PLM/MES Records; KPI/Abnahme: Query Time, Field Coverage, Read-only Boundary.',
+        'TDI tindakan pertama: engineering data query workspace untuk product/revision, route, recipe, spec, parameter dan ECN/change linkage; owner/user: TDI owner; business records: rekod TDI/PLM/MES; KPI/penerimaan: query time, field coverage, sempadan read-only.',
       )
     }
   }
@@ -2802,207 +2802,220 @@ function starterDepartmentDraft(
   if (currentLanguage.value === 'zh') {
     if (normalizedDepartment.includes('production')) {
       if (shape === 'tracker') {
-        return 'Production 首版动作：做 lot 异常/派工追踪器；使用者：生产主管；数据源：MES/SAP；KPI/验收：停留时间/处理时效，生产主管确认。'
+        return 'Production 首版动作：做 lot 异常/派工追踪器；使用者：生产主管；业务记录：MES/SAP；KPI/验收：停留时间/处理时效，生产主管确认。'
       }
       if (shape === 'alert') {
-        return 'Production 首版动作：做 WIP 超时/产出异常提醒；使用者：生产 planner；数据源：MES；KPI/验收：预警命中率/响应时间，生产 planner 确认。'
+        return 'Production 首版动作：做 WIP 超时/产出异常提醒；使用者：生产 planner；业务记录：MES；KPI/验收：预警命中率/响应时间，生产 planner 确认。'
       }
       if (shape === 'data_query') {
-        return 'Production 首版动作：做 lot/WIP 自助查询；使用者：生产 planner；数据源：MES/SAP；KPI/验收：查询耗时/覆盖字段，生产 planner 确认。'
+        return 'Production 首版动作：做 lot/WIP 自助查询；使用者：生产 planner；业务记录：MES/SAP；KPI/验收：查询耗时/覆盖字段，生产 planner 确认。'
       }
-      return 'Production 首版动作：做 WIP/lot 状态看板；使用者：生产 planner；数据源：MES/SAP；KPI/验收：产出/良率，生产 planner 确认。'
+      return 'Production 首版动作：做 WIP/lot 状态看板；使用者：生产 planner；业务记录：MES/SAP；KPI/验收：产出/良率，生产 planner 确认。'
     }
     if (normalizedDepartment.includes('quality')) {
       if (shape === 'tracker') {
-        return 'Quality 首版动作：做 MRB/CAPA 追踪器；使用者：质量工程师；数据源：QIS/MES；KPI/验收：关闭时效/证据完整性，Quality owner 待确认。'
+        return 'Quality 首版动作：做 MRB/CAPA 追踪器；使用者：质量工程师；业务记录：QIS/MES；KPI/验收：关闭时效/证据完整性，Quality owner 待确认。'
       }
       if (shape === 'alert') {
-        return 'Quality 首版动作：做重大缺陷/放行风险提醒；使用者：质量工程师；数据源：QIS/MES；KPI/验收：响应时间/误报率，质量工程师确认。'
+        return 'Quality 首版动作：做重大缺陷/放行风险提醒；使用者：质量工程师；业务记录：QIS/MES；KPI/验收：响应时间/误报率，质量工程师确认。'
       }
       if (shape === 'data_query') {
-        return 'Quality 首版动作：做缺陷与处置记录查询；使用者：质量工程师；数据源：QIS/MES；KPI/验收：查询耗时/处置记录完整性，验收 owner 待确认。'
+        return 'Quality 首版动作：做缺陷与处置记录查询；使用者：质量工程师；业务记录：QIS/MES；KPI/验收：查询耗时/处置记录完整性，验收 owner 待确认。'
       }
-      return 'Quality 首版动作：做缺陷处置看板；使用者：质量工程师；数据源：QIS/MES；KPI/验收：关闭率/证据完整性，Quality owner 待确认。'
+      return 'Quality 首版动作：做缺陷处置看板；使用者：质量工程师；业务记录：QIS/MES；KPI/验收：关闭率/证据完整性，Quality owner 待确认。'
     }
     if (normalizedDepartment.includes('tdi')) {
       if (shape === 'tracker') {
-        return 'TDI 首版动作：做 case/SLA 追踪器；使用者：TDI owner；数据源：case log；KPI/验收：SLA 准时率/关闭证据，TDI owner 确认。'
+        return 'TDI 首版动作：做 case/SLA 追踪器；使用者：TDI owner；业务记录：case log；KPI/验收：SLA 准时率/关闭证据，TDI owner 确认。'
       }
       if (shape === 'alert') {
-        return 'TDI 首版动作：做 SLA 逾期/审批阻塞提醒；使用者：TDI owner；数据源：case log；KPI/验收：逾期命中率/升级响应时间，TDI owner 确认。'
+        return 'TDI 首版动作：做 SLA 逾期/审批阻塞提醒；使用者：TDI owner；业务记录：case log；KPI/验收：逾期命中率/升级响应时间，TDI owner 确认。'
       }
       if (shape === 'data_query') {
-        return 'TDI 首版动作：做工程需求/case 自助查询；使用者：TDI owner；数据源：case log；KPI/验收：查询耗时/字段覆盖，TDI owner 确认。'
+        return 'TDI 首版动作：做工程需求/case 自助查询；使用者：TDI owner；业务记录：case log；KPI/验收：查询耗时/字段覆盖，TDI owner 确认。'
       }
-      return 'TDI 首版动作：做 case/SLA 追踪；使用者：TDI owner；数据源：case log；KPI/验收：SLA 准时率/阻塞 case 数，TDI owner 确认。'
+      return 'TDI 首版动作：做 case/SLA 追踪；使用者：TDI owner；业务记录：case log；KPI/验收：SLA 准时率/阻塞 case 数，TDI owner 确认。'
     }
-    return `${department} 首版动作：；使用者：；数据源：；KPI/验收：。`
+    return `${department} 首版动作：；使用者：；业务记录：；KPI/验收：。`
   }
   if (currentLanguage.value === 'de') {
     if (normalizedDepartment.includes('production')) {
       if (shape === 'tracker') {
-        return 'Production first action: lot exception/dispatch tracker; owner/user: production supervisor; source: MES/SAP; KPI: dwell time/response time.'
+        return 'Production first action: lot exception/dispatch tracker; owner/user: production supervisor; business records: MES/SAP; KPI: dwell time/response time.'
       }
       if (shape === 'alert') {
-        return 'Production first action: WIP aging/output risk alert; owner/user: production planner; source: MES; KPI: hit rate/response time.'
+        return 'Production first action: WIP aging/output risk alert; owner/user: production planner; business records: MES; KPI: hit rate/response time.'
       }
       if (shape === 'data_query') {
-        return 'Production first action: lot/WIP self-service query; owner/user: production planner; source: MES/SAP; KPI: query time/field coverage.'
+        return 'Production first action: lot/WIP self-service query; owner/user: production planner; business records: MES/SAP; KPI: query time/field coverage.'
       }
-      return 'Production first action: WIP/lot status dashboard; owner/user: production planner; source: MES/SAP; KPI: output/yield.'
+      return 'Production first action: WIP/lot status dashboard; owner/user: production planner; business records: MES/SAP; KPI: output/yield.'
     }
     if (normalizedDepartment.includes('quality')) {
       if (shape === 'tracker') {
-        return 'Quality first action: MRB/CAPA tracker; owner/user: quality engineer; source: QIS/MES; KPI: closure/evidence.'
+        return 'Quality first action: MRB/CAPA tracker; owner/user: quality engineer; business records: QIS/MES; KPI: closure/evidence.'
       }
       if (shape === 'alert') {
-        return 'Quality first action: defect/release risk alert; owner/user: quality engineer; source: QIS/MES; KPI: response time/false alerts.'
+        return 'Quality first action: defect/release risk alert; owner/user: quality engineer; business records: QIS/MES; KPI: response time/false alerts.'
       }
       if (shape === 'data_query') {
-        return 'Quality first action: defect and disposition self-service query; owner/user: quality engineer; source: QIS/MES; KPI/acceptance: query time/disposition record completeness.'
+        return 'Quality first action: defect and disposition self-service query; owner/user: quality engineer; business records: QIS/MES; KPI/acceptance: query time/disposition record completeness.'
       }
-      return 'Quality first action: defect disposition dashboard; owner/user: quality engineer; source: QIS/MES; KPI/acceptance: closure/evidence.'
+      return 'Quality first action: defect disposition dashboard; owner/user: quality engineer; business records: QIS/MES; KPI/acceptance: closure/evidence.'
     }
     if (normalizedDepartment.includes('tdi')) {
       if (shape === 'tracker') {
-        return 'TDI first action: case/SLA tracker; owner/user: TDI owner; source: case log; KPI/acceptance: SLA on-time rate/closure evidence.'
+        return 'TDI first action: case/SLA tracker; owner/user: TDI owner; business records: case log; KPI/acceptance: SLA on-time rate/closure evidence.'
       }
       if (shape === 'alert') {
-        return 'TDI first action: SLA overdue/approval blocker alert; owner/user: TDI owner; source: case log; KPI/acceptance: overdue hit rate/escalation response time.'
+        return 'TDI first action: SLA overdue/approval blocker alert; owner/user: TDI owner; business records: case log; KPI/acceptance: overdue hit rate/escalation response time.'
       }
       if (shape === 'data_query') {
-        return 'TDI first action: engineering request/case self-service query; owner/user: TDI owner; source: case log; KPI/acceptance: query time/field coverage.'
+        return 'TDI first action: engineering request/case self-service query; owner/user: TDI owner; business records: case log; KPI/acceptance: query time/field coverage.'
       }
-      return 'TDI first action: case/SLA tracker; owner/user: TDI owner; source: case log; KPI/acceptance: SLA on-time rate/blocked cases.'
+      return 'TDI first action: case/SLA tracker; owner/user: TDI owner; business records: case log; KPI/acceptance: SLA on-time rate/blocked cases.'
     }
-    return `${department} first action: ; owner/user: ; source: ; KPI/acceptance: .`
+    return `${department} first action: ; owner/user: ; business records: ; KPI/acceptance: .`
   }
   if (currentLanguage.value === 'ms') {
     if (normalizedDepartment.includes('production')) {
       if (shape === 'tracker') {
-        return 'Production first action: lot exception/dispatch tracker; owner/user: supervisor production; source: MES/SAP; KPI: dwell time/response time.'
+        return 'Production first action: lot exception/dispatch tracker; owner/user: supervisor production; business records: MES/SAP; KPI: dwell time/response time.'
       }
       if (shape === 'alert') {
-        return 'Production first action: WIP aging/output risk alert; owner/user: planner production; source: MES; KPI: hit rate/response time.'
+        return 'Production first action: WIP aging/output risk alert; owner/user: planner production; business records: MES; KPI: hit rate/response time.'
       }
       if (shape === 'data_query') {
-        return 'Production first action: lot/WIP self-service query; owner/user: planner production; source: MES/SAP; KPI: query time/field coverage.'
+        return 'Production first action: lot/WIP self-service query; owner/user: planner production; business records: MES/SAP; KPI: query time/field coverage.'
       }
-      return 'Production first action: dashboard WIP/lot; owner/user: planner production; source: MES/SAP; KPI: output/yield.'
+      return 'Production first action: dashboard WIP/lot; owner/user: planner production; business records: MES/SAP; KPI: output/yield.'
     }
     if (normalizedDepartment.includes('quality')) {
       if (shape === 'tracker') {
-        return 'Quality first action: MRB/CAPA tracker; owner/user: quality engineer; source: QIS/MES; KPI: evidence/closure.'
+        return 'Quality first action: MRB/CAPA tracker; owner/user: quality engineer; business records: QIS/MES; KPI: evidence/closure.'
       }
       if (shape === 'alert') {
-        return 'Quality first action: defect/release risk alert; owner/user: quality engineer; source: QIS/MES; KPI: response time/false alerts.'
+        return 'Quality first action: defect/release risk alert; owner/user: quality engineer; business records: QIS/MES; KPI: response time/false alerts.'
       }
       if (shape === 'data_query') {
-        return 'Quality first action: defect and disposition self-service query; owner/user: quality engineer; source: QIS/MES; KPI/acceptance: query time/disposition record completeness.'
+        return 'Quality first action: defect and disposition self-service query; owner/user: quality engineer; business records: QIS/MES; KPI/acceptance: query time/disposition record completeness.'
       }
-      return 'Quality first action: dashboard defect disposition; owner/user: quality engineer; source: QIS/MES; KPI/acceptance: evidence/closure.'
+      return 'Quality first action: dashboard defect disposition; owner/user: quality engineer; business records: QIS/MES; KPI/acceptance: evidence/closure.'
     }
     if (normalizedDepartment.includes('tdi')) {
       if (shape === 'tracker') {
-        return 'TDI first action: case/SLA tracker; owner/user: TDI owner; source: case log; KPI/acceptance: SLA on-time rate/closure evidence.'
+        return 'TDI first action: case/SLA tracker; owner/user: TDI owner; business records: case log; KPI/acceptance: SLA on-time rate/closure evidence.'
       }
       if (shape === 'alert') {
-        return 'TDI first action: SLA overdue/approval blocker alert; owner/user: TDI owner; source: case log; KPI/acceptance: overdue hit rate/escalation response time.'
+        return 'TDI first action: SLA overdue/approval blocker alert; owner/user: TDI owner; business records: case log; KPI/acceptance: overdue hit rate/escalation response time.'
       }
       if (shape === 'data_query') {
-        return 'TDI first action: engineering request/case self-service query; owner/user: TDI owner; source: case log; KPI/acceptance: query time/field coverage.'
+        return 'TDI first action: engineering request/case self-service query; owner/user: TDI owner; business records: case log; KPI/acceptance: query time/field coverage.'
       }
-      return 'TDI first action: case/SLA tracker; owner/user: TDI owner; source: case log; KPI/acceptance: SLA on-time rate/blocked cases.'
+      return 'TDI first action: case/SLA tracker; owner/user: TDI owner; business records: case log; KPI/acceptance: SLA on-time rate/blocked cases.'
     }
-    return `${department} first action: ; owner/user: ; source: ; KPI/acceptance: .`
+    return `${department} first action: ; owner/user: ; business records: ; KPI/acceptance: .`
   }
   if (normalizedDepartment.includes('production')) {
     if (shape === 'tracker') {
-      return 'Production first action: lot exception/dispatch tracker; owner/user: production supervisor; source: MES/SAP; KPI: dwell time/response time.'
+      return 'Production first action: lot exception/dispatch tracker; owner/user: production supervisor; business records: MES/SAP; KPI: dwell time/response time.'
     }
     if (shape === 'alert') {
-      return 'Production first action: WIP aging/output risk alert; owner/user: production planner; source: MES; KPI: hit rate/response time.'
+      return 'Production first action: WIP aging/output risk alert; owner/user: production planner; business records: MES; KPI: hit rate/response time.'
     }
     if (shape === 'data_query') {
-      return 'Production first action: lot/WIP self-service query; owner/user: production planner; source: MES/SAP; KPI: query time/field coverage.'
+      return 'Production first action: lot/WIP self-service query; owner/user: production planner; business records: MES/SAP; KPI: query time/field coverage.'
     }
-    return 'Production first action: WIP/lot status dashboard; owner/user: production planner; source: MES/SAP; KPI: output/yield.'
+    return 'Production first action: WIP/lot status dashboard; owner/user: production planner; business records: MES/SAP; KPI: output/yield.'
   }
   if (normalizedDepartment.includes('quality')) {
     if (shape === 'tracker') {
-      return 'Quality first action: MRB/CAPA tracker; owner/user: quality engineer; source: QIS/MES; KPI: closure/evidence.'
+      return 'Quality first action: MRB/CAPA tracker; owner/user: quality engineer; business records: QIS/MES; KPI: closure/evidence.'
     }
     if (shape === 'alert') {
-      return 'Quality first action: defect/release risk alert; owner/user: quality engineer; source: QIS/MES; KPI: response time/false alerts.'
+      return 'Quality first action: defect/release risk alert; owner/user: quality engineer; business records: QIS/MES; KPI: response time/false alerts.'
     }
     if (shape === 'data_query') {
-      return 'Quality first action: defect and disposition self-service query; owner/user: quality engineer; source: QIS/MES; KPI/acceptance: query time/disposition record completeness.'
+      return 'Quality first action: defect and disposition self-service query; owner/user: quality engineer; business records: QIS/MES; KPI/acceptance: query time/disposition record completeness.'
     }
-    return 'Quality first action: defect disposition dashboard; owner/user: quality engineer; source: QIS/MES; KPI/acceptance: closure/evidence.'
+    return 'Quality first action: defect disposition dashboard; owner/user: quality engineer; business records: QIS/MES; KPI/acceptance: closure/evidence.'
   }
   if (normalizedDepartment.includes('tdi')) {
     if (shape === 'tracker') {
-      return 'TDI first action: case/SLA tracker; owner/user: TDI owner; source: case log; KPI/acceptance: SLA on-time rate/closure evidence.'
+      return 'TDI first action: case/SLA tracker; owner/user: TDI owner; business records: case log; KPI/acceptance: SLA on-time rate/closure evidence.'
     }
     if (shape === 'alert') {
-      return 'TDI first action: SLA overdue/approval blocker alert; owner/user: TDI owner; source: case log; KPI/acceptance: overdue hit rate/escalation response time.'
+      return 'TDI first action: SLA overdue/approval blocker alert; owner/user: TDI owner; business records: case log; KPI/acceptance: overdue hit rate/escalation response time.'
     }
     if (shape === 'data_query') {
-      return 'TDI first action: engineering request/case self-service query; owner/user: TDI owner; source: case log; KPI/acceptance: query time/field coverage.'
+      return 'TDI first action: engineering request/case self-service query; owner/user: TDI owner; business records: case log; KPI/acceptance: query time/field coverage.'
     }
-    return 'TDI first action: case/SLA tracker; owner/user: TDI owner; source: case log; KPI/acceptance: SLA on-time rate/blocked cases.'
+    return 'TDI first action: case/SLA tracker; owner/user: TDI owner; business records: case log; KPI/acceptance: SLA on-time rate/blocked cases.'
   }
-  return `${department} first action: ; owner/user: ; source: ; KPI/acceptance: .`
+  return `${department} first action: ; owner/user: ; business records: ; KPI/acceptance: .`
 }
 
 function starterDepartmentIntakeBoundary(department: string): string {
   const normalizedDepartment = department.trim().toLowerCase()
   if (currentLanguage.value === 'zh') {
     if (normalizedDepartment.includes('production')) {
-      return '边界：首版只用 mock/只读数据，不写回 MES/SAP。'
+      return '边界：首版只用 mock/只读数据，不写回 SQL Server/SAP。'
     }
     if (normalizedDepartment.includes('quality')) {
-      return '边界：首版只用 mock/只读数据，不写回 QIS/MES。'
+      return '边界：首版只用 mock/只读数据，不写回 SQL Server/SAP。'
     }
     if (normalizedDepartment.includes('tdi')) {
-      return '边界：首版只用 mock/只读数据，不写回 TDI workflow。'
+      return '边界：首版只用 mock/只读数据，不写回 SQL Server/SAP 或 TDI workflow。'
     }
     return '边界：首版只用 mock/只读数据，不做生产写回。'
   }
   if (currentLanguage.value === 'de') {
     if (normalizedDepartment.includes('production')) {
-      return 'boundary: read-only mock data; no MES/SAP writeback.'
+      return 'boundary: read-only mock data; no SQL Server/SAP writeback.'
     }
     if (normalizedDepartment.includes('quality')) {
-      return 'boundary: read-only mock data; no QIS/MES writeback.'
+      return 'boundary: read-only mock data; no SQL Server/SAP writeback.'
     }
     if (normalizedDepartment.includes('tdi')) {
-      return 'boundary: read-only mock data; no TDI workflow writeback.'
+      return 'boundary: read-only mock data; no SQL Server/SAP or TDI workflow writeback.'
     }
     return 'boundary: read-only mock data; no production writeback.'
   }
   if (currentLanguage.value === 'ms') {
     if (normalizedDepartment.includes('production')) {
-      return 'boundary: read-only mock data; no MES/SAP writeback.'
+      return 'boundary: read-only mock data; no SQL Server/SAP writeback.'
     }
     if (normalizedDepartment.includes('quality')) {
-      return 'boundary: read-only mock data; no QIS/MES writeback.'
+      return 'boundary: read-only mock data; no SQL Server/SAP writeback.'
     }
     if (normalizedDepartment.includes('tdi')) {
-      return 'boundary: read-only mock data; no TDI workflow writeback.'
+      return 'boundary: read-only mock data; no SQL Server/SAP or TDI workflow writeback.'
     }
     return 'boundary: read-only mock data; no production writeback.'
   }
   if (normalizedDepartment.includes('production')) {
-    return 'boundary: read-only mock data; no MES/SAP writeback.'
+    return 'boundary: read-only mock data; no SQL Server/SAP writeback.'
   }
   if (normalizedDepartment.includes('quality')) {
-    return 'boundary: read-only mock data; no QIS/MES writeback.'
+    return 'boundary: read-only mock data; no SQL Server/SAP writeback.'
   }
   if (normalizedDepartment.includes('tdi')) {
-    return 'boundary: read-only mock data; no TDI workflow writeback.'
+    return 'boundary: read-only mock data; no SQL Server/SAP or TDI workflow writeback.'
   }
   return 'boundary: read-only mock data; no production writeback.'
+}
+
+function companyDataPathHint(): string {
+  if (currentLanguage.value === 'zh') {
+    return '数据路径只在 SQL Server、SAP、或用户手动上传 Excel/CSV 中选择；MES/QIS/QMS 等业务系统名需要确认由哪条路径暴露。'
+  }
+  if (currentLanguage.value === 'de') {
+    return 'Data path must be SQL Server, SAP, or user-uploaded Excel/CSV; MES/QIS/QMS names need confirmation through one of those paths.'
+  }
+  if (currentLanguage.value === 'ms') {
+    return 'Data path mesti SQL Server, SAP, atau Excel/CSV upload oleh pengguna; nama MES/QIS/QMS perlu disahkan melalui salah satu laluan itu.'
+  }
+  return 'Data path must be SQL Server, SAP, or user-uploaded Excel/CSV; MES/QIS/QMS names need confirmation through one of those paths.'
 }
 
 function starterDepartmentIntakeSeed(
@@ -3011,8 +3024,9 @@ function starterDepartmentIntakeSeed(
 ): string {
   const selectedShape = shape ?? defaultFastSeedShapeForDepartment(department)
   const draft = starterDepartmentDraft(department, selectedShape).trim()
+  const dataPathHint = companyDataPathHint()
   const boundary = starterDepartmentIntakeBoundary(department)
-  return [draft, boundary].filter(Boolean).join(' ')
+  return [draft, dataPathHint, boundary].filter(Boolean).join(' ')
 }
 
 function draftCompletionPrompt(): string {

@@ -1746,7 +1746,7 @@ class RequirementCollectorService:
             "features": "What information or action must be visible on the first screen?",
             "pages": "What screens or views are needed for the first version?",
             "rules": "How should the key metric or business rule be calculated?",
-            "integrations": "What source system or file will provide the data?",
+            "integrations": "Which company data path will provide the data: SQL Server, SAP, or user-uploaded Excel/CSV?",
             "acceptance": "How will you know the first version works well enough?",
         }
         return questions.get(key, "")
@@ -1783,7 +1783,7 @@ class RequirementCollectorService:
             "features": "functional requirements",
             "pages": "pages",
             "rules": "business rules",
-            "integrations": "data source",
+            "integrations": "data path",
             "acceptance": "acceptance criteria",
             "open_questions": "open question",
         }
@@ -1808,7 +1808,7 @@ class RequirementCollectorService:
             "features": "功能需求",
             "pages": "页面",
             "rules": "业务规则",
-            "integrations": "数据来源",
+            "integrations": "数据路径",
             "acceptance": "验收标准",
             "open_questions": "待确认问题",
         }
@@ -1852,7 +1852,7 @@ class RequirementCollectorService:
             "features": "Functional requirements",
             "pages": "Pages",
             "rules": "Business rules",
-            "integrations": "Integration systems",
+            "integrations": "Data path",
             "acceptance": "Acceptance criteria",
         }
         return labels.get(key, key.replace("_", " ").title())
@@ -2973,7 +2973,7 @@ class RequirementCollectorService:
         label_patterns = (
             ("acceptance", (r"\bacceptance\b", r"\b验收")),
             ("rules", (r"\bbusiness rules?\b", r"\bcalculation", r"\bformula", r"\bfpy\b", r"\byield loss")),
-            ("integrations", (r"\bintegration", r"\bsource system", r"\bdata source")),
+            ("integrations", (r"\bintegration", r"\bsource system", r"\bdata source", r"\bdata path")),
             ("pages", (r"\bpages?\b", r"\bscreens?\b", r"\bviews?\b", r"\bentry point", r"\bbrowser url", r"\binteraction flow")),
             ("features", (r"\bfunctional requirements?\b", r"\bfeatures?\b", r"\bvisuali[sz]ation", r"\bchart")),
             ("scenarios", (r"\bcore scenarios?\b", r"\buse scenarios?\b", r"\buser tasks?\b")),
@@ -3336,15 +3336,15 @@ class RequirementCollectorService:
             return (
                 "IC Substrate 专业对话链路：\n"
                 "- 系统角色始终是 AI 产品经理，不是制造/质量/工程顾问；目标是帮助讲不清需求的业务部门，把想开发的软件、Web dashboard、流程工具、报表或数据产品讲清楚，沉淀成可交付给开发团队的需求。\n"
-                "- 当前 IT scope 只开放 Production、Quality、TDI 和 General 四个同级入口；其他部门链路先隐藏，统一归入 General，不要在首问选项或推荐链路里展开成独立部门。\n"
+                "- 当前开放范围只包含 Production、Quality、TDI 和 General 四个同级入口；其他部门链路先隐藏，统一归入 General，不要在首问选项或推荐链路里展开成独立部门。\n"
                 "- 入口先做部门/业务 owner 路由：用户当前明显在说 Quality、TDI 或 Production，就直接进入对应链路；如果用户说其他部门、部门未开放或业务 owner 不明确，就进入 General 并继续把软件需求问清楚。\n"
                 "- 如果用户只给了“做一个 IC Substrate 系统/平台/工具”这类宽泛表达，没有明确部门和需求形态，第一问只在当前开放范围内确认首版部门或业务 owner：Production、Quality、TDI、General。\n"
                 "- 部门首问选项必须只覆盖当前开放入口：Production、Quality、TDI、General；不要列 Customer、EHS、Engineering、Equipment、Finance、IT/Data、Management、Material、Planning 或 Warehouse。\n"
-                "- 反问必须先落到软件需求：谁使用、看什么、做什么决策或动作、当前痛点、首版边界、输入输出、数据来源、验收标准；领域知识用于把问题问专业，不要变成全面业务流程审计。\n"
+                "- 反问必须先落到软件需求：谁使用、看什么、做什么决策或动作、当前痛点、首版边界、输入输出、数据路径（SQL Server、SAP 或 Excel/CSV 上传）、验收标准；领域知识用于把问题问专业，不要变成全面业务流程审计。\n"
                 "- 当用户说“做系统/看板/工具”但没说清形态时，优先确认首版软件形态：dashboard、workflow/case tracking、data query、report/export、alerting、admin console 或跨部门 cockpit；不要直接追完整制造流程。\n"
                 "- 软件形态是后端隐形路由，不要要求用户在前端选择；如果用户已经暗示 dashboard、workflow/case tracking、report/export、data query、alerting 或 admin console，就按该形态问一个更专业的问题。\n"
                 "- 每轮只问一个专业问题，但问题里可以给 2-5 个业务选项帮助用户快速确认，例如部门/owner 分组、lot / panel / unit 粒度、现行指标口径、现行状态流转或责任边界。\n"
-                "- Go Coding handoff gate：即使用户只给一句模糊的软件想法，也不能直接开放 Go Coding；先用一个最高价值问题补齐业务动作、使用者/owner、数据源、集成/写回边界或验收证据中最关键的缺口。只有结构化需求 ready_to_generate=true 时，才提示生成文档；文档生成/确认 OK 后，Go Coding 才能把文档交接给 Vibe Coding 平台。不要提供跳过文档直接 Go Coding 的选项。\n"
+                "- Go Coding handoff gate：即使用户只给一句模糊的软件想法，也不能直接开放 Go Coding；先用一个最高价值问题补齐业务动作、使用者/owner、数据路径、集成/写回边界或验收证据中最关键的缺口。只有结构化需求 ready_to_generate=true 时，才提示生成文档；文档生成/确认 OK 后，Go Coding 才能把文档交接给 Vibe Coding 平台。不要提供跳过文档直接 Go Coding 的选项。\n"
                 "- 硬性约束：每轮只能有一个问句，不要用“另外/同时/以及/还需要”追加第二个问题；如果两个口径都缺，先问更影响链路边界的那个。\n"
                 "- 硬性约束：在用户确认前，TDI 只能写作 TDI，不要写成 TDI（技术/异常/导入/接口）或任何括号解释。\n"
                 "- 硬性约束：部门首问的选项说明里也不能展开 TDI；只能写 Production/Quality/TDI 这些部门名，不要把 TDI 解释成技术导入、异常处理、接口集成或其他含义。\n"
@@ -3355,18 +3355,18 @@ class RequirementCollectorService:
                 "- Production：确认产品族/厂区/线别/工艺路线/lot-panel-unit 粒度、Finished Lot 定义、工序站点 move-in/move-out、WIP/报废/返工、良率/吞吐/周期、异常 hold/release 与 owner；所有 route、站点和公式以用户现场口径为准。\n"
                 "- TDI：不要擅自展开缩写，按用户组织内定义执行；若未确认，先确认本项目 TDI 的业务含义，再问触发条件、输入输出、状态流转、责任方/SLA、审批点，以及与上游/下游生产、质量或数据系统的交接。\n"
                 "- Quality：确认用户现行检测点、defect code/taxonomy、规格上下限、抽检/全检、retest/rework/scrap/MRB 判定、缺陷 Pareto、root cause 维度、CAPA/改善闭环和验收对账；不要自造缺陷分类、规格规则或 MRB/CAPA 状态。\n"
-                "- 当前开放入口平级：如果用户提到 Production、Quality 或 TDI，要切到该部门的软件使用场景；如果用户提到其他部门或不确定归属，就走 General 的通用 PM 软件需求链路，继续确认业务决策/动作、KPI、主数据、流程状态、责任边界、系统来源和验收方式。\n"
+                "- 当前开放入口平级：如果用户提到 Production、Quality 或 TDI，要切到该部门的软件使用场景；如果用户提到其他部门或不确定归属，就走 General 的通用 PM 软件需求链路，继续确认业务决策/动作、KPI、主数据、流程状态、责任边界、数据路径（SQL Server、SAP 或 Excel/CSV 上传）和验收方式。\n"
                 "- 初期不要优先追问权限、部署、菜单、颜色、通用 CRUD，除非它直接影响该部门的首版业务链路边界。"
             )
         if normalized_language == "de":
             return (
                 "IC Substrate Experten-Dialogkette:\n"
                 "- Die Rolle ist immer AI Product Manager, nicht Manufacturing-, Quality- oder Engineering-Berater. Ziel ist, unklare Anforderungen aus Fachbereichen in Software, Web Dashboards, Workflow Tools, Reports oder Datenprodukte fuer Engineering-Handover zu uebersetzen.\n"
-                "- Im aktuellen IT Scope sind Production, Quality, TDI und General als gleichrangige Einstiege aktiv; andere Fachbereiche bleiben verborgen und werden in General zusammengefasst, nicht als eigene Erstfrage-Optionen.\n"
+                "- Im aktuellen Scope sind Production, Quality, TDI und General als gleichrangige Einstiege aktiv; andere Fachbereiche bleiben verborgen und werden in General zusammengefasst, nicht als eigene Erstfrage-Optionen.\n"
                 "- Zuerst nach Fachbereich/Business Owner routen: Wenn Quality, TDI oder Production klar genannt ist, direkt in diesen Track wechseln. Wenn ein anderer oder nicht freigegebener Bereich genannt wird oder der Owner unklar ist, in General wechseln und die Softwareanforderung klaeren.\n"
                 "- Bei breiten Wuenschen wie IC Substrate System/Plattform/Tool ohne klaren Bereich zuerst nur im aktiven Scope fragen, welcher First-Version Owner verantwortlich ist: Production, Quality, TDI oder General.\n"
                 "- Die Erstfrage zu Bereichen darf nur Production, Quality, TDI und General nennen; Customer, EHS, Engineering, Equipment, Finance, IT/Data, Management, Material, Planning oder Warehouse nicht anbieten.\n"
-                "- Jede Rueckfrage muss zuerst die Softwareanforderung klaeren: Nutzer, Sicht/Aktion, Entscheidung, aktueller Schmerz, First-Version Boundary, Inputs/Outputs, Datenquelle und Abnahme. Domainwissen dient schaerferen PM-Fragen, nicht einer kompletten Prozessauditierung.\n"
+                "- Jede Rueckfrage muss zuerst die Softwareanforderung klaeren: Nutzer, Sicht/Aktion, Entscheidung, aktueller Schmerz, First-Version Boundary, Inputs/Outputs, Datenpfad (SQL Server, SAP oder Excel/CSV Upload) und Abnahme. Domainwissen dient schaerferen PM-Fragen, nicht einer kompletten Prozessauditierung.\n"
                 "- Wenn der Nutzer System/Dashboard/Tool sagt, aber die Produktform unklar ist, zuerst die First-Version Softwareform klaeren: dashboard, workflow/case tracking, data query, report/export, alerting, admin console oder cross-department cockpit.\n"
                 "- Softwareform ist ein verborgenes Backend-Routing, keine Frontend-Auswahl. Wenn der Nutzer dashboard, workflow/case tracking, report/export, data query, alerting oder admin console andeutet, eine fachlich passende PM-Frage stellen.\n"
                 "- Pro Runde genau eine professionelle Frage stellen; 2-5 fachliche Optionen sind erlaubt, wenn sie dem Nutzer beim schnellen Einordnen helfen.\n"
@@ -3383,11 +3383,11 @@ class RequirementCollectorService:
             return (
                 "Rantaian dialog pakar IC Substrate:\n"
                 "- Peranan sistem sentiasa AI Product Manager, bukan penasihat manufacturing, quality atau engineering. Matlamatnya ialah membantu jabatan bisnes yang belum jelas menerangkan software, Web dashboard, workflow tool, report atau data product untuk handover kepada engineering.\n"
-                "- Untuk scope IT semasa, Production, Quality, TDI dan General dibuka sebagai entry setara; jabatan lain disembunyikan dan disatukan di bawah General, bukan pilihan jabatan berasingan.\n"
+                "- Untuk scope semasa, Production, Quality, TDI dan General dibuka sebagai entry setara; jabatan lain disembunyikan dan disatukan di bawah General, bukan pilihan jabatan berasingan.\n"
                 "- Mula dengan routing jabatan/business owner: jika Quality, TDI atau Production jelas disebut, terus masuk ke track tersebut. Jika jabatan lain disebut, jabatan belum dibuka atau owner belum jelas, masuk ke General dan terus jelaskan keperluan software.\n"
                 "- Jika pengguna hanya minta IC Substrate system/platform/tool tanpa jabatan atau bentuk keperluan yang jelas, tanya dahulu first-version owner dalam scope aktif sahaja: Production, Quality, TDI atau General.\n"
                 "- Pilihan soalan jabatan pertama mesti hanya meliputi Production, Quality, TDI dan General; jangan tawarkan Customer, EHS, Engineering, Equipment, Finance, IT/Data, Management, Material, Planning atau Warehouse.\n"
-                "- Setiap soalan mesti mula-mula menjelaskan keperluan software: pengguna, view/action, keputusan, pain point semasa, first-version boundary, input/output, sumber data dan acceptance. Pengetahuan domain digunakan untuk soalan PM yang tajam, bukan audit proses penuh.\n"
+                "- Setiap soalan mesti mula-mula menjelaskan keperluan software: pengguna, view/action, keputusan, pain point semasa, first-version boundary, input/output, data path (SQL Server, SAP atau Excel/CSV upload) dan acceptance. Pengetahuan domain digunakan untuk soalan PM yang tajam, bukan audit proses penuh.\n"
                 "- Apabila pengguna menyebut system/dashboard/tool tetapi bentuk produk belum jelas, sahkan dahulu first-version software shape: dashboard, workflow/case tracking, data query, report/export, alerting, admin console atau cross-department cockpit.\n"
                 "- Software shape ialah routing backend tersembunyi, bukan pilihan frontend. Jika pengguna sudah membayangkan dashboard, workflow/case tracking, report/export, data query, alerting atau admin console, tanya satu soalan PM yang lebih khusus untuk shape itu.\n"
                 "- Tanya tepat satu soalan profesional setiap pusingan; 2-5 pilihan bisnes boleh diberi jika membantu pengguna mengesahkan dengan cepat.\n"
@@ -3398,16 +3398,16 @@ class RequirementCollectorService:
                 "- Production: sahkan product family, plant, line, route, lot-panel-unit grain, Finished Lot definition, move-in/move-out, WIP/scrap/rework, yield/throughput/cycle time, hold/release dan owner.\n"
                 "- TDI: jangan kembangkan akronim sendiri; sahkan maksud TDI untuk projek ini, trigger, input/output, state flow, owner/SLA, approval points dan upstream/downstream handoff.\n"
                 "- Quality: sahkan inspection points semasa, defect code/taxonomy, spec limits, sampling/full inspection, retest/rework/scrap/MRB disposition, Pareto, root cause, CAPA/improvement closure dan acceptance reconciliation.\n"
-                "- Entry aktif adalah setara: untuk Production, Quality atau TDI, tanya melalui software use case jabatan itu; untuk jabatan lain atau owner tidak jelas, gunakan General dengan business decision/action, KPI, master data, workflow state, ownership boundary, source system dan acceptance."
+                "- Entry aktif adalah setara: untuk Production, Quality atau TDI, tanya melalui software use case jabatan itu; untuk jabatan lain atau owner tidak jelas, gunakan General dengan business decision/action, KPI, master data, workflow state, ownership boundary, data path (SQL Server/SAP/Excel/CSV upload) dan acceptance."
             )
         return (
             "IC Substrate professional conversation chain:\n"
             "- The role is always an AI product manager, not a manufacturing/quality/engineering consultant. The goal is to help business departments who cannot clearly express needs define software, web dashboards, workflow tools, reports, or data products for engineering handoff.\n"
-            "- The current IT scope exposes four equal entry points: Production, Quality, TDI, and General. Hide other department tracks and route them into General instead of listing them as first-question options or recommended chains.\n"
+            "- The current scope exposes four equal entry points: Production, Quality, TDI, and General. Hide other department tracks and route them into General instead of listing them as first-question options or recommended chains.\n"
             "- First route by department/business owner: if the user is clearly discussing Quality, TDI, or Production, move directly into that track. If they mention another department, an unopened department, or an unclear owner, move into General and continue clarifying the software requirement.\n"
             "- If the user only gives a broad request like an IC Substrate system/platform/tool without a clear department or need type, first ask only within the active scope: Production, Quality, TDI, or General.\n"
             "- Department-first options must include only Production, Quality, TDI, and General; do not offer Customer, EHS, Engineering, Equipment, Finance, IT/Data, Management, Material, Planning, or Warehouse.\n"
-            "- Every question must first clarify the software requirement: user, view or action, decision, current pain, first-version boundary, inputs/outputs, data source, and acceptance. Use domain knowledge to ask sharper PM questions; do not turn the conversation into a full process audit.\n"
+            "- Every question must first clarify the software requirement: user, view or action, decision, current pain, first-version boundary, inputs/outputs, data path (SQL Server, SAP, or Excel/CSV upload), and acceptance. Use domain knowledge to ask sharper PM questions; do not turn the conversation into a full process audit.\n"
             "- When the user says system/dashboard/tool but has not clarified the product shape, first confirm whether the first version is a dashboard, workflow/case tracker, data query, report/export, alerting, admin console, or cross-department cockpit. Do not jump directly into the whole manufacturing process.\n"
             "- Software shape is hidden backend routing, not a frontend choice. If the user already implies dashboard, workflow/case tracking, report/export, data query, alerting, or admin console, ask one more expert PM question for that shape.\n"
             "- Ask one professional question per turn, but include 2-5 domain options when helpful, such as department/owner groups, lot / panel / unit grain, current metric definitions, current state flow, or ownership boundaries.\n"
@@ -3422,7 +3422,7 @@ class RequirementCollectorService:
             "- Production: confirm product family, plant, line, route, lot-panel-unit grain, Finished Lot definition, move-in/move-out stations, WIP/scrap/rework, yield/throughput/cycle-time metrics, abnormal hold/release, and owners. Route, station, and formula definitions must come from the user.\n"
             "- TDI: do not expand the acronym on your own; follow the user's organizational definition. If not confirmed, ask what TDI means in this project, then collect triggers, inputs/outputs, state flow, owner/SLA, approval points, and upstream/downstream production, quality, or data-system handoffs.\n"
             "- Quality: confirm the user's current inspection points, defect code/taxonomy, spec limits, sampling vs. full inspection, retest/rework/scrap/MRB disposition, defect Pareto, root-cause dimensions, CAPA/improvement closure, and validation reconciliation. Do not invent defect categories, spec rules, or MRB/CAPA states.\n"
-            "- Active-entry routing: if the user mentions Production, Quality, or TDI, ask through that department's software use case. If they mention another department or unclear ownership, use General's PM software-requirement chain and clarify business decision/action, KPIs, master data, workflow states, ownership boundaries, source systems, and acceptance.\n"
+            "- Active-entry routing: if the user mentions Production, Quality, or TDI, ask through that department's software use case. If they mention another department or unclear ownership, use General's PM software-requirement chain and clarify business decision/action, KPIs, master data, workflow states, ownership boundaries, data path (SQL Server, SAP, or Excel/CSV upload), and acceptance.\n"
             "- Early turns should not prioritize permissions, deployment, menus, colors, or generic CRUD unless they directly affect that department's first-version business boundary."
         )
 
@@ -4099,7 +4099,7 @@ class RequirementCollectorService:
                 f"- 看板/报表要展示的 KPI/口径：{playbook['kpi']}\n"
                 f"- 软件需要识别的主数据/对象：{playbook['master']}\n"
                 f"- 软件要承载或反映的流程状态：{playbook['workflow']}\n"
-                f"- 软件数据来源与接口边界：{playbook['source']}\n"
+                f"- 软件数据路径与接口边界（可连接路径仅 SQL Server、SAP 或 Excel/CSV 上传）：{playbook['source']}\n"
                 f"- 软件验收与责任边界：{playbook['acceptance']}\n"
                 f"- 专家必确认清单：{playbook['expert_checks']}\n"
                 f"- 专家追问梯子：{playbook['ladder']}"
@@ -4146,7 +4146,7 @@ class RequirementCollectorService:
             f"- Dashboard/report KPI and definition: {playbook['kpi']}\n"
             f"- Master data/object the software must identify: {playbook['master']}\n"
             f"- Workflow states the software must carry or reflect: {playbook['workflow']}\n"
-            f"- Software data sources and integration boundary: {playbook['source']}\n"
+            f"- Software data path and integration boundary (connectable paths only SQL Server, SAP, or Excel/CSV upload): {playbook['source']}\n"
             f"- Software acceptance and ownership boundary: {playbook['acceptance']}\n"
             f"- Expert must-confirm checklist: {playbook['expert_checks']}\n"
             f"- Expert question ladder: {playbook['ladder']}"
@@ -4311,7 +4311,7 @@ class RequirementCollectorService:
             labels_by_focus = {
                 "metric_definition": f"确认 {label} 的 KPI、成本/数量口径和数据粒度",
                 "workflow_state": f"确认 {label} 的流程状态、owner、SLA 和关闭条件",
-                "data_integration": f"确认 {label} 的数据源、主数据、接口和对账方式",
+                "data_integration": f"确认 {label} 的数据路径（SQL Server/SAP/Excel/CSV 上传）、主数据、接口和对账方式",
                 "alert_exception": f"确认 {label} 的异常阈值、升级规则和闭环证据",
                 "drilldown_analysis": f"确认 {label} 的分析维度、追溯路径和根因闭环",
                 "dashboard_view": f"确认 {label} 的看板决策场景、核心 KPI 和默认维度",
@@ -4347,7 +4347,7 @@ class RequirementCollectorService:
             labels_by_focus = {
                 "metric_definition": f"Sahkan KPI {label}, definisi kos/kuantiti dan data grain",
                 "workflow_state": f"Sahkan workflow states, owner, SLA dan closure criteria untuk {label}",
-                "data_integration": f"Sahkan sumber data, master data, interface dan reconciliation untuk {label}",
+                "data_integration": f"Sahkan data path (SQL Server/SAP/Excel/CSV upload), master data, interface dan reconciliation untuk {label}",
                 "alert_exception": f"Sahkan exception thresholds, escalation rules dan closure evidence untuk {label}",
                 "drilldown_analysis": f"Sahkan analysis dimensions, traceability path dan root-cause closure untuk {label}",
                 "dashboard_view": f"Sahkan dashboard decision scenario, core KPIs dan default dimensions untuk {label}",
@@ -4364,7 +4364,7 @@ class RequirementCollectorService:
         labels_by_focus = {
             "metric_definition": f"Confirm {label} KPIs, cost/quantity definitions, and data grain",
             "workflow_state": f"Confirm {label} workflow states, owners, SLA, and closure criteria",
-            "data_integration": f"Confirm {label} data sources, master data, interfaces, and reconciliation",
+            "data_integration": f"Confirm {label} data path (SQL Server/SAP/Excel/CSV upload), master data, interfaces, and reconciliation",
             "alert_exception": f"Confirm {label} exception thresholds, escalation rules, and closure evidence",
             "drilldown_analysis": f"Confirm {label} analysis dimensions, traceability path, and root-cause closure",
             "dashboard_view": f"Confirm {label} dashboard decision scenario, core KPIs, and default dimensions",
@@ -4515,7 +4515,7 @@ class RequirementCollectorService:
                 f"- 看板/报表要展示的 KPI/口径：{playbook['kpi']}\n"
                 f"- 软件需要识别的主数据/对象：{playbook['master']}\n"
                 f"- 软件要承载或反映的流程状态：{playbook['workflow']}\n"
-                f"- 软件数据来源与接口边界：{playbook['source']}\n"
+                f"- 软件数据路径与接口边界（可连接路径仅 SQL Server、SAP 或 Excel/CSV 上传）：{playbook['source']}\n"
                 f"- 软件验收与责任边界：{playbook['acceptance']}"
             )
 
@@ -4620,7 +4620,7 @@ class RequirementCollectorService:
             f"- Dashboard/report KPI and definition: {playbook['kpi']}\n"
             f"- Master data/object the software must identify: {playbook['master']}\n"
             f"- Workflow states the software must carry or reflect: {playbook['workflow']}\n"
-            f"- Software data sources and integration boundary: {playbook['source']}\n"
+            f"- Software data path and integration boundary (connectable paths only SQL Server, SAP, or Excel/CSV upload): {playbook['source']}\n"
             f"- Software acceptance and ownership boundary: {playbook['acceptance']}"
         )
 
@@ -5062,14 +5062,14 @@ class RequirementCollectorService:
                 "scope_triage": (
                     "当前节点专业追问方向：\n"
                     "- 用户只给了宽泛目标，没有明确部门/业务 owner 或需求形态；第一问先确认需求来自哪个部门、谁是首版 owner，不要直接问字段、页面或技术栈。\n"
-                    "- 当前 IT scope 只开放 Production、Quality、TDI、General；首问选项只能列这四个入口，不要展开其他部门。\n"
+                    "- 当前开放范围只包含 Production、Quality、TDI、General；首问选项只能列这四个入口，不要展开其他部门。\n"
                     "- 首问选项里不要展开 TDI，也不要自造 EAP/SPC/MES/QMS/ERP 等未确认系统或内部术语。\n"
                     "- 好问题示例：这个 IC Substrate 需求首版主要由哪个入口发起并负责验收：Production、Quality、TDI，还是 General？"
                 ),
                 "track_disambiguation": (
                     "当前节点专业追问方向：\n"
                     "- 用户已经表达了需求形态，但没有说明发起部门或业务 owner；先问部门归属，不要默认套到 Production/TDI/Quality。\n"
-                    "- 当前 IT scope 只开放 Production、Quality、TDI、General；如果用户想做其他部门，归入 General，不要展开隐藏部门专家链路。\n"
+                    "- 当前开放范围只包含 Production、Quality、TDI、General；如果用户想做其他部门，归入 General，不要展开隐藏部门专家链路。\n"
                     "- 好问题示例：这个需求当前应归到哪个已开放入口来定义首版：Production、Quality、TDI，还是 General？"
                 ),
                 "production_scope": (
@@ -5128,14 +5128,14 @@ class RequirementCollectorService:
                 "scope_triage": (
                     "Current-node professional question guidance:\n"
                     "- The user only gave a broad goal without a clear department/business owner or need type. First confirm the requesting department and first-version owner; do not jump into fields, pages, or tech stack.\n"
-                    "- The current IT scope exposes only Production, Quality, TDI, and General. The first question may list only these four entry points.\n"
+                    "- The current scope exposes only Production, Quality, TDI, and General. The first question may list only these four entry points.\n"
                     "- Do not expand TDI in first-question options, and do not invent unconfirmed system/internal terms such as EAP/SPC/MES/QMS/ERP.\n"
                     "- Strong question example: Which open entry point is requesting and accepting the first IC Substrate version: Production, Quality, TDI, or General?"
                 ),
             "track_disambiguation": (
                 "Current-node professional question guidance:\n"
                 "- The user expressed a need focus but did not identify the requesting department or business owner. Ask for department ownership first instead of defaulting to Production/TDI/Quality.\n"
-                "- The current IT scope exposes only Production, Quality, TDI, and General. If the need belongs to another department, route it to General instead of continuing a hidden expert chain.\n"
+                "- The current scope exposes only Production, Quality, TDI, and General. If the need belongs to another department, route it to General instead of continuing a hidden expert chain.\n"
                 "- Strong question example: Which opened entry point should own this first version: Production, Quality, TDI, or General?"
             ),
             "production_scope": (
@@ -5968,9 +5968,9 @@ class RequirementCollectorService:
                 "- 面向指令遵循较弱的内网模型时，最后一段必须使用 A/B/C 选项格式：A. 同意建议口径；B. 补充实际口径；C. 暂记待确认。不要只留下开放式问题。\n"
                 "- 推荐答案必须明确标记为建议或假设，不得伪装成已确认事实；如果用户不同意，以用户口径为准。\n"
                 "- 建立共享领域语言：持续识别关键名词、状态、KPI、对象和 owner；发现同词异义、同义词或模糊词时，立即用一个问题澄清 canonical term。\n"
-                "- 对 IC Substrate，优先统一部门、业务对象、粒度、状态、指标口径、数据源、验收 owner；不要自造现场术语、状态名、公式、系统名或 SLA。\n"
+                "- 对 IC Substrate，优先统一部门、业务对象、粒度、状态、指标口径、数据路径（SQL Server、SAP 或 Excel/CSV 上传）、验收 owner；不要自造现场术语、状态名、公式、系统名或 SLA。\n"
                 "- 当用户给出业务术语时，把它沉淀为后续 PRD 的 glossary/definition；当术语未确认时，写成 open question 或 assumption。\n"
-                "- 追问必须服务 PRD 质量门：problem、business goal、requesting department、primary user、core scenario、decision/action、data source、business rule、workflow state、acceptance criteria、out-of-scope。\n"
+                "- 追问必须服务 PRD 质量门：problem、business goal、requesting department、primary user、core scenario、decision/action、data path、business rule、workflow state、acceptance criteria、out-of-scope。\n"
                 "- 只有结构化需求 gate ready 时，才允许提示生成文档；PM Methodology 只作质量参考，不阻断生成。\n"
                 "- 如果还缺信息，只问那个最阻塞 PRD 可交付质量的缺口，并说明为什么它影响文档质量。"
             )
@@ -5984,9 +5984,9 @@ class RequirementCollectorService:
                 "- Fuer intern gehostete Modelle mit schwaecherer Instruktionsbefolgung muss der letzte Absatz A/B/C-Optionen enthalten: A. Empfehlung bestaetigen; B. echte Fachdefinition ergaenzen; C. als offen markieren. Keine rein offene Frage am Ende.\n"
                 "- Empfehlungen muessen als Empfehlung oder Annahme markiert sein, nie als bestaetigte Tatsache. Nutzerdefinitionen haben Vorrang.\n"
                 "- Baue eine gemeinsame Fachsprache auf: erkenne Begriffe, Status, KPIs, Objekte und Owner; bei Mehrdeutigkeit sofort mit einer Frage den canonical term klaeren.\n"
-                "- Fuer IC Substrate zuerst Bereich, Business Object, Grain, Status, KPI-Definition, Datenquelle und Acceptance Owner vereinheitlichen; keine Site-Begriffe, Status, Formeln, Systeme oder SLA erfinden.\n"
+                "- Fuer IC Substrate zuerst Bereich, Business Object, Grain, Status, KPI-Definition, Datenpfad (SQL Server, SAP oder Excel/CSV Upload) und Acceptance Owner vereinheitlichen; keine Site-Begriffe, Status, Formeln, Systeme oder SLA erfinden.\n"
                 "- Nutzerbegriffe als spaetere PRD Glossary/Definition sichern; unbestaetigte Begriffe als Open Question oder Assumption markieren.\n"
-                "- Fragen dienen dem PRD Quality Gate: Problem, Business Goal, Requesting Department, Primary User, Core Scenario, Decision/Action, Data Source, Business Rule, Workflow State, Acceptance Criteria, Out-of-Scope.\n"
+                "- Fragen dienen dem PRD Quality Gate: Problem, Business Goal, Requesting Department, Primary User, Core Scenario, Decision/Action, Data Path, Business Rule, Workflow State, Acceptance Criteria, Out-of-Scope.\n"
                 "- Wenn diese Bloecke dokumentreif sind, keine neuen Themen oeffnen; mit einer Bestaetigungsfrage abschliessen und Dokumentgenerierung vorschlagen."
             )
         if normalized_language == "ms":
@@ -5999,9 +5999,9 @@ class RequirementCollectorService:
                 "- Untuk model dalaman yang kurang patuh arahan, perenggan akhir mesti guna pilihan A/B/C: A. sahkan cadangan; B. tambah definisi sebenar; C. simpan sebagai belum disahkan. Jangan akhiri dengan soalan terbuka sahaja.\n"
                 "- Cadangan mesti dilabel sebagai cadangan atau assumption, bukan fakta sah. Definisi pengguna sentiasa mengatasi cadangan.\n"
                 "- Bina shared domain language: kenal pasti term, status, KPI, objek dan owner; jika istilah kabur atau overloaded, tanya satu soalan untuk canonical term.\n"
-                "- Untuk IC Substrate, utamakan penyelarasan department, business object, grain, status, KPI definition, data source dan acceptance owner; jangan reka site term, status, formula, system name atau SLA.\n"
+                "- Untuk IC Substrate, utamakan penyelarasan department, business object, grain, status, KPI definition, data path (SQL Server, SAP atau Excel/CSV upload) dan acceptance owner; jangan reka site term, status, formula, system name atau SLA.\n"
                 "- Simpan istilah pengguna sebagai glossary/definition untuk PRD; istilah belum sah masuk sebagai open question atau assumption.\n"
-                "- Soalan mesti menyokong PRD quality gate: problem, business goal, requesting department, primary user, core scenario, decision/action, data source, business rule, workflow state, acceptance criteria, out-of-scope.\n"
+                "- Soalan mesti menyokong PRD quality gate: problem, business goal, requesting department, primary user, core scenario, decision/action, data path, business rule, workflow state, acceptance criteria, out-of-scope.\n"
                 "- Jika blok ini sudah cukup untuk dokumen, jangan buka topik baharu; tutup dengan soalan pengesahan dan cadangkan penjanaan dokumen."
             )
         return (
@@ -6013,9 +6013,9 @@ class RequirementCollectorService:
             "- For internally hosted models with weaker instruction following, the final paragraph must use plain A/B/C options: A. use a practical v1 assumption and continue; B. provide exact wording or an exception; C. leave it pending. Do not end with only an open-ended question.\n"
             "- Mark recommendations as suggestions or assumptions, never as confirmed facts. The user's definition wins.\n"
             "- Build shared domain language: identify terms, states, KPIs, objects, and owners; when a term is ambiguous, overloaded, or conflicting, ask one question to establish the canonical term.\n"
-            "- For IC Substrate, prioritize department, business object, grain, state, KPI definition, data source, and acceptance owner; do not invent site terms, states, formulas, system names, or SLAs.\n"
+            "- For IC Substrate, prioritize department, business object, grain, state, KPI definition, data path (SQL Server, SAP, or Excel/CSV upload), and acceptance owner; do not invent site terms, states, formulas, system names, or SLAs.\n"
             "- Preserve user-provided terms as later PRD glossary/definitions; keep unconfirmed terms as open questions or assumptions.\n"
-            "- Questions must serve the PRD quality gate: problem, business goal, requesting department, primary user, core scenario, decision/action, data source, business rule, workflow state, acceptance criteria, out-of-scope.\n"
+            "- Questions must serve the PRD quality gate: problem, business goal, requesting department, primary user, core scenario, decision/action, data path, business rule, workflow state, acceptance criteria, out-of-scope.\n"
             "- If these blocks are document-ready, stop opening new topics; ask a confirmation question and suggest document generation."
         )
 
@@ -6028,7 +6028,7 @@ class RequirementCollectorService:
                 "- 不新增 schema；把术语定义放入 business_rules、data_and_dependencies、risks_and_notes 或 open_questions 的最贴近位置。\n"
                 "- 对推荐答案、假设、待确认术语要保持 pending_confirmation 或 open question，不要升级为 confirmed。\n"
                 "- 如果用户确认了 canonical term、公式、状态、owner 或验收标准，要尽量标成 confirmed，并保留用户原话口径。\n"
-                "- 看板/指标/KPI 类需求的硬门禁：数据源字段（integrations / data_and_dependencies）和 KPI 公式字段（rules / business_rules）在拿到具体数据接口（来源系统 + 视图/API + 主键字段 + 刷新）且每个指标公式（分子/分母、时间窗、排除项）明确、或用户明确接受某条假设之前，最多 pending_confirmation；含糊的“从 MES 取”不算 confirmed。"
+                "- 看板/指标/KPI 类需求的硬门禁：数据源字段（integrations / data_and_dependencies）和 KPI 公式字段（rules / business_rules）在拿到具体数据接口（仅 SQL Server、SAP，或用户手动上传 Excel/CSV；需说明视图/API/表/文件模板、主键字段、刷新/上传频率）且每个指标公式（分子/分母、时间窗、排除项）明确、或用户明确接受某条假设之前，最多 pending_confirmation；含糊的“从 MES/QIS/QMS 取”不算 confirmed，必须追问它通过 SQL Server、SAP 还是 Excel/CSV upload 暴露。"
             )
         if normalized_language == "de":
             return (
@@ -6037,24 +6037,24 @@ class RequirementCollectorService:
                 "- Schema nicht erweitern; Termdefinitionen in business_rules, data_and_dependencies, risks_and_notes oder open_questions ablegen.\n"
                 "- Empfehlungen, Annahmen und unbestaetigte Begriffe bleiben pending_confirmation oder open question, nicht confirmed.\n"
                 "- Wenn der Nutzer canonical term, Formel, State, Owner oder Acceptance bestaetigt, als confirmed erfassen und Nutzerwortlaut bewahren.\n"
-                "- Hard gate for dashboard/metric/KPI requirements: keep the data-source area (integrations / data_and_dependencies) and the KPI-formula area (rules / business_rules) at most pending_confirmation until the concrete data interface (source system + view/API + key fields + refresh) AND each metric's formula (numerator/denominator, time window, exclusions) are captured, OR the user explicitly accepted a stated assumption. A vague 'from MES' is not confirmed."
+                "- Hard gate for dashboard/metric/KPI requirements: keep the data-source area (integrations / data_and_dependencies) and the KPI-formula area (rules / business_rules) at most pending_confirmation until the concrete data interface (only SQL Server, SAP, or user-uploaded Excel/CSV; include view/API/table/file template, key fields, and refresh/upload cadence) AND each metric's formula (numerator/denominator, time window, exclusions) are captured, OR the user explicitly accepted a stated assumption. A vague 'from MES/QIS/QMS' is not confirmed; ask whether it is exposed through SQL Server, SAP, or Excel/CSV upload."
             )
         if normalized_language == "ms":
             return (
                 "Peraturan ekstraksi gaya skill:\n"
-                "- Ekstrak shared domain language: business terms, KPI names, state names, object grain, owner, data sources dan acceptance definitions.\n"
+                "- Ekstrak shared domain language: business terms, KPI names, state names, object grain, owner, data paths dan acceptance definitions.\n"
                 "- Jangan tambah schema; letakkan definisi term di business_rules, data_and_dependencies, risks_and_notes atau open_questions yang paling sesuai.\n"
                 "- Recommended answers, assumptions dan unconfirmed terms kekal pending_confirmation atau open question, bukan confirmed.\n"
                 "- Jika pengguna sahkan canonical term, formula, state, owner atau acceptance criteria, tandakan sebagai confirmed dan kekalkan wording pengguna.\n"
-                "- Gerbang keras untuk requirement dashboard/metric/KPI: kekalkan area data-source (integrations / data_and_dependencies) dan area formula KPI (rules / business_rules) paling tinggi pending_confirmation sehingga antara muka data konkrit (sistem sumber + view/API + key fields + refresh) DAN formula setiap metrik (numerator/denominator, time window, exclusions) ditangkap, ATAU pengguna terima andaian yang dinyatakan. Jawapan kabur 'dari MES' bukan confirmed."
+                "- Gerbang keras untuk requirement dashboard/metric/KPI: kekalkan area data-source (integrations / data_and_dependencies) dan area formula KPI (rules / business_rules) paling tinggi pending_confirmation sehingga antara muka data konkrit (hanya SQL Server, SAP, atau upload Excel/CSV oleh pengguna; sertakan view/API/table/file template, key fields dan refresh/upload cadence) DAN formula setiap metrik (numerator/denominator, time window, exclusions) ditangkap, ATAU pengguna terima andaian yang dinyatakan. Jawapan kabur 'dari MES/QIS/QMS' bukan confirmed; tanya sama ada ia melalui SQL Server, SAP atau Excel/CSV upload."
             )
         return (
             "Skill-style extraction rules:\n"
-            "- Extract shared domain language: business terms, KPI names, state names, object grain, owners, data sources, and acceptance definitions.\n"
+            "- Extract shared domain language: business terms, KPI names, state names, object grain, owners, data paths, and acceptance definitions.\n"
             "- Do not add schema; place term definitions in the closest existing areas such as business_rules, data_and_dependencies, risks_and_notes, or open_questions.\n"
             "- Keep recommended answers, assumptions, and unconfirmed terms as pending_confirmation or open questions, not confirmed facts.\n"
             "- When the user confirms a canonical term, formula, state, owner, or acceptance standard, mark the closest requirement area confirmed and preserve the user's wording.\n"
-            "- HARD GATE for dashboard/metric/KPI requirements: keep the data-source area (integrations / data_and_dependencies) and the KPI-formula area (rules / business_rules) at most pending_confirmation until the concrete data interface (source system + view/API + key fields + refresh) AND each metric's formula (numerator/denominator, time window, exclusions) are captured, OR the user explicitly accepted a stated assumption. A vague 'from MES' is not confirmed."
+            "- HARD GATE for dashboard/metric/KPI requirements: keep the data-source area (integrations / data_and_dependencies) and the KPI-formula area (rules / business_rules) at most pending_confirmation until the concrete data interface (only SQL Server, SAP, or user-uploaded Excel/CSV; include view/API/table/file template, key fields, and refresh/upload cadence) AND each metric's formula (numerator/denominator, time window, exclusions) are captured, OR the user explicitly accepted a stated assumption. A vague 'from MES/QIS/QMS' is not confirmed; ask whether it is exposed through SQL Server, SAP, or Excel/CSV upload."
         )
 
     def _ic_substrate_structured_extraction_contract(
@@ -6078,10 +6078,10 @@ class RequirementCollectorService:
                 "- product_context：抽取 requesting_department 只能是 Production、Quality、TDI 或 General；business_owner、software_type、primary_user、decision_or_action、acceptance_owner 必须来自用户确认或标为待确认。\n"
                 "- functional_requirements.feature_details：每个 feature 都要尽量写清 trigger、processing_logic、inputs、outputs、exception_cases；围绕 lot/panel/unit/case/page/action 的业务动作，不写泛泛页面功能。\n"
                 "- business_rules：存放 KPI/公式、状态定义、缺陷分类、放行/关闭规则、SLA 起止点、权限/owner 规则；未确认公式或状态必须写成 draft assumption 或 open question。\n"
-                "- data_and_dependencies：存放 source of truth、对象粒度、字段来源、刷新频率、对账逻辑、历史数据迁移、接口边界；不要自造 MES/QMS/ERP/SAP 表名。\n"
+                "- data_and_dependencies：存放 source of truth、对象粒度、字段来源、刷新频率、对账逻辑、历史数据迁移、接口边界；公司可连接数据路径只写 SQL Server、SAP 或用户手动上传 Excel/CSV，不要自造 MES/QMS/ERP/SAP 表名。\n"
                 "- acceptance_criteria：存放可验收证据，包括主流程、异常流程、数据准确性、导出/下载、跨部门 sign-off、证据留存和关闭条件。\n"
                 "- collection_status：只有用户明确确认的字段才能 confirmed；从模板、AI 推荐或附件推断出的内容最多 pending_confirmation；矛盾内容标 conflict，关键缺口保留 pending_questions。\n"
-                "- 生成硬门禁：`integrations`（数据接口）在拿到具体 source-of-truth（来源系统 + 视图/API + 主键/字段 + 刷新频率）或用户明确接受某条假设之前最多 pending_confirmation、不能 confirmed；`rules`（KPI 公式）在每个指标都有具体公式（分子/分母、时间窗、排除项）或明确假设之前不能 confirmed。“从 MES 取”这类含糊回答只能 pending_confirmation。被接受的假设写进 open_questions/business_rules 并标注“ASSUMPTION: …”。"
+                "- 生成硬门禁：`integrations`（数据接口）在拿到具体 source-of-truth（SQL Server 视图/API/表、SAP 对象/API/报表，或 Excel/CSV 上传模板 + 主键/字段 + 刷新/上传频率）或用户明确接受某条假设之前最多 pending_confirmation、不能 confirmed；`rules`（KPI 公式）在每个指标都有具体公式（分子/分母、时间窗、排除项）或明确假设之前不能 confirmed。“从 MES/QIS/QMS 取”这类含糊回答只能 pending_confirmation，必须追问它通过 SQL Server、SAP 还是 Excel/CSV upload 暴露。被接受的假设写进 open_questions/business_rules 并标注“ASSUMPTION: …”。"
             )
         if normalized_language == "de":
             return (
@@ -6090,10 +6090,10 @@ class RequirementCollectorService:
                 "- product_context: requesting_department must be Production, Quality, TDI, or General; business_owner, software_type, primary_user, decision_or_action, and acceptance_owner need user confirmation or remain pending.\n"
                 "- functional_requirements.feature_details: capture trigger, processing_logic, inputs, outputs, and exception_cases for each feature around lot/panel/unit/case/page/action business actions, not generic page features.\n"
                 "- business_rules: store KPI/formula, state definition, defect taxonomy, release/closure rule, SLA start-end, permission/owner rule; unconfirmed formulas or states are draft assumptions or open questions.\n"
-                "- data_and_dependencies: store source of truth, object grain, field source, refresh frequency, reconciliation logic, historical migration, and interface boundary. Do not invent MES/QMS/ERP/SAP table names.\n"
+                "- data_and_dependencies: store source of truth, object grain, field source, refresh frequency, reconciliation logic, historical migration, and interface boundary. Company-connectable data paths are SQL Server, SAP, or user-uploaded Excel/CSV only; do not invent MES/QMS/ERP/SAP table names.\n"
                 "- acceptance_criteria: store verifiable evidence for main flow, exception flow, data accuracy, export/download, cross-functional sign-off, evidence retention, and closure condition.\n"
                 "- collection_status: mark confirmed only when the user explicitly confirms it; template evidence, AI recommendations, or attachment inference are at most pending_confirmation; contradictions are conflict and key gaps keep pending_questions.\n"
-                "- GENERATION HARD GATE: keep `integrations` (data interface) at most pending_confirmation until a concrete source-of-truth is captured (source system + view/API + key fields + refresh cadence) OR the user explicitly accepts a stated assumption; keep `rules` (KPI formulas) unconfirmed until every metric has a concrete formula (numerator/denominator, time window, exclusions) OR an explicit assumption. Vague answers like 'from MES' stay pending_confirmation. Record accepted assumptions in open_questions/business_rules as 'ASSUMPTION: ...'."
+                "- GENERATION HARD GATE: keep `integrations` (data interface) at most pending_confirmation until a concrete source-of-truth is captured (SQL Server view/API/table, SAP object/API/report, or Excel/CSV upload template + key fields + refresh/upload cadence) OR the user explicitly accepts a stated assumption; keep `rules` (KPI formulas) unconfirmed until every metric has a concrete formula (numerator/denominator, time window, exclusions) OR an explicit assumption. Vague answers like 'from MES/QIS/QMS' stay pending_confirmation; ask whether the data is exposed through SQL Server, SAP, or Excel/CSV upload. Record accepted assumptions in open_questions/business_rules as 'ASSUMPTION: ...'."
             )
         if normalized_language == "ms":
             return (
@@ -6102,10 +6102,10 @@ class RequirementCollectorService:
                 "- product_context: requesting_department mesti Production, Quality, TDI atau General; business_owner, software_type, primary_user, decision_or_action dan acceptance_owner mesti disahkan pengguna atau kekal pending.\n"
                 "- functional_requirements.feature_details: untuk setiap feature, tangkap trigger, processing_logic, inputs, outputs dan exception_cases sekitar business action lot/panel/unit/case/page/action, bukan fungsi halaman umum.\n"
                 "- business_rules: simpan KPI/formula, state definition, defect taxonomy, release/closure rule, SLA start-end, permission/owner rule; formula atau state belum sah ialah draft assumption atau open question.\n"
-                "- data_and_dependencies: simpan source of truth, object grain, field source, refresh frequency, reconciliation logic, historical migration dan interface boundary. Jangan reka nama table MES/QMS/ERP/SAP.\n"
+                "- data_and_dependencies: simpan source of truth, object grain, field source, refresh frequency, reconciliation logic, historical migration dan interface boundary. Laluan data yang boleh disambung hanya SQL Server, SAP atau upload Excel/CSV oleh pengguna; jangan reka nama table MES/QMS/ERP/SAP.\n"
                 "- acceptance_criteria: simpan evidence yang boleh diverifikasi untuk main flow, exception flow, data accuracy, export/download, cross-functional sign-off, evidence retention dan closure condition.\n"
                 "- collection_status: confirmed hanya jika pengguna sahkan dengan jelas; template evidence, AI recommendation atau attachment inference paling tinggi pending_confirmation; contradiction ialah conflict dan key gaps kekalkan pending_questions.\n"
-                "- GERBANG KERAS PENJANAAN: kekalkan `integrations` (antara muka data) paling tinggi pending_confirmation sehingga source-of-truth konkrit ditangkap (sistem sumber + view/API + key fields + refresh cadence) ATAU pengguna terima andaian yang dinyatakan; kekalkan `rules` (formula KPI) belum confirmed sehingga setiap metrik ada formula konkrit (numerator/denominator, time window, exclusions) ATAU andaian eksplisit. Jawapan kabur seperti 'dari MES' kekal pending_confirmation. Rekod andaian diterima dalam open_questions/business_rules sebagai 'ASSUMPTION: ...'."
+                "- GERBANG KERAS PENJANAAN: kekalkan `integrations` (antara muka data) paling tinggi pending_confirmation sehingga source-of-truth konkrit ditangkap (SQL Server view/API/table, SAP object/API/report, atau Excel/CSV upload template + key fields + refresh/upload cadence) ATAU pengguna terima andaian yang dinyatakan; kekalkan `rules` (formula KPI) belum confirmed sehingga setiap metrik ada formula konkrit (numerator/denominator, time window, exclusions) ATAU andaian eksplisit. Jawapan kabur seperti 'dari MES/QIS/QMS' kekal pending_confirmation; tanya sama ada data melalui SQL Server, SAP atau Excel/CSV upload. Rekod andaian diterima dalam open_questions/business_rules sebagai 'ASSUMPTION: ...'."
             )
         return (
             "IC Substrate structured extraction contract:\n"
@@ -6113,10 +6113,10 @@ class RequirementCollectorService:
             "- product_context: requesting_department must be Production, Quality, TDI, or General; business_owner, software_type, primary_user, decision_or_action, and acceptance_owner need user confirmation or remain pending.\n"
             "- functional_requirements.feature_details: capture trigger, processing_logic, inputs, outputs, and exception_cases for each feature around lot/panel/unit/case/page/action business actions, not generic page features.\n"
             "- business_rules: store KPI/formula, state definition, defect taxonomy, release/closure rule, SLA start-end, permission/owner rule; unconfirmed formulas or states are draft assumptions or open questions.\n"
-            "- data_and_dependencies: store source of truth, object grain, field source, refresh frequency, reconciliation logic, historical migration, and interface boundary. Do not invent MES/QMS/ERP/SAP table names.\n"
+            "- data_and_dependencies: store source of truth, object grain, field source, refresh frequency, reconciliation logic, historical migration, and interface boundary. Company-connectable data paths are SQL Server, SAP, or user-uploaded Excel/CSV only; do not invent MES/QMS/ERP/SAP table names.\n"
             "- acceptance_criteria: store verifiable evidence for main flow, exception flow, data accuracy, export/download, cross-functional sign-off, evidence retention, and closure condition.\n"
             "- collection_status: mark confirmed only when the user explicitly confirms it; template evidence, AI recommendations, or attachment inference are at most pending_confirmation; contradictions are conflict and key gaps keep pending_questions.\n"
-            "- GENERATION HARD GATE: keep `integrations` (data interface) at most pending_confirmation until a concrete source-of-truth is captured (source system + view/API + key fields + refresh cadence) OR the user explicitly accepts a stated assumption; keep `rules` (KPI formulas) unconfirmed until every metric has a concrete formula (numerator/denominator, time window, exclusions) OR an explicit assumption. Vague answers like 'from MES' stay pending_confirmation. Record accepted assumptions in open_questions/business_rules as 'ASSUMPTION: ...'."
+            "- GENERATION HARD GATE: keep `integrations` (data interface) at most pending_confirmation until a concrete source-of-truth is captured (SQL Server view/API/table, SAP object/API/report, or Excel/CSV upload template + key fields + refresh/upload cadence) OR the user explicitly accepts a stated assumption; keep `rules` (KPI formulas) unconfirmed until every metric has a concrete formula (numerator/denominator, time window, exclusions) OR an explicit assumption. Vague answers like 'from MES/QIS/QMS' stay pending_confirmation; ask whether the data is exposed through SQL Server, SAP, or Excel/CSV upload. Record accepted assumptions in open_questions/business_rules as 'ASSUMPTION: ...'."
         )
 
     def _prd_skill_style_document_guidance(self, language: str | None = None) -> str:
@@ -6175,10 +6175,10 @@ class RequirementCollectorService:
             return (
                 "IC Substrate URD/PRD 专家文档合同：\n"
                 "- 文档必须像资深 IC Substrate 产品经理交付给业务和 IT 的需求包，不是聊天总结。\n"
-                "- 前半部分必须包含 Glossary / Definitions：现场确认的业务术语、对象粒度、KPI/公式、状态名、owner、数据源；未确认项进入 Open Questions，不要隐式假设。\n"
+                "- 前半部分必须包含 Glossary / Definitions：现场确认的业务术语、对象粒度、KPI/公式、状态名、owner、数据路径；未确认项进入 Open Questions，不要隐式假设。\n"
                 "- Production/TDI/Quality/General 只按用户已确认的入口写，不要展开隐藏部门链路；其他部门诉求归入 General 或 Out of Scope。\n"
                 "- Functional Requirements 必须按业务动作组织：谁在什么触发条件下，对哪个 lot/panel/unit/case/page/action 做什么，系统输出什么判断、看板、提醒、导出或回写。\n"
-                "- Data & Dependencies 必须写清 source of truth、字段/对象粒度、刷新频率、对账逻辑、历史数据迁移和未确认接口；不要自造 MES/QMS/ERP/SAP 表名。\n"
+                "- Data & Dependencies 必须写清 source of truth、字段/对象粒度、刷新频率、对账逻辑、历史数据迁移和未确认接口；公司可连接数据路径只写 SQL Server、SAP 或用户手动上传 Excel/CSV，不要自造 MES/QMS/ERP/SAP 表名。\n"
                 "- Business Rules 必须区分已确认规则、draft assumption 和 open question；公式、SLA、状态流、缺陷分类、放行/关闭条件没有用户确认时不能写成事实。\n"
                 "- Acceptance Criteria 必须能被业务验收：主流程、异常流程、权限/owner、数据准确性、导出/下载、跨部门签核和证据留存。"
             )
@@ -6186,10 +6186,10 @@ class RequirementCollectorService:
             return (
                 "IC Substrate URD/PRD Expert Document Contract:\n"
                 "- The document must read like a senior IC Substrate PM handoff to business and IT, not a chat summary.\n"
-                "- Include early Glossary / Definitions: confirmed business terms, object grain, KPI/formula, state names, owners, and data sources; unresolved items go to Open Questions.\n"
+                "- Include early Glossary / Definitions: confirmed business terms, object grain, KPI/formula, state names, owners, and data paths; unresolved items go to Open Questions.\n"
                 "- Write only the confirmed entry track among Production/TDI/Quality/General; keep hidden departments under General or Out of Scope.\n"
                 "- Functional Requirements must be organized by business action: who does what, under which trigger, to which lot/panel/unit/case/page/action, and what judgement, dashboard, alert, export, or writeback the system produces.\n"
-                "- Data & Dependencies must state source of truth, field/object grain, refresh frequency, reconciliation logic, historical migration, and unconfirmed interfaces. Do not invent MES/QMS/ERP/SAP table names.\n"
+                "- Data & Dependencies must state source of truth, field/object grain, refresh frequency, reconciliation logic, historical migration, and unconfirmed interfaces. Company-connectable data paths are SQL Server, SAP, or user-uploaded Excel/CSV only; do not invent MES/QMS/ERP/SAP table names.\n"
                 "- Business Rules must separate confirmed rules, draft assumptions, and open questions; unconfirmed formulas, SLAs, state flows, defect taxonomy, release/closure rules are not facts.\n"
                 "- Acceptance Criteria must be business-verifiable: main flow, exception flow, role/owner, data accuracy, export/download, cross-functional sign-off, and evidence retention."
             )
@@ -6197,20 +6197,20 @@ class RequirementCollectorService:
             return (
                 "Kontrak dokumen pakar IC Substrate URD/PRD:\n"
                 "- Dokumen mesti kelihatan seperti handoff PM IC Substrate senior kepada business dan IT, bukan ringkasan chat.\n"
-                "- Sertakan Glossary / Definitions awal: confirmed business terms, object grain, KPI/formula, state names, owners dan data sources; item belum jelas masuk Open Questions.\n"
+                "- Sertakan Glossary / Definitions awal: confirmed business terms, object grain, KPI/formula, state names, owners dan data paths; item belum jelas masuk Open Questions.\n"
                 "- Tulis hanya entry track Production/TDI/Quality/General yang disahkan pengguna; hidden departments kekal dalam General atau Out of Scope.\n"
                 "- Functional Requirements mesti disusun mengikut business action: siapa buat apa, trigger apa, object lot/panel/unit/case/page/action mana, dan system menghasilkan judgement, dashboard, alert, export atau writeback apa.\n"
-                "- Data & Dependencies mesti nyatakan source of truth, field/object grain, refresh frequency, reconciliation logic, historical migration dan unconfirmed interfaces. Jangan reka nama table MES/QMS/ERP/SAP.\n"
+                "- Data & Dependencies mesti nyatakan source of truth, field/object grain, refresh frequency, reconciliation logic, historical migration dan unconfirmed interfaces. Laluan data yang boleh disambung hanya SQL Server, SAP atau upload Excel/CSV oleh pengguna; jangan reka nama table MES/QMS/ERP/SAP.\n"
                 "- Business Rules mesti bezakan confirmed rules, draft assumptions dan open questions; formula, SLA, state flow, defect taxonomy, release/closure rules yang belum disahkan bukan fakta.\n"
                 "- Acceptance Criteria mesti boleh diverifikasi oleh business: main flow, exception flow, role/owner, data accuracy, export/download, cross-functional sign-off dan evidence retention."
             )
         return (
             "IC Substrate URD/PRD expert document contract:\n"
             "- The document must read like a senior IC Substrate PM handoff to business and IT, not a chat summary.\n"
-            "- Include early Glossary / Definitions: confirmed business terms, object grain, KPI/formula, state names, owners, and data sources; unresolved items go to Open Questions.\n"
+            "- Include early Glossary / Definitions: confirmed business terms, object grain, KPI/formula, state names, owners, and data paths; unresolved items go to Open Questions.\n"
             "- Write only the confirmed entry track among Production/TDI/Quality/General; keep hidden departments under General or Out of Scope.\n"
             "- Functional Requirements must be organized by business action: who does what, under which trigger, to which lot/panel/unit/case/page/action, and what judgement, dashboard, alert, export, or writeback the system produces.\n"
-            "- Data & Dependencies must state source of truth, field/object grain, refresh frequency, reconciliation logic, historical migration, and unconfirmed interfaces. Do not invent MES/QMS/ERP/SAP table names.\n"
+            "- Data & Dependencies must state source of truth, field/object grain, refresh frequency, reconciliation logic, historical migration, and unconfirmed interfaces. Company-connectable data paths are SQL Server, SAP, or user-uploaded Excel/CSV only; do not invent MES/QMS/ERP/SAP table names.\n"
             "- Business Rules must separate confirmed rules, draft assumptions, and open questions; unconfirmed formulas, SLAs, state flows, defect taxonomy, release/closure rules are not facts.\n"
             "- Acceptance Criteria must be business-verifiable: main flow, exception flow, role/owner, data accuracy, export/download, cross-functional sign-off, and evidence retention."
         )
@@ -6256,7 +6256,7 @@ class RequirementCollectorService:
             return (
                 "IC Substrate 专家 PM 质量门：\n"
                 "- 下一问必须补齐一个可写进 URD/PRD 的字段，而不是泛泛展示行业知识。\n"
-                "- 追问优先级：业务动作/决策 -> 目标用户/owner -> 业务对象与粒度 -> KPI/公式/状态定义 -> 流程状态与责任边界 -> 数据来源/对账/刷新频率 -> 验收证据/签核/不做范围。\n"
+                "- 追问优先级：业务动作/决策 -> 目标用户/owner -> 业务对象与粒度 -> KPI/公式/状态定义 -> 流程状态与责任边界 -> 数据路径（SQL Server/SAP/Excel/CSV 上传）/对账/刷新频率 -> 验收证据/签核/不做范围。\n"
                 f"- 当前轨道校验：{track_checks[track]}\n"
                 "- A/B/C 选项只能用于确认路径、口径或待确认事实；不得把未确认的公式、站点、状态、系统名、SLA 或 owner 伪装成事实。\n"
                 "- 如果关键字段已足够生成首版文档，不要继续发散追问；转为请用户确认是否生成 URD/PRD。"
@@ -6304,7 +6304,7 @@ class RequirementCollectorService:
             return (
                 "IC Substrate Expert PM quality gate:\n"
                 "- Soalan seterusnya mesti melengkapkan satu field yang sedia masuk URD/PRD, bukan sekadar menunjukkan pengetahuan domain.\n"
-                "- Keutamaan: business action/decision -> user/owner -> business object and grain -> KPI/formula/state definition -> workflow and ownership boundary -> data source/reconciliation/refresh -> acceptance evidence/sign-off/out-of-scope.\n"
+                "- Keutamaan: business action/decision -> user/owner -> business object and grain -> KPI/formula/state definition -> workflow and ownership boundary -> data path (SQL Server/SAP/Excel/CSV upload)/reconciliation/refresh -> acceptance evidence/sign-off/out-of-scope.\n"
                 f"- Semakan track semasa: {track_checks[track]}\n"
                 "- Pilihan A/B/C hanya untuk mengesahkan path, definition atau unknowns. Jangan jadikan formula, station, state, system, SLA atau owner yang belum disahkan sebagai fakta.\n"
                 "- Jika key fields sudah cukup untuk first document, berhenti mengembangkan soalan dan minta pengguna sahkan penjanaan URD/PRD."
@@ -6327,7 +6327,7 @@ class RequirementCollectorService:
         return (
             "IC Substrate expert PM quality gate:\n"
             "- The next question must fill one URD/PRD-ready field, not merely show domain knowledge.\n"
-            "- Priority: business action/decision -> user/owner -> business object and grain -> KPI/formula/state definition -> workflow and ownership boundary -> data source/reconciliation/refresh -> acceptance evidence/sign-off/out-of-scope.\n"
+            "- Priority: business action/decision -> user/owner -> business object and grain -> KPI/formula/state definition -> workflow and ownership boundary -> data path (SQL Server/SAP/Excel/CSV upload)/reconciliation/refresh -> acceptance evidence/sign-off/out-of-scope.\n"
             f"- Current track check: {track_checks[track]}\n"
             "- A/B/C options may confirm paths, definitions, or unknowns only. Do not present unconfirmed formulas, stations, states, systems, SLAs, or owners as facts.\n"
             "- If the key fields are ready for a first document, stop expanding and ask the user to confirm URD/PRD generation."
@@ -6422,7 +6422,7 @@ class RequirementCollectorService:
                 "- 模板来源术语只能作为证据，不要自动变成选项；FVI、AOI、E-test、AVI、SAP、EAP、SPC、MES、QMS、ERP 等术语只有在用户或明确来源已确认适用时才能进入选项。\n"
                 "- TDI 只能写作 TDI；不要展开缩写，不要在括号里解释，也不要在部门选项里暗示含义。\n"
                 "- 不要自造公式、状态、站点、系统名、缺陷分类、SLA 数字或 owner 角色；这些都要问用户现场现行定义。\n"
-                "- 如果用户的问题很宽泛，第一问先确认来自哪个入口或首版业务 owner：Production、Quality、TDI、General；如果用户属于其他部门或归属不清，归入 General，不要展开隐藏部门；如果部门已明确，就先确认首版软件形态、目标用户、使用场景和要支撑的业务决策/动作，再按 KPI/口径、主数据、流程状态、数据来源、责任边界来问。"
+                "- 如果用户的问题很宽泛，第一问先确认来自哪个入口或首版业务 owner：Production、Quality、TDI、General；如果用户属于其他部门或归属不清，归入 General，不要展开隐藏部门；如果部门已明确，就先确认首版软件形态、目标用户、使用场景和要支撑的业务决策/动作，再按 KPI/口径、主数据、流程状态、数据路径（SQL Server/SAP/Excel/CSV 上传）、责任边界来问。"
             )
         if self._normalize_language(language) == "de":
             return (
@@ -6442,7 +6442,7 @@ class RequirementCollectorService:
                 "- Istilah daripada templat ialah bukti, bukan pilihan default. Istilah seperti FVI, AOI, E-test, AVI, SAP, EAP, SPC, MES, QMS atau ERP hanya boleh masuk pilihan jika pengguna atau sumber jelas mengesahkan ia terpakai.\n"
                 "- Tulis TDI hanya sebagai TDI. Jangan kembangkan akronim, tambah penerangan dalam kurungan atau membayangkan makna dalam pilihan jabatan.\n"
                 "- Jangan reka formula, status, station, system name, defect category, nombor SLA atau owner role. Tanya definisi semasa di site pengguna.\n"
-                "- Jika permintaan luas, tanya dahulu entry atau first-version business owner: Production, Quality, TDI atau General. Jika jabatan lain atau ownership belum jelas, route ke General dan jangan buka hidden department chain. Jika jabatan jelas, sahkan dahulu software shape, target user, use case dan business decision/action, kemudian tanya KPI definitions, master data, workflow states, data sources dan ownership boundary."
+                "- Jika permintaan luas, tanya dahulu entry atau first-version business owner: Production, Quality, TDI atau General. Jika jabatan lain atau ownership belum jelas, route ke General dan jangan buka hidden department chain. Jika jabatan jelas, sahkan dahulu software shape, target user, use case dan business decision/action, kemudian tanya KPI definitions, master data, workflow states, data path (SQL Server/SAP/Excel/CSV upload) dan ownership boundary."
             )
         return (
             "Runtime hard constraints:\n"
@@ -6451,7 +6451,7 @@ class RequirementCollectorService:
             "- Source terms from the template are evidence, not default options. Terms such as FVI, AOI, E-test, AVI, SAP, EAP, SPC, MES, QMS, or ERP may enter options only when the user or an explicit source confirms they apply.\n"
             "- Write TDI only as TDI. Do not expand the acronym, add parenthetical explanations, or imply a meaning inside department options.\n"
             "- Do not invent formulas, states, stations, system names, defect categories, SLA numbers, or owner roles. Ask for the user's current site definitions.\n"
-            "- If the request is broad, first ask which entry point or first-version business owner it comes from: Production, Quality, TDI, or General. If it belongs to another department or ownership is unclear, route to General and do not open hidden department chains. If department is clear, first confirm the first-version software shape, target user, use case, and business decision/action the software must support, then ask through KPI definitions, master data, workflow states, data sources, and ownership boundary."
+            "- If the request is broad, first ask which entry point or first-version business owner it comes from: Production, Quality, TDI, or General. If it belongs to another department or ownership is unclear, route to General and do not open hidden department chains. If department is clear, first confirm the first-version software shape, target user, use case, and business decision/action the software must support, then ask through KPI definitions, master data, workflow states, data path (SQL Server/SAP/Excel/CSV upload), and ownership boundary."
         )
 
     def _business_template_document_context(self, session: Session, language: str | None = None) -> str:
@@ -6521,6 +6521,18 @@ class RequirementCollectorService:
         all_text = "\n".join(collect_text(model)).lower()
         data_text = "\n".join(collect_text(model.get("data_and_dependencies", []))).lower()
         acceptance_text = "\n".join(collect_text(model.get("acceptance_criteria", []))).lower()
+        has_company_data_path = any(
+            keyword in data_text
+            for keyword in [
+                "sql server",
+                "sap",
+                "excel",
+                "csv",
+                "上传",
+                "上傳",
+                "upload",
+            ]
+        )
         department = str(product_context.get("requesting_department", "")).strip().lower()
         department_key = self._ic_substrate_intent_track_from_structured_model(model).lower() or department
         has_pending_or_conflict = any(
@@ -6613,8 +6625,9 @@ class RequirementCollectorService:
             },
             {
                 "key": "data_reconciliation",
-                "label": "Data source, source of truth, refresh, and reconciliation boundary",
+                "label": "Data path, source of truth, refresh, and reconciliation boundary",
                 "ready": bool(data_text)
+                and has_company_data_path
                 and any(
                     keyword in data_text
                     for keyword in [
@@ -6624,18 +6637,29 @@ class RequirementCollectorService:
                         "reconciliation",
                         "interface",
                         "system",
+                        "view",
+                        "table",
+                        "api",
+                        "report",
+                        "template",
+                        "upload",
                         "数据源",
                         "刷新",
                         "对账",
                         "接口",
                         "系统",
+                        "视图",
+                        "表",
+                        "报表",
+                        "模板",
+                        "上传",
                     ]
                 ),
                 "evidence": first_evidence(
                     [model.get("data_and_dependencies", [])],
-                    ["source", "truth", "refresh", "reconciliation", "interface", "数据源", "刷新", "对账", "接口"],
+                    ["sql server", "sap", "excel", "csv", "source", "truth", "refresh", "reconciliation", "interface", "数据源", "刷新", "对账", "接口"],
                 ),
-                "if_missing": "Ask source of truth, refresh frequency, reconciliation rule, and unconfirmed interfaces.",
+                "if_missing": "Ask whether the data path is SQL Server, SAP, or user-uploaded Excel/CSV, plus refresh/upload frequency, reconciliation rule, and unconfirmed interfaces.",
             },
             {
                 "key": "acceptance_evidence",
@@ -7709,7 +7733,7 @@ class RequirementCollectorService:
                     f"- 阶段=采集中。结构化门禁未过：已确认 {confirmed}/{total}（覆盖 {cov}%、确认 {conf}%）。PM Methodology {score}% 仅作质量参考，不阻断生成。\n"
                     "- 严禁声称“需求已足够/已完整/可以生成文档/可以 Go Coding”，严禁让用户点 Generate 或 Open Vibe Coding；它们只有结构化全部确认后才会亮。\n"
                     "- 本轮只补这一个结构化缺口：只问一个问题，结尾给 A/B/C。不要为方法论分数单独追问。\n"
-                    "- 数据接口与每个 KPI 公式是上线必备项：若当前缺口是数据接口或公式且用户给不出确切值，A/B/C 必须有一项为“采用以下假设并继续”（该假设记入 ASSUMPTIONS）；绝不能因含糊回答（如“从 MES 取”）就标确认。\n"
+                    "- 数据接口与每个 KPI 公式是上线必备项：若当前缺口是数据接口或公式且用户给不出确切值，A/B/C 必须有一项为“采用以下假设并继续”（该假设记入 ASSUMPTIONS）；接口假设只能在 SQL Server、SAP、Excel/CSV upload 三类中选，绝不能因含糊回答（如“从 MES/QIS/QMS 取”）就标确认。\n"
                     f"- 下一个缺口（{blocker_label}）：{blocker_question}"
                 )
             return (
@@ -7717,7 +7741,7 @@ class RequirementCollectorService:
                 f"- Phase = collecting. Structured gate not passed: {confirmed}/{total} confirmed (coverage {cov}%, confirmation {conf}%). PM Methodology {score}% is an advisory quality score only and does NOT block generation.\n"
                 "- Do NOT claim the requirement is enough/complete/ready, and do NOT tell the user to click Generate or Open Vibe Coding; those unlock only after every structured item is confirmed.\n"
                 "- This turn close exactly one structured gap: one question, end with A/B/C. Do not raise separate questions just to lift the methodology score.\n"
-                "- The data interface and every KPI formula are mandatory for go-live: if the current gap is the data interface or a formula and the user has no exact value, one of the A/B/C options MUST be 'use this stated assumption and continue' (recorded under ASSUMPTIONS); never mark them confirmed on a vague answer like 'from MES'.\n"
+                "- The data interface and every KPI formula are mandatory for go-live: if the current gap is the data interface or a formula and the user has no exact value, one of the A/B/C options MUST be 'use this stated assumption and continue' (recorded under ASSUMPTIONS); interface assumptions must choose SQL Server, SAP, or Excel/CSV upload, and vague answers like 'from MES/QIS/QMS' are never confirmed.\n"
                 f"- Next gap ({blocker_label}): {blocker_question}"
             )
 
@@ -8011,7 +8035,7 @@ class RequirementCollectorService:
                 "半成品需求书完善模式：\n"
                 "- 用户不是从零开始，而是上传或粘贴了半成品需求书；先利用附件和对话里已有内容，不要重复询问已经明确的信息。\n"
                 "- 每次回复先简短归纳：已明确、推断但待确认、缺失、冲突。只保留和 PRD 质量有关的高信号内容。\n"
-                "- 下一问只追一个最影响 PRD 产出质量的缺口，优先级为：业务目标/范围、使用者与 owner、核心场景、业务规则、数据源/口径、流程状态、验收标准、out-of-scope。\n"
+                "- 下一问只追一个最影响 PRD 产出质量的缺口，优先级为：业务目标/范围、使用者与 owner、核心场景、业务规则、数据路径/口径、流程状态、验收标准、out-of-scope。\n"
                 "- Draft completion：不要引入快速半成品文档概念；用附件 + 专家链路补齐最关键缺口。只有 structured requirement ready_to_generate=true 时，才提示生成文档；文档生成/确认 OK 后，Go Coding 才能把文档交接给 Vibe Coding 平台。\n"
                 "- 附件推断永远是待确认，不得写成已确认事实；如果附件与用户口径冲突，直接指出冲突并请用户确认一个版本。\n"
                 "- 对 Production/Quality/TDI 仍使用对应专家链路，但问题必须围绕补齐 draft 缺口，而不是重新做流程审计。\n"
@@ -8033,7 +8057,7 @@ class RequirementCollectorService:
                 "Mod melengkapkan draft requirement:\n"
                 "- Pengguna bukan bermula dari kosong; gunakan kandungan lampiran dan perbualan sedia ada, jangan tanya semula perkara yang sudah jelas.\n"
                 "- Setiap jawapan ringkaskan secara pendek: sudah jelas, inferens perlu disahkan, masih kurang, konflik.\n"
-                "- Soalan seterusnya hanya menutup satu gap yang paling menghalang kualiti PRD: business goal/scope, user/owner, core scenario, business rule, data source/definition, workflow state, acceptance atau out-of-scope.\n"
+                "- Soalan seterusnya hanya menutup satu gap yang paling menghalang kualiti PRD: business goal/scope, user/owner, core scenario, business rule, data path/definition, workflow state, acceptance atau out-of-scope.\n"
                 "- Draft completion: jangan janji dokumen separuh siap awal; gunakan lampiran + expert chain untuk menutup gap paling penting. Jika structured requirement ready_to_generate=true, jana dokumen dahulu; Go Coding hanya handoff dokumen itu ke Vibe Coding selepas dokumen OK.\n"
                 "- Inferens daripada lampiran sentiasa pending confirmation, bukan fakta sah.\n"
                 "- Untuk Production/Quality/TDI, kekalkan expert chain tetapi fokus pada melengkapkan gap draft, bukan audit proses baharu.\n"
@@ -8043,7 +8067,7 @@ class RequirementCollectorService:
             "Draft completion mode:\n"
             "- The user is not starting from scratch; they are improving an existing draft requirement. Use attachment and conversation content first, and do not re-ask facts already present.\n"
             "- In each reply, briefly separate: confirmed, inferred but pending confirmation, missing, and conflicts. Keep only PRD-quality-relevant signal.\n"
-            "- Ask exactly one next question that closes the biggest PRD-quality gap: business goal/scope, user/owner, core scenario, business rule, data source/definition, workflow state, acceptance criteria, or out-of-scope.\n"
+            "- Ask exactly one next question that closes the biggest PRD-quality gap: business goal/scope, user/owner, core scenario, business rule, data path/definition, workflow state, acceptance criteria, or out-of-scope.\n"
             "- Draft completion: do not promise an early partial document; use the attachment plus expert chain to close the biggest gap. Once structured requirement ready_to_generate=true, generate documents first; Go Coding only hands that generated/approved document package to Vibe Coding.\n"
             "- Attachment-derived content is pending confirmation, never confirmed fact. If it conflicts with the user's wording, name the conflict and ask which version wins.\n"
             "- Production/Quality/TDI expert chains still apply, but use them to close draft gaps instead of restarting a process audit.\n"

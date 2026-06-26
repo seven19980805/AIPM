@@ -194,6 +194,16 @@ class TemplateExampleStartTest(unittest.TestCase):
             self.assertTrue("formula" in lowered or "公式" in guidance)
             self.assertTrue("assumption" in lowered or "假设" in guidance)
             self.assertTrue("interface" in lowered or "数据接口" in guidance)
+            self.assertIn("sql server", lowered)
+            self.assertIn("sap", lowered)
+            self.assertIn("excel", lowered)
+            self.assertIn("csv", lowered)
+
+        integration_question = self.service._default_structured_requirement_question("integrations").lower()
+        self.assertIn("sql server", integration_question)
+        self.assertIn("sap", integration_question)
+        self.assertIn("excel", integration_question)
+        self.assertIn("csv", integration_question)
 
     def test_guided_template_session_stays_empty(self) -> None:
         session = self.service.create_session(
@@ -541,7 +551,7 @@ class TemplateExampleStartTest(unittest.TestCase):
 
     def test_streamed_reply_returns_fresh_structured_summary_before_done(self) -> None:
         self.llm_client.stream_response_parts = [
-            {"type": "content", "text": "请确认首版数据源。\n\nA. MES mock data\nB. 手工 CSV"}
+            {"type": "content", "text": "请确认首版数据路径。\n\nA. SQL Server 只读视图\nB. 手工 CSV"}
         ]
         session = self.service.create_session(language="zh")
 
@@ -571,7 +581,7 @@ class TemplateExampleStartTest(unittest.TestCase):
         promoted from the pre-reply cache to the post-reply message_count
         without making a second LLM extraction call."""
         self.llm_client.stream_response_parts = [
-            {"type": "content", "text": "Next question about data sources.\n\nA. MES\nB. CSV"}
+            {"type": "content", "text": "Next question about data path.\n\nA. SAP report export\nB. CSV upload"}
         ]
         session = self.service.create_session(language="zh")
 
@@ -658,7 +668,7 @@ class TemplateExampleStartTest(unittest.TestCase):
                     "in_scope": ["First release is Availability only dashboard for downtime monitoring."],
                     "out_of_scope": [
                         "Performance speed-loss and Quality yield-loss are excluded from v1.",
-                        "No MES/SAP writeback, scheduling changes, or maintenance ticket creation.",
+                        "No SQL Server/SAP writeback, scheduling changes, or maintenance ticket creation.",
                     ],
                 },
                 "functional_requirements": {
@@ -955,7 +965,7 @@ class TemplateExampleStartTest(unittest.TestCase):
         self.assertIn("IC Substrate 专业对话链路", prompt)
         self.assertIn("AI 产品经理，不是制造/质量/工程顾问", prompt)
         self.assertIn("软件、Web dashboard、流程工具、报表或数据产品", prompt)
-        self.assertIn("当前 IT scope 只开放 Production、Quality、TDI 和 General 四个同级入口", prompt)
+        self.assertIn("当前开放范围只包含 Production、Quality、TDI 和 General 四个同级入口", prompt)
         self.assertIn("其他部门链路先隐藏，统一归入 General", prompt)
         self.assertIn("首问选项只能列这四个入口", prompt)
         self.assertIn("Production、Quality、TDI，还是 General", prompt)
