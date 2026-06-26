@@ -183,6 +183,21 @@ class TemplateExampleStartTest(unittest.TestCase):
         with self.assertRaises(LLMError):
             list(self.service.stream_system_design_document(session.id, "en", save_history=False))
 
+    def test_design_doc_result_carries_projected_document_qa_state(self) -> None:
+        # The generation result feeds the panel immediately (no wait for the next
+        # snapshot poll), and exposes only the API subset (no renderer-only fields).
+        session = self.service.create_session(language="en", starter_department="quality")
+        self.service._append_message(session.id, "user", "Build a lot yield dashboard.")
+        self._cache_ready_requirement_model(session.id)
+        self.llm_client.chat_response = "# System Design Document\n\nUse mock MES data for the demo."
+        result = self.service.build_system_design_document(session.id, "en", save_history=False)
+        qa = result["document_qa_state"]
+        self.assertIsNotNone(qa)
+        self.assertEqual(qa["source_kind"], "design_doc")
+        self.assertIn("production_readiness", qa)
+        self.assertNotIn("classified_questions", qa)
+        self.assertNotIn("readiness_percentage", qa)
+
     def test_guided_template_session_stays_empty(self) -> None:
         session = self.service.create_session(
             template_id=self.template_id,

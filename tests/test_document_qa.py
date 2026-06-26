@@ -1,11 +1,13 @@
 """Unit tests for the structured Document QA module.
 
-These lock two contracts:
-  1. ``build_document_qa_state`` produces the structured payload the frontend now
+These lock the contracts:
+  1. ``build_document_qa_state`` produces the structured payload the frontend
      consumes directly (instead of regex-reparsing the document Markdown).
-  2. ``render_document_qa_appendix`` (rendered FROM that state) still emits the exact
-     headings/keys the frontend ``documentQa.ts`` parser keys on, so the legacy
-     Markdown-parse fallback keeps working and the two can never silently drift.
+  2. ``to_api_state`` exposes only the fields the client reads (renderer-only
+     fields are stripped from the API payload).
+  3. ``render_document_qa_appendix`` (rendered FROM that state) keeps a stable,
+     well-formed QA section in the generated document, derived from the same
+     state so the document text and the structured payload can never drift.
 """
 
 import unittest
@@ -90,9 +92,9 @@ class BuildDocumentQaStateTests(unittest.TestCase):
 
 
 class RenderAppendixContractTests(unittest.TestCase):
-    """The rendered Markdown must keep the keys the frontend parser depends on."""
+    """The rendered Markdown keeps a stable, well-formed QA section in the doc."""
 
-    FRONTEND_PARSER_KEYS_EN = (
+    APPENDIX_SECTION_KEYS_EN = (
         "## Document QA",
         "- **Document type**:",
         "- **Demo readiness**:",
@@ -117,7 +119,7 @@ class RenderAppendixContractTests(unittest.TestCase):
             source_kind="prd_doc",
         )
         markdown = document_qa.render_document_qa_appendix(state, "en")
-        for key in self.FRONTEND_PARSER_KEYS_EN:
+        for key in self.APPENDIX_SECTION_KEYS_EN:
             self.assertIn(key, markdown)
 
     def test_zh_render_uses_bilingual_heading(self) -> None:
@@ -132,6 +134,46 @@ class RenderAppendixContractTests(unittest.TestCase):
         self.assertIn("## 文档质量检查 / Document QA", markdown)
         self.assertIn("### 生产版阻塞项", markdown)
         self.assertIn("- **Production readiness**：", markdown)
+
+
+class ToApiStateTests(unittest.TestCase):
+    """The API payload exposes only the fields the frontend reads."""
+
+    def test_strips_renderer_only_fields(self) -> None:
+        full = document_qa.build_document_qa_state(
+            "# PRD\n\nPlan vs actual dashboard.",
+            _model(),
+            PROGRESS,
+            is_design=False,
+            source_kind="prd_doc",
+        )
+        # The full state carries renderer-only fields for the Markdown appendix.
+        self.assertIn("classified_questions", full)
+        self.assertIn("readiness_percentage", full)
+
+        api = document_qa.to_api_state(full)
+        for key in (
+            "source_kind",
+            "document_type",
+            "demo_readiness",
+            "production_readiness",
+            "open_question_count",
+            "production_blockers",
+            "business_rule_findings",
+            "implementation_findings",
+            "classification_counts",
+        ):
+            self.assertIn(key, api)
+        for key in (
+            "classified_questions",
+            "readiness_percentage",
+            "collection_coverage_percentage",
+            "confirmation_percentage",
+        ):
+            self.assertNotIn(key, api)
+
+    def test_none_passes_through(self) -> None:
+        self.assertIsNone(document_qa.to_api_state(None))
 
 
 if __name__ == "__main__":

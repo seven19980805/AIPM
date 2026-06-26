@@ -1975,10 +1975,14 @@ class RequirementCollectorService:
         # file, whose stored copy can be a stub. Prefer the design document.
         design_markdown = self._latest_document_message_markdown(session, DESIGN_MESSAGE_KIND)
         if design_markdown:
-            return self._document_qa_state(design_markdown, model, progress, DESIGN_MESSAGE_KIND)
+            return document_qa_module.to_api_state(
+                self._document_qa_state(design_markdown, model, progress, DESIGN_MESSAGE_KIND)
+            )
         prd_markdown = self._latest_document_message_markdown(session, PRD_MESSAGE_KIND)
         if prd_markdown:
-            return self._document_qa_state(prd_markdown, model, progress, PRD_MESSAGE_KIND)
+            return document_qa_module.to_api_state(
+                self._document_qa_state(prd_markdown, model, progress, PRD_MESSAGE_KIND)
+            )
         return None
 
     def _latest_document_message_markdown(self, session: Session, kind: str) -> str | None:
@@ -8244,6 +8248,18 @@ class RequirementCollectorService:
                 doc_markdown=doc_markdown,
             )
 
+        # Carry the structured QA state on the generation result so the panel can
+        # render the card immediately, without waiting for the next snapshot poll.
+        # Only real generated documents have it (not quality-gate/insufficient stubs).
+        document_qa_state = None
+        if status in ("ok", "draft_with_assumptions"):
+            progress = self._structured_requirement_progress(structured_requirement_model)
+            document_qa_state = document_qa_module.to_api_state(
+                self._document_qa_state(
+                    doc_markdown, structured_requirement_model, progress, document_kind
+                )
+            )
+
         return {
             "session_id": session_id,
             "document_markdown": doc_markdown,
@@ -8254,6 +8270,7 @@ class RequirementCollectorService:
             "summary": structured_requirement_model,
             "structured_requirement_model": structured_requirement_model,
             "status": status,
+            "document_qa_state": document_qa_state,
             "prd_v0_ready": False,
         }
 

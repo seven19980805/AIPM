@@ -7,7 +7,7 @@ import RequirementMarkdownPreview from './components/RequirementMarkdownPreview.
 import StructuredRequirementPanel from './components/StructuredRequirementPanel.vue'
 import { extractChoiceReplyOptions, type ChoiceReplyOption } from './lib/choiceReplyOptions'
 import { computeStructuredRequirementProgress } from './lib/structuredRequirementProgress'
-import { parseDocumentQa, extractDocumentQaState, type DocumentQaState } from './lib/documentQa'
+import { extractDocumentQaState, type DocumentQaState } from './lib/documentQa'
 import type {
   ChatMessage,
   ChatMessagePayload,
@@ -879,23 +879,11 @@ const composerFastSeedOptions = computed<FastSeedOption[]>(() => {
 })
 const latestPrdDocument = computed(() => findLatestDocumentMessage('prd_doc'))
 const latestDesignDocument = computed(() => findLatestDocumentMessage('design_doc'))
-const latestDocumentQa = computed<DocumentQaState | null>(() => {
-  // Prefer the structured payload from the API (no fragile Markdown reparsing).
-  if (apiDocumentQaState.value) {
-    return apiDocumentQaState.value
-  }
-  // Fallback: parse the just-generated document before the next state refresh
-  // arrives, and for legacy documents whose API state is unavailable.
-  const designDocument = latestDesignDocument.value
-  if (designDocument) {
-    const designQa = parseDocumentQa(designDocument.content, 'design_doc')
-    if (designQa) {
-      return designQa
-    }
-  }
-  const prdDocument = latestPrdDocument.value
-  return prdDocument ? parseDocumentQa(prdDocument.content, 'prd_doc') : null
-})
+// Driven entirely by the structured API payload: the backend supplies
+// document_qa_state on the generation result, on chat responses, and on snapshot
+// polls (recomputed from the saved document for older sessions too), so there is
+// no need to reparse the document Markdown.
+const latestDocumentQa = computed<DocumentQaState | null>(() => apiDocumentQaState.value)
 const canGenerateDocumentsForCurrentState = computed(() =>
   structuredRequirementProgress.value.readyToGenerate,
 )

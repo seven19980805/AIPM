@@ -309,6 +309,32 @@ def build_document_qa_state(
     }
 
 
+_API_STATE_KEYS = (
+    "source_kind",
+    "document_type",
+    "demo_readiness",
+    "production_readiness",
+    "open_question_count",
+    "production_blockers",
+    "business_rule_findings",
+    "implementation_findings",
+    "classification_counts",
+)
+
+
+def to_api_state(state: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Project the full QA state down to the API-serializable subset.
+
+    :func:`build_document_qa_state` also carries renderer-only fields
+    (``classified_questions`` and the readiness percentages) that the frontend
+    never reads. Strip them so the API payload is exactly the set of fields the
+    client consumes.
+    """
+    if not state:
+        return None
+    return {key: state[key] for key in _API_STATE_KEYS if key in state}
+
+
 # --- Markdown appendix (rendered FROM the structured state) -------------------------
 
 
