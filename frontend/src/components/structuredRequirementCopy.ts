@@ -171,6 +171,26 @@ export const structuredRequirementPanelCopy = {
       reason: 'Current judgement',
       pendingQuestion: 'Next thing to confirm',
     },
+    documentQa: {
+      sourceLabel: { design: 'Design Doc QA', prd: 'Requirement Doc QA' },
+      demoReadiness: 'Demo deliverability',
+      productionReadiness: 'Production readiness',
+      openQuestions: 'Open questions',
+      findings: 'QA findings',
+      topBlockers: 'Top blockers',
+      readiness: {
+        blocked: 'Blocked',
+        review: 'Needs review',
+        readyWithAssumptions: 'Ready (with assumptions)',
+        ready: 'Ready',
+        unknown: '-',
+      },
+      handoff: {
+        blocked: 'Demo can hand off; production still has blockers.',
+        review: 'Demo can hand off; production assumptions need review.',
+        ready: 'Document is ready to hand off.',
+      },
+    },
   },
   de: {
     requirementTitle: 'Strukturiertes Anforderungsmodell',
@@ -341,6 +361,26 @@ export const structuredRequirementPanelCopy = {
     cardLabels: {
       reason: 'Aktuelle Einschaetzung',
       pendingQuestion: 'Naechste Klaerung',
+    },
+    documentQa: {
+      sourceLabel: { design: 'Design-Dokument QA', prd: 'Anforderungsdokument QA' },
+      demoReadiness: 'Demo-Lieferbarkeit',
+      productionReadiness: 'Produktionsreife',
+      openQuestions: 'Offene Fragen',
+      findings: 'QA-Befunde',
+      topBlockers: 'Hauptblocker',
+      readiness: {
+        blocked: 'Blockiert',
+        review: 'Pruefung noetig',
+        readyWithAssumptions: 'Bereit (mit Annahmen)',
+        ready: 'Bereit',
+        unknown: '-',
+      },
+      handoff: {
+        blocked: 'Demo uebergabebereit; Produktion hat noch Blocker.',
+        review: 'Demo uebergabebereit; Produktionsannahmen brauchen Pruefung.',
+        ready: 'Dokument ist uebergabebereit.',
+      },
     },
   },
   zh: {
@@ -513,6 +553,26 @@ export const structuredRequirementPanelCopy = {
       reason: '\u5f53\u524d\u5224\u65ad',
       pendingQuestion: '\u4e0b\u4e00\u6b65\u5f85\u786e\u8ba4',
     },
+    documentQa: {
+      sourceLabel: { design: '\u8bbe\u8ba1\u6587\u6863 QA', prd: '\u9700\u6c42\u6587\u6863 QA' },
+      demoReadiness: 'Demo \u53ef\u4ea4\u4ed8\u6027',
+      productionReadiness: '\u751f\u4ea7\u53ef\u7528\u6027',
+      openQuestions: '\u672a\u51b3\u95ee\u9898',
+      findings: 'QA \u53d1\u73b0',
+      topBlockers: '\u4e3b\u8981\u963b\u585e\u9879',
+      readiness: {
+        blocked: '\u53d7\u963b',
+        review: '\u9700\u4eba\u5de5\u590d\u6838',
+        readyWithAssumptions: '\u53ef\u4ea4\u63a5\uff08\u542b\u5047\u8bbe\uff09',
+        ready: '\u53ef\u4ea4\u63a5',
+        unknown: '-',
+      },
+      handoff: {
+        blocked: 'Demo \u53ef\u4ee5\u4ea4\u63a5\uff1b\u751f\u4ea7\u7248\u4ecd\u6709\u963b\u585e\u9879\u3002',
+        review: 'Demo \u53ef\u4ee5\u4ea4\u63a5\uff1b\u751f\u4ea7\u5047\u8bbe\u9700\u8981\u4eba\u5de5\u590d\u6838\u3002',
+        ready: '\u6587\u6863\u5df2\u53ef\u4ea4\u63a5\u3002',
+      },
+    },
   },
   ms: {
     requirementTitle: 'Model Keperluan Berstruktur',
@@ -684,6 +744,26 @@ export const structuredRequirementPanelCopy = {
       reason: 'Penilaian semasa',
       pendingQuestion: 'Perkara seterusnya untuk disahkan',
     },
+    documentQa: {
+      sourceLabel: { design: 'QA Dokumen Reka Bentuk', prd: 'QA Dokumen Keperluan' },
+      demoReadiness: 'Kebolehhantaran demo',
+      productionReadiness: 'Kesediaan produksi',
+      openQuestions: 'Soalan terbuka',
+      findings: 'Penemuan QA',
+      topBlockers: 'Penghalang utama',
+      readiness: {
+        blocked: 'Disekat',
+        review: 'Perlu semakan',
+        readyWithAssumptions: 'Sedia (dengan andaian)',
+        ready: 'Sedia',
+        unknown: '-',
+      },
+      handoff: {
+        blocked: 'Demo boleh handoff; produksi masih ada penghalang.',
+        review: 'Demo boleh handoff; andaian produksi perlu semakan.',
+        ready: 'Dokumen sedia untuk handoff.',
+      },
+    },
   },
 } satisfies Record<
   LanguageCode,
@@ -817,5 +897,15 @@ export const structuredRequirementPanelCopy = {
     >
     methodologyStatus: Record<'ready' | 'partial' | 'missing' | 'conflict', string>
     cardLabels: Record<'reason' | 'pendingQuestion', string>
+    documentQa: {
+      sourceLabel: Record<'design' | 'prd', string>
+      demoReadiness: string
+      productionReadiness: string
+      openQuestions: string
+      findings: string
+      topBlockers: string
+      readiness: Record<'blocked' | 'review' | 'readyWithAssumptions' | 'ready' | 'unknown', string>
+      handoff: Record<'blocked' | 'review' | 'ready', string>
+    }
   }
 >

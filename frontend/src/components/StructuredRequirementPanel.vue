@@ -221,7 +221,9 @@ const documentQaSourceLabel = computed(() => {
   if (!props.documentQaState) {
     return ''
   }
-  return props.documentQaState.sourceKind === 'design_doc' ? '设计文档 QA' : '需求文档 QA'
+  return props.documentQaState.sourceKind === 'design_doc'
+    ? copy.value.documentQa.sourceLabel.design
+    : copy.value.documentQa.sourceLabel.prd
 })
 
 const documentQaProductionClass = computed(() => {
@@ -250,11 +252,11 @@ const documentQaFindingCount = computed(
 )
 
 const documentQaDemoReadinessText = computed(() =>
-  formatDocumentQaReadiness(props.documentQaState?.demoReadiness ?? '', 'Demo'),
+  formatDocumentQaReadiness(props.documentQaState?.demoReadiness ?? ''),
 )
 
 const documentQaProductionReadinessText = computed(() =>
-  formatDocumentQaReadiness(props.documentQaState?.productionReadiness ?? '', '生产版'),
+  formatDocumentQaReadiness(props.documentQaState?.productionReadiness ?? ''),
 )
 
 const documentQaHandoffNote = computed(() => {
@@ -262,12 +264,12 @@ const documentQaHandoffNote = computed(() => {
     return ''
   }
   if (documentQaProductionClass.value === 'blocked') {
-    return 'Demo 可以交接；生产版仍有阻塞项。'
+    return copy.value.documentQa.handoff.blocked
   }
   if (documentQaProductionClass.value === 'review') {
-    return 'Demo 可以交接；生产假设需要人工复核。'
+    return copy.value.documentQa.handoff.review
   }
-  return '文档已可交接。'
+  return copy.value.documentQa.handoff.ready
 })
 
 function buildRow(
@@ -353,24 +355,24 @@ function methodologyEvidenceSummary(check: PMMethodologyCheck): string {
   return copy.value.notCaptured
 }
 
-function formatDocumentQaReadiness(value: string, scopeLabel: string): string {
+function formatDocumentQaReadiness(value: string): string {
   const normalized = value.trim()
-  const lower = normalized.toLowerCase()
-  const prefix = scopeLabel === 'Demo' ? 'Demo ' : scopeLabel
+  const phrases = copy.value.documentQa.readiness
   if (!normalized) {
-    return '-'
+    return phrases.unknown
   }
+  const lower = normalized.toLowerCase()
   if (lower.includes('blocked')) {
-    return `${prefix}受阻`
+    return phrases.blocked
   }
   if (lower.includes('review')) {
-    return '需人工复核'
+    return phrases.review
   }
   if (lower.includes('ready') && lower.includes('assumption')) {
-    return `${prefix}可交接（含假设）`
+    return phrases.readyWithAssumptions
   }
   if (lower.includes('ready')) {
-    return `${prefix}可交接`
+    return phrases.ready
   }
   return normalized
 }
@@ -539,21 +541,21 @@ function summarizeText(value: string): string {
             <strong>{{ documentQaState.documentType }}</strong>
           </div>
           <div class="document-qa-row">
-            <span>Demo 可交付性</span>
+            <span>{{ copy.documentQa.demoReadiness }}</span>
             <strong>{{ documentQaDemoReadinessText }}</strong>
           </div>
           <div class="document-qa-row">
-            <span>生产可用性</span>
+            <span>{{ copy.documentQa.productionReadiness }}</span>
             <strong class="document-qa-status" :class="documentQaProductionClass">
               {{ documentQaProductionReadinessText }}
             </strong>
           </div>
           <div class="document-qa-row">
-            <span>未决问题</span>
+            <span>{{ copy.documentQa.openQuestions }}</span>
             <strong>{{ documentQaState.openQuestionCount ?? '-' }}</strong>
           </div>
           <div class="document-qa-row">
-            <span>QA 发现</span>
+            <span>{{ copy.documentQa.findings }}</span>
             <strong>{{ documentQaFindingCount }}</strong>
           </div>
         </div>
@@ -563,7 +565,7 @@ function summarizeText(value: string): string {
         </p>
 
         <div v-if="documentQaTopBlockers.length" class="document-qa-blockers">
-          <span>主要阻塞项</span>
+          <span>{{ copy.documentQa.topBlockers }}</span>
           <ul>
             <li v-for="blocker in documentQaTopBlockers" :key="blocker">{{ blocker }}</li>
           </ul>
