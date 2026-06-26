@@ -17,7 +17,6 @@ from .business_template_library import BusinessTemplateLibrary
 from .llm_client import LLMError
 from .ic_substrate_domain import build_ic_substrate_evidence_state as build_ic_substrate_evidence_state_payload
 from .pm_methodology import build_pm_methodology_state as build_pm_methodology_state_payload
-from . import document_qa as document_qa_module
 from .session_store import SQLiteSessionStore
 from .structured_requirement_model import (
     REQUIREMENT_ITEM_KEYS,
@@ -1953,49 +1952,6 @@ class RequirementCollectorService:
             normalized_language,
         )
 
-    def build_document_qa_state(
-        self,
-        session: Session | None,
-        structured_requirement_model: dict[str, Any] | None,
-        language: str = "zh",
-    ) -> dict[str, Any] | None:
-        """Structured Document QA state for the latest generated document.
-
-        Returns ``None`` when no document exists yet (the panel hides the card).
-        The design document is preferred over the PRD to match the frontend's
-        ``latestDocumentQa`` ordering. The card is now driven by this structured
-        payload instead of regex-reparsing the document Markdown.
-        """
-        if session is None:
-            return None
-        model = normalize_structured_requirement_model(structured_requirement_model)
-        progress = self._structured_requirement_progress(model)
-        # Use the generated-document MESSAGE content (the full Markdown the frontend
-        # renders and the user reads, including the QA appendix) — not the on-disk
-        # file, whose stored copy can be a stub. Prefer the design document.
-        design_markdown = self._latest_document_message_markdown(session, DESIGN_MESSAGE_KIND)
-        if design_markdown:
-            return document_qa_module.to_api_state(
-                self._document_qa_state(design_markdown, model, progress, DESIGN_MESSAGE_KIND)
-            )
-        prd_markdown = self._latest_document_message_markdown(session, PRD_MESSAGE_KIND)
-        if prd_markdown:
-            return document_qa_module.to_api_state(
-                self._document_qa_state(prd_markdown, model, progress, PRD_MESSAGE_KIND)
-            )
-        return None
-
-    def _latest_document_message_markdown(self, session: Session, kind: str) -> str | None:
-        """Return the content of the latest ``kind`` document message, if any."""
-        messages = getattr(session, "messages", None) or []
-        for message in reversed(messages):
-            if not isinstance(message, dict) or message.get("kind") != kind:
-                continue
-            content = message.get("content")
-            if isinstance(content, str) and content.strip():
-                return content
-        return None
-
     def _ic_substrate_product_shape_from_model_or_template(
         self,
         session: Session,
@@ -2061,11 +2017,6 @@ class RequirementCollectorService:
                         canonical_model,
                         normalized_language,
                     ),
-                    "document_qa_state": self.build_document_qa_state(
-                        session,
-                        canonical_model,
-                        normalized_language,
-                    ),
                 }
             empty_model = self._empty_structured_requirement_model()
             conversation_chain_state = self.build_conversation_chain_state(
@@ -2083,11 +2034,6 @@ class RequirementCollectorService:
                     normalized_language,
                 ),
                 "ic_substrate_evidence_state": self.build_ic_substrate_evidence_state(
-                    session,
-                    empty_model,
-                    normalized_language,
-                ),
-                "document_qa_state": self.build_document_qa_state(
                     session,
                     empty_model,
                     normalized_language,
@@ -2119,11 +2065,6 @@ class RequirementCollectorService:
                 normalized_language,
             ),
             "ic_substrate_evidence_state": self.build_ic_substrate_evidence_state(
-                session,
-                cached_model,
-                normalized_language,
-            ),
-            "document_qa_state": self.build_document_qa_state(
                 session,
                 cached_model,
                 normalized_language,
@@ -2194,13 +2135,6 @@ class RequirementCollectorService:
             # The seed scaffold is a prompt aid only; never emit it as a finished
             # document. If the LLM produced nothing, fail loudly (no local fakes).
             raise LLMError("LLM returned empty design document.")
-        doc_markdown = self._append_document_qa_appendix(
-            doc_markdown,
-            structured_requirement_model,
-            progress,
-            DESIGN_MESSAGE_KIND,
-            language,
-        )
         return self._build_generated_document_result(
             session_id=session_id,
             document_kind=DESIGN_MESSAGE_KIND,
@@ -2304,22 +2238,6 @@ class RequirementCollectorService:
             # document. If the LLM streamed nothing, fail loudly (no local fakes).
             raise LLMError("LLM returned empty streamed design document.")
 
-        appended_doc_markdown = self._append_document_qa_appendix(
-            doc_markdown,
-            structured_requirement_model,
-            progress,
-            DESIGN_MESSAGE_KIND,
-            language,
-        )
-        if appended_doc_markdown != doc_markdown:
-            appendix_delta = (
-                appended_doc_markdown[len(doc_markdown):]
-                if appended_doc_markdown.startswith(doc_markdown)
-                else f"\n\n{appended_doc_markdown}"
-            )
-            yield {"event": "content", "delta": appendix_delta}
-            doc_markdown = appended_doc_markdown
-
         if thinking_text:
             yield {"event": "thinking_done", "thinking": thinking_text}
         yield {
@@ -2395,13 +2313,6 @@ class RequirementCollectorService:
             doc_markdown,
             session,
             structured_requirement_model,
-            language,
-        )
-        doc_markdown = self._append_document_qa_appendix(
-            doc_markdown,
-            structured_requirement_model,
-            progress,
-            PRD_MESSAGE_KIND,
             language,
         )
         return self._build_generated_document_result(
@@ -2502,22 +2413,6 @@ class RequirementCollectorService:
             doc_markdown,
             session,
             structured_requirement_model,
-            language,
-        )
-        if appended_doc_markdown != doc_markdown:
-            appendix_delta = (
-                appended_doc_markdown[len(doc_markdown):]
-                if appended_doc_markdown.startswith(doc_markdown)
-                else f"\n\n{appended_doc_markdown}"
-            )
-            yield {"event": "content", "delta": appendix_delta}
-            doc_markdown = appended_doc_markdown
-
-        appended_doc_markdown = self._append_document_qa_appendix(
-            doc_markdown,
-            structured_requirement_model,
-            progress,
-            PRD_MESSAGE_KIND,
             language,
         )
         if appended_doc_markdown != doc_markdown:
@@ -7030,68 +6925,6 @@ class RequirementCollectorService:
             gate["ic_substrate_readiness_evidence"] = ic_substrate_gate
         return gate
 
-    def _append_document_qa_appendix(
-        self,
-        doc_markdown: str,
-        structured_requirement_model: dict[str, Any],
-        progress: dict[str, Any],
-        document_kind: str,
-        language: str,
-    ) -> str:
-        heading = "## 文档质量检查 / Document QA" if self._normalize_language(language) == "zh" else "## Document QA"
-        if heading in doc_markdown or "\n## Document QA" in doc_markdown or "\n## 文档质量检查" in doc_markdown:
-            return doc_markdown
-        appendix = self._format_document_qa_appendix(
-            doc_markdown,
-            structured_requirement_model,
-            progress,
-            document_kind,
-            language,
-        )
-        if not appendix:
-            return doc_markdown
-        return f"{doc_markdown.rstrip()}\n\n{appendix}"
-
-    def _document_qa_state(
-        self,
-        doc_markdown: str,
-        structured_requirement_model: dict[str, Any],
-        progress: dict[str, Any],
-        document_kind: str,
-    ) -> dict[str, Any]:
-        """Structured Document QA findings — the single source of truth.
-
-        Both the Markdown appendix and the API ``document_qa_state`` payload are
-        derived from this dict, so the two can no longer drift apart.
-        """
-        model = normalize_structured_requirement_model(structured_requirement_model)
-        return document_qa_module.build_document_qa_state(
-            doc_markdown,
-            model,
-            progress,
-            is_design=document_kind == DESIGN_MESSAGE_KIND,
-            source_kind=document_kind,
-        )
-
-    def _format_document_qa_appendix(
-        self,
-        doc_markdown: str,
-        structured_requirement_model: dict[str, Any],
-        progress: dict[str, Any],
-        document_kind: str,
-        language: str,
-    ) -> str:
-        state = self._document_qa_state(
-            doc_markdown,
-            structured_requirement_model,
-            progress,
-            document_kind,
-        )
-        return document_qa_module.render_document_qa_appendix(
-            state,
-            self._normalize_language(language),
-        )
-
     def _append_ic_substrate_prd_evidence_appendix(
         self,
         doc_markdown: str,
@@ -8248,18 +8081,6 @@ class RequirementCollectorService:
                 doc_markdown=doc_markdown,
             )
 
-        # Carry the structured QA state on the generation result so the panel can
-        # render the card immediately, without waiting for the next snapshot poll.
-        # Only real generated documents have it (not quality-gate/insufficient stubs).
-        document_qa_state = None
-        if status in ("ok", "draft_with_assumptions"):
-            progress = self._structured_requirement_progress(structured_requirement_model)
-            document_qa_state = document_qa_module.to_api_state(
-                self._document_qa_state(
-                    doc_markdown, structured_requirement_model, progress, document_kind
-                )
-            )
-
         return {
             "session_id": session_id,
             "document_markdown": doc_markdown,
@@ -8270,7 +8091,6 @@ class RequirementCollectorService:
             "summary": structured_requirement_model,
             "structured_requirement_model": structured_requirement_model,
             "status": status,
-            "document_qa_state": document_qa_state,
             "prd_v0_ready": False,
         }
 

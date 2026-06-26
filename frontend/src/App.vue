@@ -7,7 +7,6 @@ import RequirementMarkdownPreview from './components/RequirementMarkdownPreview.
 import StructuredRequirementPanel from './components/StructuredRequirementPanel.vue'
 import { extractChoiceReplyOptions, type ChoiceReplyOption } from './lib/choiceReplyOptions'
 import { computeStructuredRequirementProgress } from './lib/structuredRequirementProgress'
-import { extractDocumentQaState, type DocumentQaState } from './lib/documentQa'
 import type {
   ChatMessage,
   ChatMessagePayload,
@@ -123,8 +122,6 @@ const structuredRequirementModel = ref<StructuredRequirementModel>(createEmptySt
 const conversationChainState = ref<ConversationChainState>(createEmptyConversationChainState())
 const pmMethodologyState = ref<PMMethodologyState>(createEmptyPMMethodologyState())
 const icSubstrateEvidenceState = ref<ICSubstrateEvidenceState>(createEmptyICSubstrateEvidenceState())
-// Structured Document QA from the API; preferred over reparsing the document Markdown.
-const apiDocumentQaState = ref<DocumentQaState | null>(null)
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 const GO_CODING_URL = resolveExternalUrl(import.meta.env.VITE_GO_CODING_URL, 'http://localhost:8888')
 let structuredRequirementRequestToken = 0
@@ -264,7 +261,7 @@ const translations = {
     newChatProductionDesc: 'Production planning, yield, WIP, lot flow, output, and operating dashboards.',
     newChatQualityDesc: 'Inspection, defects, disposition, CAPA, quality release, and evidence tracking.',
     newChatTdiDesc: 'TDI request intake, handoff, SLA, approval, verification, and closure tracking.',
-    newChatOthersDesc: 'More departments will be added after the first IT scope is stable.',
+    newChatOthersDesc: 'More departments will be added after the first workflow is stable.',
     newChatOthersStatus: 'Pending / Under development',
     newChatStartFromScratch: 'Start from scratch',
     newChatImproveFromDraft: 'Improve from draft',
@@ -366,7 +363,7 @@ const translations = {
     newChatProductionDesc: 'Produktionsplanung, Yield, WIP, Lot Flow, Output und operative Dashboards.',
     newChatQualityDesc: 'Inspection, Defects, Disposition, CAPA, Quality Release und Evidence Tracking.',
     newChatTdiDesc: 'TDI Intake, Handoff, SLA, Approval, Verification und Closure Tracking.',
-    newChatOthersDesc: 'Weitere Bereiche folgen nach Stabilisierung des ersten IT Scopes.',
+    newChatOthersDesc: 'Weitere Bereiche folgen, sobald der erste Workflow stabil ist.',
     newChatOthersStatus: 'Pending / Under development',
     newChatStartFromScratch: 'Von null starten',
     newChatImproveFromDraft: 'Draft verbessern',
@@ -468,7 +465,7 @@ const translations = {
     newChatProductionDesc: '生产计划、良率、WIP、lot 流转、产出和运营看板。',
     newChatQualityDesc: '检验、缺陷、判定、CAPA、质量 release 和证据追溯。',
     newChatTdiDesc: 'TDI 需求受理、交接、SLA、审批、验证和关闭追踪。',
-    newChatOthersDesc: '其他部门会在第一阶段 IT scope 稳定后开放。',
+    newChatOthersDesc: '其他部门会在第一阶段流程稳定后开放。',
     newChatOthersStatus: 'Pending / Under development',
     newChatStartFromScratch: '从零开始',
     newChatImproveFromDraft: '完善半成品需求书',
@@ -569,7 +566,7 @@ const translations = {
     newChatProductionDesc: 'Production planning, yield, WIP, lot flow, output dan dashboard operasi.',
     newChatQualityDesc: 'Inspection, defect, disposition, CAPA, quality release dan evidence tracking.',
     newChatTdiDesc: 'TDI intake, handoff, SLA, approval, verification dan closure tracking.',
-    newChatOthersDesc: 'Area lain akan ditambah selepas scope IT pertama stabil.',
+    newChatOthersDesc: 'Area lain akan ditambah selepas aliran kerja pertama stabil.',
     newChatOthersStatus: 'Pending / Under development',
     newChatStartFromScratch: 'Mula dari kosong',
     newChatImproveFromDraft: 'Lengkapkan draft',
@@ -879,11 +876,6 @@ const composerFastSeedOptions = computed<FastSeedOption[]>(() => {
 })
 const latestPrdDocument = computed(() => findLatestDocumentMessage('prd_doc'))
 const latestDesignDocument = computed(() => findLatestDocumentMessage('design_doc'))
-// Driven entirely by the structured API payload: the backend supplies
-// document_qa_state on the generation result, on chat responses, and on snapshot
-// polls (recomputed from the saved document for older sessions too), so there is
-// no need to reparse the document Markdown.
-const latestDocumentQa = computed<DocumentQaState | null>(() => apiDocumentQaState.value)
 const canGenerateDocumentsForCurrentState = computed(() =>
   structuredRequirementProgress.value.readyToGenerate,
 )
@@ -1897,7 +1889,6 @@ function resetStructuredRequirementState() {
   conversationChainState.value = createEmptyConversationChainState()
   pmMethodologyState.value = createEmptyPMMethodologyState()
   icSubstrateEvidenceState.value = createEmptyICSubstrateEvidenceState()
-  apiDocumentQaState.value = null
   structuredRequirementError.value = ''
   loadingStructuredRequirement.value = false
   activeStructuredRequirementSyncCount.value = 0
@@ -1918,10 +1909,6 @@ function applyStructuredRequirementPayload(payload: unknown) {
   if (evidenceState) {
     icSubstrateEvidenceState.value = evidenceState
   }
-
-  // The key is present (object) whenever a document exists, and absent/null only
-  // when there is no generated document yet — so clearing on null is correct.
-  apiDocumentQaState.value = extractDocumentQaState(payload)
 
   const model = extractStructuredRequirementModel(payload)
   if (model) {
@@ -2447,7 +2434,6 @@ async function loadStructuredRequirement(
       structuredRequirementModel.value = createEmptyStructuredRequirementModel()
       pmMethodologyState.value = createEmptyPMMethodologyState()
       icSubstrateEvidenceState.value = createEmptyICSubstrateEvidenceState()
-      apiDocumentQaState.value = null
     }
   } finally {
     if (useBackgroundSync) {
@@ -4905,7 +4891,6 @@ watch(messageRenderSignature, (signature, previousSignature) => {
                 :generation-disabled="messagePipelineActive || switchingSession || documentGenerationConfirmOpen || !hasSession"
                 :generation-label="documentGenerationActionLabel"
                 :has-prd-document="Boolean(latestPrdDocument)"
-                :document-qa-state="latestDocumentQa"
                 :error="structuredRequirementError"
                 @generate-documents="generatePanelDocuments"
                 @go-coding="openGoCodingWhenReady"

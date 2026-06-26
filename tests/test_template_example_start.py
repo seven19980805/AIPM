@@ -183,21 +183,6 @@ class TemplateExampleStartTest(unittest.TestCase):
         with self.assertRaises(LLMError):
             list(self.service.stream_system_design_document(session.id, "en", save_history=False))
 
-    def test_design_doc_result_carries_projected_document_qa_state(self) -> None:
-        # The generation result feeds the panel immediately (no wait for the next
-        # snapshot poll), and exposes only the API subset (no renderer-only fields).
-        session = self.service.create_session(language="en", starter_department="quality")
-        self.service._append_message(session.id, "user", "Build a lot yield dashboard.")
-        self._cache_ready_requirement_model(session.id)
-        self.llm_client.chat_response = "# System Design Document\n\nUse mock MES data for the demo."
-        result = self.service.build_system_design_document(session.id, "en", save_history=False)
-        qa = result["document_qa_state"]
-        self.assertIsNotNone(qa)
-        self.assertEqual(qa["source_kind"], "design_doc")
-        self.assertIn("production_readiness", qa)
-        self.assertNotIn("classified_questions", qa)
-        self.assertNotIn("readiness_percentage", qa)
-
     def test_guided_template_session_stays_empty(self) -> None:
         session = self.service.create_session(
             template_id=self.template_id,
@@ -862,110 +847,6 @@ class TemplateExampleStartTest(unittest.TestCase):
             normalize_structured_requirement_model({"collection_status": low_coverage})
         )
         self.assertFalse(low_coverage_progress["ready_to_generate"])
-
-    def test_prd_document_appends_deterministic_document_qa(self) -> None:
-        session = self.service.create_session(language="en", starter_department="production")
-        self.service._append_message(session.id, "user", "Build a production line dashboard.")
-        collection_status = {
-            key: {"status": "confirmed", "reason": "Confirmed.", "pending_questions": []}
-            for key in REQUIREMENT_ITEM_KEYS
-        }
-        model = normalize_structured_requirement_model(
-            {
-                "document_info": {"project_name": "Production Line Dashboard"},
-                "product_context": {
-                    "requesting_department": "Production",
-                    "primary_user": "Supervisors",
-                    "decision_or_action": "Identify lines behind schedule.",
-                    "software_type": "Dashboard",
-                    "acceptance_owner": "Supervisor",
-                },
-                "background": {
-                    "objective": "Enable supervisors to monitor current shift production performance.",
-                    "summary": "Supervisors compare plan vs actual from MES.",
-                },
-                "scope": {
-                    "in_scope": ["Real-time current shift dashboard"],
-                    "out_of_scope": ["Export", "History", "Mobile"],
-                },
-                "users_and_scenarios": {
-                    "target_users": ["Production supervisors"],
-                    "core_scenarios": ["Review current shift output by line and product"],
-                },
-                "functional_requirements": {
-                    "overview": "Show line/product plan vs actual and behind indicator.",
-                },
-                "business_rules": ["Behind schedule when actual < plan."],
-                "page_and_interaction": {
-                    "pages": [{"page_name": "Shift Dashboard", "entry_point": "Direct URL"}],
-                },
-                "data_and_dependencies": ["MES provides plan and actual pieces"],
-                "acceptance_criteria": ["Supervisor cross-checks dashboard counts against MES report."],
-                "open_questions": [
-                    "What is the exact shift duration, start time, and end time?",
-                    "How often should the dashboard refresh?",
-                    "Is SSO or VPN authentication required?",
-                    "Which MES API or database view provides the data?",
-                    "Are there any branding or color constraints?",
-                    "Should supervisors sort or filter by line or product?",
-                ],
-                "collection_status": collection_status,
-            }
-        )
-        self._cache_requirement_model(session.id, model)
-        self.llm_client.chat_response = "# Production Line Dashboard PRD\n\nConfirmed requirement."
-
-        result = self.service.build_prd_document(session.id, "en", save_history=True)
-        markdown = result["document_markdown"]
-
-        self.assertIn("## Document QA", markdown)
-        self.assertIn("System-counted open questions**: 6", markdown)
-        self.assertIn("Production readiness**: Blocked", markdown)
-        self.assertIn("Behind-schedule rule may be wrong", markdown)
-        self.assertIn("Which MES API or database view provides the data?", markdown)
-        self.assertIn("Are there any branding or color constraints?", markdown)
-        self.assertIn("Document QA", self.service.get_saved_prd_document(session.id)[0].read_text())
-
-    def test_design_document_qa_flags_default_stack_and_mock_assumptions(self) -> None:
-        session = self.service.create_session(language="en", starter_department="production")
-        self.service._append_message(session.id, "user", "Build a production line dashboard.")
-        collection_status = {
-            key: {"status": "confirmed", "reason": "Confirmed.", "pending_questions": []}
-            for key in REQUIREMENT_ITEM_KEYS
-        }
-        model = normalize_structured_requirement_model(
-            {
-                "document_info": {"project_name": "Production Line Dashboard"},
-                "background": {"objective": "Monitor current shift output."},
-                "scope": {"in_scope": ["Real-time dashboard"], "out_of_scope": ["Mobile"]},
-                "users_and_scenarios": {
-                    "target_users": ["Supervisors"],
-                    "core_scenarios": ["Open dashboard mid-shift"],
-                },
-                "functional_requirements": {"overview": "Plan vs actual table."},
-                "business_rules": ["Behind schedule when actual < plan."],
-                "page_and_interaction": {"pages": [{"page_name": "Shift Dashboard"}]},
-                "data_and_dependencies": ["MES data"],
-                "acceptance_criteria": ["Cross-check with MES report."],
-                "open_questions": ["Which MES system API is available?", "What is the refresh cadence?"],
-                "collection_status": collection_status,
-            }
-        )
-        self._cache_requirement_model(session.id, model)
-        self.llm_client.chat_response = (
-            "# System Design Document\n\n"
-            "Default technology stack: Frontend static HTML/CSS/vanilla JS, Backend: C#, Database: SQLite.\n\n"
-            "Use mock MES data for demo. Real-time dashboard uses manual refresh only."
-        )
-
-        result = self.service.build_system_design_document(session.id, "en", save_history=True)
-        markdown = result["document_markdown"]
-
-        self.assertIn("## Document QA", markdown)
-        self.assertIn("Technology stack appears to be a system default or demo assumption", markdown)
-        self.assertIn("Mock/demo data is acceptable for prototype validation only", markdown)
-        self.assertIn("Real-time wording conflicts with manual/TBD refresh behavior", markdown)
-        self.assertIn("Real MES integration is not yet specified", markdown)
 
     def test_coding_handoff_requires_saved_prd_document(self) -> None:
         session = self.service.create_session(language="en", starter_department="quality")
