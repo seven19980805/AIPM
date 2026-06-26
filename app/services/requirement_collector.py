@@ -2185,7 +2185,11 @@ class RequirementCollectorService:
             temperature=0.2,
         )
         doc_markdown, _ = self._split_thinking(doc_markdown)
-        doc_markdown = doc_markdown.strip() or seed_markdown
+        doc_markdown = doc_markdown.strip()
+        if not doc_markdown:
+            # The seed scaffold is a prompt aid only; never emit it as a finished
+            # document. If the LLM produced nothing, fail loudly (no local fakes).
+            raise LLMError("LLM returned empty design document.")
         doc_markdown = self._append_document_qa_appendix(
             doc_markdown,
             structured_requirement_model,
@@ -2292,9 +2296,9 @@ class RequirementCollectorService:
             thinking_text = f"{thinking_text}\n{content_embedded_thinking}".strip()
 
         if not doc_markdown:
-            doc_markdown = seed_markdown
-            if not doc_parts:
-                yield {"event": "content", "delta": doc_markdown}
+            # The seed scaffold is a prompt aid only; never emit it as a finished
+            # document. If the LLM streamed nothing, fail loudly (no local fakes).
+            raise LLMError("LLM returned empty streamed design document.")
 
         appended_doc_markdown = self._append_document_qa_appendix(
             doc_markdown,

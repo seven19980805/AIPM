@@ -17,6 +17,7 @@ from app.services.requirement_collector import (
     STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
     RequirementCollectorService,
 )
+from app.services.llm_client import LLMError
 from app.services.session_store import SQLiteSessionStore
 from app.services.structured_requirement_model import REQUIREMENT_ITEM_KEYS, normalize_structured_requirement_model
 
@@ -163,6 +164,24 @@ class TemplateExampleStartTest(unittest.TestCase):
             }
         )
         self._cache_requirement_model(session_id, model)
+
+    def test_design_doc_generation_raises_on_empty_llm_output(self) -> None:
+        # The seed scaffold is a prompt aid; when the LLM produces nothing the
+        # generator must fail loudly instead of emitting a local TBD document.
+        session = self.service.create_session(language="en", starter_department="quality")
+        self.service._append_message(session.id, "user", "Build a lot yield dashboard.")
+        self._cache_ready_requirement_model(session.id)
+        self.llm_client.chat_response = ""
+        with self.assertRaises(LLMError):
+            self.service.build_system_design_document(session.id, "en", save_history=False)
+
+    def test_design_doc_stream_raises_on_empty_llm_output(self) -> None:
+        session = self.service.create_session(language="en", starter_department="quality")
+        self.service._append_message(session.id, "user", "Build a lot yield dashboard.")
+        self._cache_ready_requirement_model(session.id)
+        self.llm_client.stream_response_parts = []
+        with self.assertRaises(LLMError):
+            list(self.service.stream_system_design_document(session.id, "en", save_history=False))
 
     def test_guided_template_session_stays_empty(self) -> None:
         session = self.service.create_session(
