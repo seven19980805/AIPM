@@ -36,6 +36,29 @@ type PreviewCopy = {
   missingHint: string
   featureLabel: string
   pageLabel: string
+  icEvidence: {
+    ready: string
+    missing: string
+    noVisibleUnresolvedTerms: string
+    labels: {
+      entryOwner: string
+      businessAction: string
+      objectGrain: string
+      workflowStateOwner: string
+      dataReconciliation: string
+      acceptanceEvidence: string
+      openQuestions: string
+    }
+    missingPrompts: {
+      entryOwner: string
+      businessAction: string
+      objectGrain: string
+      workflowStateOwner: string
+      dataReconciliation: string
+      acceptanceEvidence: string
+      openQuestions: string
+    }
+  }
   fields: {
     projectName: string
     requirementName: string
@@ -101,6 +124,7 @@ type PreviewCopy = {
     moduleCandidates: string
     pageTouchpoints: string
     api: string
+    icSubstrateEvidence: string
     dataModel: string
     dependencies: string
     keyFlows: string
@@ -135,8 +159,8 @@ const enCopy: PreviewCopy = {
   loading: 'Refreshing the latest collected requirements...',
   syncing: 'Syncing...',
   tbd: 'TBD',
-  progressLabel: 'Collection coverage',
-  confirmationLabel: 'Confirmation progress',
+  progressLabel: 'Fields collected',
+  confirmationLabel: 'Fields confirmed',
   tabs: {
     user: 'User View',
     developer: 'Developer View',
@@ -152,6 +176,29 @@ const enCopy: PreviewCopy = {
   missingHint: '> Missing or unconfirmed information is marked as TBD.',
   featureLabel: 'Feature',
   pageLabel: 'Page',
+  icEvidence: {
+    ready: 'ready',
+    missing: 'missing',
+    noVisibleUnresolvedTerms: 'No visible unresolved terms',
+    labels: {
+      entryOwner: 'Entry department and owner',
+      businessAction: 'Business action or decision',
+      objectGrain: 'Object grain',
+      workflowStateOwner: 'Workflow state and owner',
+      dataReconciliation: 'Data source and reconciliation',
+      acceptanceEvidence: 'Acceptance evidence',
+      openQuestions: 'Open questions / assumptions',
+    },
+    missingPrompts: {
+      entryOwner: 'Confirm the v1 requesting entry and who signs off.',
+      businessAction: 'Clarify the business action before implementation design.',
+      objectGrain: 'Confirm lot/panel/unit/case grain and route/station/time-window boundary.',
+      workflowStateOwner: 'Confirm current state names, owners, and exception closure.',
+      dataReconciliation: 'Confirm source of truth, refresh, reconciliation, and interface boundary.',
+      acceptanceEvidence: 'Confirm the evidence used for business sign-off.',
+      openQuestions: 'List unconfirmed formulas, states, system names, SLA values, or owner roles.',
+    },
+  },
   fields: {
     projectName: 'Project name',
     requirementName: 'Requirement name',
@@ -217,16 +264,17 @@ const enCopy: PreviewCopy = {
     moduleCandidates: '### 7.1 Candidate Modules',
     pageTouchpoints: '### 7.2 Page / Touchpoint Notes',
     api: '## 8. API Design (Draft)',
-    dataModel: '## 9. Data Model and Database Design',
-    dependencies: '### 9.1 Known Data / Dependency Inputs',
-    keyFlows: '## 10. Key Flows / Sequence Notes',
-    security: '## 11. Security, Privacy, and Compliance',
-    observability: '## 12. Observability and Operations',
-    deployment: '## 13. Deployment and Environment Planning',
-    testing: '## 14. Testing and Acceptance Plan',
-    risks: '## 15. Risks, Trade-offs, and Assumptions',
-    milestones: '## 16. Milestones and Delivery Plan',
-    openQuestions: '## 17. Open Questions / Missing Inputs',
+    icSubstrateEvidence: '## 9. IC Substrate Expert Evidence Checklist',
+    dataModel: '## 10. Data Model and Database Design',
+    dependencies: '### 10.1 Known Data / Dependency Inputs',
+    keyFlows: '## 11. Key Flows / Sequence Notes',
+    security: '## 12. Security, Privacy, and Compliance',
+    observability: '## 13. Observability and Operations',
+    deployment: '## 14. Deployment and Environment Planning',
+    testing: '## 15. Testing and Acceptance Plan',
+    risks: '## 16. Risks, Trade-offs, and Assumptions',
+    milestones: '## 17. Milestones and Delivery Plan',
+    openQuestions: '## 18. Open Questions / Missing Inputs',
   },
 }
 
@@ -236,8 +284,8 @@ const zhCopy: PreviewCopy = {
   loading: '\u6b63\u5728\u5237\u65b0\u6700\u65b0\u6536\u96c6\u5230\u7684\u9700\u6c42...',
   syncing: '\u540c\u6b65\u4e2d...',
   tbd: 'TBD',
-  progressLabel: '\u6536\u96c6\u8986\u76d6\u7387',
-  confirmationLabel: '\u786e\u8ba4\u5b8c\u6210\u5ea6',
+  progressLabel: '\u5df2\u6536\u96c6\u5b57\u6bb5',
+  confirmationLabel: '\u5df2\u786e\u8ba4\u5b57\u6bb5',
   tabs: {
     user: '\u7528\u6237\u7248',
     developer: '\u5f00\u53d1\u7248',
@@ -253,6 +301,29 @@ const zhCopy: PreviewCopy = {
   missingHint: '> \u5c1a\u672a\u786e\u8ba4\u6216\u7f3a\u5931\u7684\u4fe1\u606f\u4f1a\u6807\u8bb0\u4e3a TBD\u3002',
   featureLabel: '\u529f\u80fd',
   pageLabel: '\u9875\u9762',
+  icEvidence: {
+    ready: '\u5df2\u5177\u5907',
+    missing: '\u7f3a\u5931',
+    noVisibleUnresolvedTerms: '\u6682\u65e0\u663e\u5f0f\u672a\u51b3\u9879',
+    labels: {
+      entryOwner: '\u5165\u53e3\u90e8\u95e8\u4e0e owner',
+      businessAction: '\u4e1a\u52a1\u52a8\u4f5c\u6216\u51b3\u7b56',
+      objectGrain: '\u4e1a\u52a1\u5bf9\u8c61\u7c92\u5ea6',
+      workflowStateOwner: '\u6d41\u7a0b\u72b6\u6001\u4e0e owner',
+      dataReconciliation: '\u6570\u636e\u6e90\u4e0e\u5bf9\u8d26',
+      acceptanceEvidence: '\u9a8c\u6536\u8bc1\u636e',
+      openQuestions: '\u5f85\u786e\u8ba4\u95ee\u9898 / \u5047\u8bbe',
+    },
+    missingPrompts: {
+      entryOwner: '\u786e\u8ba4\u9996\u7248\u7531\u54ea\u4e2a\u5165\u53e3\u63d0\u9700\u4ee5\u53ca\u8c01\u8d1f\u8d23 sign-off\u3002',
+      businessAction: '\u5148\u786e\u8ba4\u7cfb\u7edf\u8981\u652f\u6491\u7684\u4e1a\u52a1\u52a8\u4f5c\uff0c\u518d\u8fdb\u5165\u5b9e\u73b0\u8bbe\u8ba1\u3002',
+      objectGrain: '\u786e\u8ba4 lot/panel/unit/case \u7c92\u5ea6\u4ee5\u53ca route/station/time-window \u8fb9\u754c\u3002',
+      workflowStateOwner: '\u786e\u8ba4\u73b0\u884c\u72b6\u6001\u540d\u3001owner \u548c\u5f02\u5e38\u5173\u95ed\u65b9\u5f0f\u3002',
+      dataReconciliation: '\u786e\u8ba4 source of truth\u3001\u5237\u65b0\u9891\u7387\u3001\u5bf9\u8d26\u903b\u8f91\u548c\u63a5\u53e3\u8fb9\u754c\u3002',
+      acceptanceEvidence: '\u786e\u8ba4\u7528\u4ec0\u4e48\u8bc1\u636e\u652f\u6491\u4e1a\u52a1\u9a8c\u6536\u3002',
+      openQuestions: '\u5217\u51fa\u672a\u786e\u8ba4\u7684\u516c\u5f0f\u3001\u72b6\u6001\u3001\u7cfb\u7edf\u540d\u3001SLA \u6216 owner\u3002',
+    },
+  },
   fields: {
     projectName: '\u9879\u76ee\u540d\u79f0',
     requirementName: '\u9700\u6c42\u540d\u79f0',
@@ -318,16 +389,17 @@ const zhCopy: PreviewCopy = {
     moduleCandidates: '### 7.1 \u5019\u9009\u6a21\u5757',
     pageTouchpoints: '### 7.2 \u9875\u9762 / \u89e6\u70b9\u8bf4\u660e',
     api: '## 8. API \u8bbe\u8ba1\uff08\u8349\u6848\uff09',
-    dataModel: '## 9. \u6570\u636e\u6a21\u578b\u4e0e\u6570\u636e\u5e93\u8bbe\u8ba1',
-    dependencies: '### 9.1 \u5df2\u8bc6\u522b\u7684\u6570\u636e / \u4f9d\u8d56\u8f93\u5165',
-    keyFlows: '## 10. \u5173\u952e\u6d41\u7a0b / \u65f6\u5e8f\u8bf4\u660e',
-    security: '## 11. \u5b89\u5168\u3001\u9690\u79c1\u4e0e\u5408\u89c4',
-    observability: '## 12. \u53ef\u89c2\u6d4b\u6027\u4e0e\u8fd0\u7ef4',
-    deployment: '## 13. \u90e8\u7f72\u4e0e\u73af\u5883\u89c4\u5212',
-    testing: '## 14. \u6d4b\u8bd5\u4e0e\u9a8c\u6536\u65b9\u6848',
-    risks: '## 15. \u98ce\u9669\u3001\u6743\u8861\u4e0e\u5047\u8bbe',
-    milestones: '## 16. \u91cc\u7a0b\u7891\u4e0e\u4ea4\u4ed8\u8ba1\u5212',
-    openQuestions: '## 17. \u5f85\u786e\u8ba4\u95ee\u9898 / \u7f3a\u5931\u8f93\u5165',
+    icSubstrateEvidence: '## 9. IC Substrate \u4e13\u5bb6\u8bc1\u636e\u6e05\u5355',
+    dataModel: '## 10. \u6570\u636e\u6a21\u578b\u4e0e\u6570\u636e\u5e93\u8bbe\u8ba1',
+    dependencies: '### 10.1 \u5df2\u8bc6\u522b\u7684\u6570\u636e / \u4f9d\u8d56\u8f93\u5165',
+    keyFlows: '## 11. \u5173\u952e\u6d41\u7a0b / \u65f6\u5e8f\u8bf4\u660e',
+    security: '## 12. \u5b89\u5168\u3001\u9690\u79c1\u4e0e\u5408\u89c4',
+    observability: '## 13. \u53ef\u89c2\u6d4b\u6027\u4e0e\u8fd0\u7ef4',
+    deployment: '## 14. \u90e8\u7f72\u4e0e\u73af\u5883\u89c4\u5212',
+    testing: '## 15. \u6d4b\u8bd5\u4e0e\u9a8c\u6536\u65b9\u6848',
+    risks: '## 16. \u98ce\u9669\u3001\u6743\u8861\u4e0e\u5047\u8bbe',
+    milestones: '## 17. \u91cc\u7a0b\u7891\u4e0e\u4ea4\u4ed8\u8ba1\u5212',
+    openQuestions: '## 18. \u5f85\u786e\u8ba4\u95ee\u9898 / \u7f3a\u5931\u8f93\u5165',
   },
 }
 
@@ -339,8 +411,8 @@ const previewCopy: Record<LanguageCode, PreviewCopy> = {
     subtitle: 'Zwischen PRD-Entwurf und technischem Entwurf aus dem aktuellen Anforderungsmodell wechseln.',
     loading: 'Aktualisiere die zuletzt erfassten Anforderungen...',
     syncing: 'Synchronisiert...',
-    progressLabel: 'Erfassungsgrad',
-    confirmationLabel: 'Bestaetigungsstand',
+    progressLabel: 'Erfasste Felder',
+    confirmationLabel: 'Bestaetigte Felder',
     tabs: {
       user: 'Fachbereich',
       developer: 'Entwicklung',
@@ -356,6 +428,29 @@ const previewCopy: Record<LanguageCode, PreviewCopy> = {
     missingHint: '> Fehlende oder noch nicht bestaetigte Informationen werden als TBD markiert.',
     featureLabel: 'Funktion',
     pageLabel: 'Seite',
+    icEvidence: {
+      ready: 'bereit',
+      missing: 'fehlt',
+      noVisibleUnresolvedTerms: 'Keine sichtbaren offenen Punkte',
+      labels: {
+        entryOwner: 'Einstiegsbereich und Owner',
+        businessAction: 'Business-Aktion oder Entscheidung',
+        objectGrain: 'Objektgranularitaet',
+        workflowStateOwner: 'Workflow-Status und Owner',
+        dataReconciliation: 'Datenquelle und Reconciliation',
+        acceptanceEvidence: 'Abnahme-Evidence',
+        openQuestions: 'Offene Fragen / Annahmen',
+      },
+      missingPrompts: {
+        entryOwner: 'Bestaetige den v1-Einstiegsbereich und wer sign-off gibt.',
+        businessAction: 'Klaere die Business-Aktion vor dem Implementierungsdesign.',
+        objectGrain: 'Bestaetige lot/panel/unit/case-Granularitaet sowie route/station/time-window boundary.',
+        workflowStateOwner: 'Bestaetige aktuelle Statusnamen, Owner und Exception Closure.',
+        dataReconciliation: 'Bestaetige source of truth, refresh, reconciliation und interface boundary.',
+        acceptanceEvidence: 'Bestaetige die Evidence fuer Business Sign-off.',
+        openQuestions: 'Liste unbestaetigte Formeln, Status, Systemnamen, SLA-Werte oder Owner-Rollen.',
+      },
+    },
     fields: {
       projectName: 'Projektname',
       requirementName: 'Anforderungsname',
@@ -421,16 +516,17 @@ const previewCopy: Record<LanguageCode, PreviewCopy> = {
       moduleCandidates: '### 7.1 Kandidatenmodule',
       pageTouchpoints: '### 7.2 Seiten- / Touchpoint-Hinweise',
       api: '## 8. API-Design (Entwurf)',
-      dataModel: '## 9. Datenmodell und Datenbankdesign',
-      dependencies: '### 9.1 Bekannte Daten- / Abhaengigkeitseingaben',
-      keyFlows: '## 10. Wichtige Ablaeufe / Sequenzhinweise',
-      security: '## 11. Sicherheit, Datenschutz und Compliance',
-      observability: '## 12. Observability und Betrieb',
-      deployment: '## 13. Deployment- und Umgebungsplanung',
-      testing: '## 14. Test- und Abnahmeplan',
-      risks: '## 15. Risiken, Trade-offs und Annahmen',
-      milestones: '## 16. Meilensteine und Lieferplan',
-      openQuestions: '## 17. Offene Fragen / fehlende Inputs',
+      icSubstrateEvidence: '## 9. IC Substrate Expert Evidence Checklist',
+      dataModel: '## 10. Datenmodell und Datenbankdesign',
+      dependencies: '### 10.1 Bekannte Daten- / Abhaengigkeitseingaben',
+      keyFlows: '## 11. Wichtige Ablaeufe / Sequenzhinweise',
+      security: '## 12. Sicherheit, Datenschutz und Compliance',
+      observability: '## 13. Observability und Betrieb',
+      deployment: '## 14. Deployment- und Umgebungsplanung',
+      testing: '## 15. Test- und Abnahmeplan',
+      risks: '## 16. Risiken, Trade-offs und Annahmen',
+      milestones: '## 17. Meilensteine und Lieferplan',
+      openQuestions: '## 18. Offene Fragen / fehlende Inputs',
     },
   },
   zh: zhCopy,
@@ -440,8 +536,8 @@ const previewCopy: Record<LanguageCode, PreviewCopy> = {
     subtitle: 'Tukar antara draf PRD dan draf teknikal berdasarkan model keperluan semasa.',
     loading: 'Menyegarkan keperluan terkini yang telah dikumpul...',
     syncing: 'Menyelaras...',
-    progressLabel: 'Liputan kutipan',
-    confirmationLabel: 'Kemajuan pengesahan',
+    progressLabel: 'Medan dikumpul',
+    confirmationLabel: 'Medan disahkan',
     tabs: {
       user: 'Paparan Pengguna',
       developer: 'Paparan Pembangun',
@@ -457,6 +553,29 @@ const previewCopy: Record<LanguageCode, PreviewCopy> = {
     missingHint: '> Maklumat yang belum lengkap atau belum disahkan ditandakan sebagai TBD.',
     featureLabel: 'Fungsi',
     pageLabel: 'Halaman',
+    icEvidence: {
+      ready: 'sedia',
+      missing: 'hilang',
+      noVisibleUnresolvedTerms: 'Tiada item terbuka yang jelas',
+      labels: {
+        entryOwner: 'Entry department dan owner',
+        businessAction: 'Business action atau decision',
+        objectGrain: 'Object grain',
+        workflowStateOwner: 'Workflow state dan owner',
+        dataReconciliation: 'Data source dan reconciliation',
+        acceptanceEvidence: 'Acceptance evidence',
+        openQuestions: 'Open questions / assumptions',
+      },
+      missingPrompts: {
+        entryOwner: 'Sahkan entry v1 dan siapa yang memberi sign-off.',
+        businessAction: 'Jelaskan business action sebelum implementation design.',
+        objectGrain: 'Sahkan grain lot/panel/unit/case dan boundary route/station/time-window.',
+        workflowStateOwner: 'Sahkan state name semasa, owner dan exception closure.',
+        dataReconciliation: 'Sahkan source of truth, refresh, reconciliation dan interface boundary.',
+        acceptanceEvidence: 'Sahkan evidence untuk business sign-off.',
+        openQuestions: 'Senaraikan formula, state, system name, SLA atau owner role yang belum disahkan.',
+      },
+    },
     fields: {
       projectName: 'Nama projek',
       requirementName: 'Nama keperluan',
@@ -522,16 +641,17 @@ const previewCopy: Record<LanguageCode, PreviewCopy> = {
       moduleCandidates: '### 7.1 Modul Cadangan',
       pageTouchpoints: '### 7.2 Nota Halaman / Titik Sentuh',
       api: '## 8. Reka Bentuk API (Draf)',
-      dataModel: '## 9. Model Data dan Reka Bentuk Pangkalan Data',
-      dependencies: '### 9.1 Input Data / Kebergantungan Dikenal Pasti',
-      keyFlows: '## 10. Aliran Utama / Nota Urutan',
-      security: '## 11. Keselamatan, Privasi dan Pematuhan',
-      observability: '## 12. Kebolehcerapan dan Operasi',
-      deployment: '## 13. Perancangan Deployment dan Persekitaran',
-      testing: '## 14. Pelan Ujian dan Penerimaan',
-      risks: '## 15. Risiko, Trade-off dan Andaian',
-      milestones: '## 16. Milestone dan Pelan Serahan',
-      openQuestions: '## 17. Soalan Terbuka / Input Hilang',
+      icSubstrateEvidence: '## 9. Senarai Semak Evidence Pakar IC Substrate',
+      dataModel: '## 10. Model Data dan Reka Bentuk Pangkalan Data',
+      dependencies: '### 10.1 Input Data / Kebergantungan Dikenal Pasti',
+      keyFlows: '## 11. Aliran Utama / Nota Urutan',
+      security: '## 12. Keselamatan, Privasi dan Pematuhan',
+      observability: '## 13. Kebolehcerapan dan Operasi',
+      deployment: '## 14. Perancangan Deployment dan Persekitaran',
+      testing: '## 15. Pelan Ujian dan Penerimaan',
+      risks: '## 16. Risiko, Trade-off dan Andaian',
+      milestones: '## 17. Milestone dan Pelan Serahan',
+      openQuestions: '## 18. Soalan Terbuka / Input Hilang',
     },
   },
 }
@@ -577,7 +697,7 @@ function buildUserMarkdownDocument(
     '',
     labels.draftHints.user,
     labels.missingHint,
-    `> ${labels.progressLabel}: ${progressValue.collectionCoveragePercentage}% | ${labels.confirmationLabel}: ${progressValue.confirmationPercentage}%`,
+    `> ${labels.progressLabel}: ${progressValue.collectedCount}/${progressValue.totalCount} | ${labels.confirmationLabel}: ${progressValue.confirmedCount}/${progressValue.totalCount}`,
     '',
     labels.userSections.documentInfo,
     '',
@@ -670,7 +790,7 @@ function buildDeveloperMarkdownDocument(
     '',
     labels.draftHints.developer,
     labels.missingHint,
-    `> ${labels.progressLabel}: ${progressValue.collectionCoveragePercentage}% | ${labels.confirmationLabel}: ${progressValue.confirmationPercentage}%`,
+    `> ${labels.progressLabel}: ${progressValue.collectedCount}/${progressValue.totalCount} | ${labels.confirmationLabel}: ${progressValue.confirmedCount}/${progressValue.totalCount}`,
     '',
     labels.developerSections.scopeGoals,
     '',
@@ -720,7 +840,7 @@ function buildDeveloperMarkdownDocument(
     '',
     labels.developerSections.api,
     ...asBulletSection([], labels.tbd),
-    '',
+    ...asIcSubstrateEvidenceSection(model, labels),
     labels.developerSections.dataModel,
     '',
     labels.developerSections.dependencies,
@@ -818,6 +938,80 @@ function asPageSection(pages: StructuredRequirementPage[], labels: PreviewCopy):
   return lines
 }
 
+function asIcSubstrateEvidenceSection(model: StructuredRequirementModel, labels: PreviewCopy): string[] {
+  if (!isIcSubstrateModel(model)) {
+    return ['', '']
+  }
+
+  const allText = collectModelText(model)
+  const dataText = normalizeList(model.data_and_dependencies)
+  const acceptanceText = normalizeList(model.acceptance_criteria)
+  const pendingQuestions = collectOpenQuestions(model.collection_status, model.open_questions)
+  const context = model.product_context
+  const entryOwnerEvidence = joinOrTbd(
+    [context.requesting_department, context.business_owner, context.acceptance_owner],
+    labels.tbd,
+  )
+  const checks = [
+    {
+      label: labels.icEvidence.labels.entryOwner,
+      ready:
+        ['production', 'quality', 'tdi', 'general'].includes(context.requesting_department.trim().toLowerCase()) &&
+        Boolean(context.business_owner.trim() || context.acceptance_owner.trim()),
+      evidence: entryOwnerEvidence,
+      missing: labels.icEvidence.missingPrompts.entryOwner,
+    },
+    {
+      label: labels.icEvidence.labels.businessAction,
+      ready: Boolean(context.decision_or_action.trim()),
+      evidence: valueOrTbd(context.decision_or_action, labels.tbd),
+      missing: labels.icEvidence.missingPrompts.businessAction,
+    },
+    {
+      label: labels.icEvidence.labels.objectGrain,
+      ready: hasAnyKeyword(allText, ['lot', 'panel', 'unit', 'case', 'route', 'station', '对象', '粒度', '工序', '站点']),
+      evidence: firstEvidence(allText, ['lot', 'panel', 'unit', 'case', 'route', 'station', '对象', '粒度', '工序', '站点'], labels.tbd),
+      missing: labels.icEvidence.missingPrompts.objectGrain,
+    },
+    {
+      label: labels.icEvidence.labels.workflowStateOwner,
+      ready: hasAnyKeyword(allText, ['state', 'status', 'owner', 'hold', 'release', 'closure', 'rework', 'scrap', '状态', '责任', '放行', '关闭']),
+      evidence: firstEvidence(allText, ['state', 'status', 'owner', 'hold', 'release', 'closure', '状态', '责任', '放行', '关闭'], labels.tbd),
+      missing: labels.icEvidence.missingPrompts.workflowStateOwner,
+    },
+    {
+      label: labels.icEvidence.labels.dataReconciliation,
+      ready: dataText.length > 0 && hasAnyKeyword(dataText, ['source', 'truth', 'refresh', 'reconciliation', 'interface', 'system', '数据源', '刷新', '对账', '接口']),
+      evidence: firstEvidence(dataText, ['source', 'truth', 'refresh', 'reconciliation', 'interface', '数据源', '刷新', '对账', '接口'], labels.tbd),
+      missing: labels.icEvidence.missingPrompts.dataReconciliation,
+    },
+    {
+      label: labels.icEvidence.labels.acceptanceEvidence,
+      ready: acceptanceText.length > 0 && hasAnyKeyword(acceptanceText, ['accept', 'evidence', 'sign-off', 'verify', '验收', '证据', '签核', '验证']),
+      evidence: firstEvidence(acceptanceText, ['accept', 'evidence', 'sign-off', 'verify', '验收', '证据', '签核', '验证'], labels.tbd),
+      missing: labels.icEvidence.missingPrompts.acceptanceEvidence,
+    },
+    {
+      label: labels.icEvidence.labels.openQuestions,
+      ready: pendingQuestions.length > 0 || progressReadyEnough(model.collection_status),
+      evidence: pendingQuestions[0] || labels.icEvidence.noVisibleUnresolvedTerms,
+      missing: labels.icEvidence.missingPrompts.openQuestions,
+    },
+  ]
+
+  return [
+    '',
+    labels.developerSections.icSubstrateEvidence,
+    '',
+    ...checks.map((check) => {
+      const status = check.ready ? labels.icEvidence.ready : labels.icEvidence.missing
+      const detail = check.ready ? check.evidence : check.missing
+      return `- [${status}] ${check.label}: ${detail}`
+    }),
+    '',
+  ]
+}
+
 function collectModuleCandidates(model: StructuredRequirementModel): string[] {
   const values = [
     ...model.functional_requirements.feature_details.map((item) => item.feature_name || item.description),
@@ -832,6 +1026,69 @@ function collectOpenQuestions(
 ): string[] {
   const pendingQuestions = Object.values(collectionStatus).flatMap((item) => item.pending_questions)
   return uniqueStrings([...openQuestions, ...pendingQuestions])
+}
+
+function isIcSubstrateModel(model: StructuredRequirementModel): boolean {
+  const department = model.product_context.requesting_department.trim().toLowerCase()
+  if (['production', 'quality', 'tdi'].includes(department)) {
+    return true
+  }
+
+  return hasAnyKeyword(collectModelText(model), ['ic substrate', 'finished lot', 'tdi'])
+}
+
+function collectModelText(model: StructuredRequirementModel): string[] {
+  return [
+    model.product_context.requesting_department,
+    model.product_context.business_owner,
+    model.product_context.software_type,
+    model.product_context.primary_user,
+    model.product_context.decision_or_action,
+    model.product_context.acceptance_owner,
+    model.background.summary,
+    model.background.objective,
+    ...model.scope.in_scope,
+    ...model.scope.out_of_scope,
+    ...model.users_and_scenarios.target_users,
+    ...model.users_and_scenarios.core_scenarios,
+    model.functional_requirements.overview,
+    ...model.functional_requirements.feature_details.flatMap((feature) => [
+      feature.feature_name,
+      feature.description,
+      feature.trigger,
+      feature.processing_logic,
+      ...feature.inputs,
+      ...feature.outputs,
+      ...feature.exception_cases,
+    ]),
+    ...model.business_rules,
+    ...model.page_and_interaction.pages.flatMap((page) => [
+      page.page_name,
+      page.entry_point,
+      ...page.page_elements,
+      ...page.button_actions,
+    ]),
+    ...model.page_and_interaction.interaction_flow,
+    ...model.data_and_dependencies,
+    ...model.risks_and_notes,
+    ...model.acceptance_criteria,
+    ...model.open_questions,
+  ].map((item) => item.trim()).filter(Boolean)
+}
+
+function hasAnyKeyword(values: string[], keywords: string[]): boolean {
+  const loweredValues = values.map((item) => item.toLowerCase())
+  return keywords.some((keyword) => loweredValues.some((value) => value.includes(keyword.toLowerCase())))
+}
+
+function firstEvidence(values: string[], keywords: string[], fallback: string): string {
+  const loweredKeywords = keywords.map((keyword) => keyword.toLowerCase())
+  const match = values.find((value) => loweredKeywords.some((keyword) => value.toLowerCase().includes(keyword)))
+  return valueOrTbd(match || '', fallback)
+}
+
+function progressReadyEnough(collectionStatus: StructuredRequirementCollectionStatus): boolean {
+  return Object.values(collectionStatus).every((item) => item.status === 'confirmed')
 }
 
 function asProductContextLines(model: StructuredRequirementModel, labels: PreviewCopy): string[] {

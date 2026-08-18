@@ -1,0 +1,491 @@
+{
+  "template_id": "multiple_chart_requirement_template_zh_cn",
+  "template_key": "multiple_chart_requirement",
+  "template_name": "多图表需求模板",
+  "template_category": "business_requirement",
+  "business_domain": "data_visualization",
+  "language": "zh-CN",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "适用于响应式多图表看板的需求模板，覆盖多数据源、图表清单、布局选择、联动交互、筛选、UI 规则、技术规格和验收标准。",
+  "tags": [
+    "multiple-charts",
+    "dashboard",
+    "visualization",
+    "drill-down",
+    "data-contract"
+  ],
+  "applicable_scenarios": [
+    "多图表看板页面",
+    "多个相关 QDM 数据源",
+    "主次布局或统一网格图表布局",
+    "图表下钻和交叉筛选",
+    "看板导出和数据准确性验证"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/multiple-chart-requirement-template.zh-CN.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "基础文档信息",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.document_name",
+          "label": "文档名称",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "D.CHQ.QDM 多图表需求"
+        },
+        {
+          "field_key": "document_info.module",
+          "label": "系统 / 模块",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "D.CHQ.QDM / 看板与图表呈现"
+        }
+      ]
+    },
+    {
+      "section_key": "background_objectives",
+      "section_title": "背景与目标",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "background_objectives.background",
+          "label": "背景",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "描述业务问题、数据源和统一看板需求"
+        },
+        {
+          "field_key": "background_objectives.objectives",
+          "label": "目标",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "对比、下钻、图表配置标准化、验收目标"
+        }
+      ]
+    },
+    {
+      "section_key": "scope",
+      "section_title": "范围",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "scope.items",
+          "label": "范围",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "布局、图表、交互、数据、交付范围"
+        }
+      ]
+    },
+    {
+      "section_key": "stakeholders",
+      "section_title": "责任方与干系人",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "stakeholders.roles",
+          "label": "干系人角色",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "业务负责人、产品负责人、数据负责人、UI/UX、开发、QA、安全"
+        }
+      ]
+    },
+    {
+      "section_key": "data_contract",
+      "section_title": "数据说明与数据契约",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "data_contract.sources",
+          "label": "数据来源",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "来源 ID、表/视图/API、粒度、刷新频率、负责人"
+        },
+        {
+          "field_key": "data_contract.fields",
+          "label": "必要数据字段",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "字段名、来源、类型、是否必填、业务逻辑"
+        },
+        {
+          "field_key": "data_contract.rules",
+          "label": "字段逻辑与数据规则",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "关联键、聚合层级、公式、空值处理、标签"
+        }
+      ]
+    },
+    {
+      "section_key": "layout",
+      "section_title": "页面 / 功能布局",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "layout.options",
+          "label": "布局选项",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "统一网格、主次布局、下钻、标签页、瀑布流"
+        }
+      ]
+    },
+    {
+      "section_key": "page_presentation",
+      "section_title": "页面 / 功能呈现",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "page_presentation.areas",
+          "label": "页面区域",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "页面目的、顶部查询区、中部图表、底部明细区"
+        }
+      ]
+    },
+    {
+      "section_key": "chart_inventory",
+      "section_title": "图表清单与配置",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "chart_inventory.charts",
+          "label": "图表清单",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "图表 ID、名称、类型、指标、维度、来源、交互"
+        },
+        {
+          "field_key": "chart_inventory.configuration",
+          "label": "图表配置字段",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "标题、坐标轴、图例、tooltip、空/加载/错误态、导出"
+        }
+      ]
+    },
+    {
+      "section_key": "filters_interactions",
+      "section_title": "查询条件与用户交互",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "filters_interactions.filters",
+          "label": "筛选器",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "日期范围、组织、分类、数据源、重置"
+        },
+        {
+          "field_key": "filters_interactions.rules",
+          "label": "交互规则",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "交叉筛选、激活态、tooltip、键盘图例、导出上下文"
+        }
+      ]
+    },
+    {
+      "section_key": "ui_design",
+      "section_title": "UI 与视觉设计要求",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "ui_design.requirements",
+          "label": "UI 要求",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "色彩系统、字体、间距、面板、响应式、状态"
+        }
+      ]
+    },
+    {
+      "section_key": "technical_specs",
+      "section_title": "技术规格",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "technical_specs.requirements",
+          "label": "技术规格",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "前端栈、图表库、响应式、性能、浏览器支持、可维护性、安全"
+        }
+      ]
+    },
+    {
+      "section_key": "non_functional",
+      "section_title": "非功能需求",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "non_functional.requirements",
+          "label": "非功能需求",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "数据准确性、性能、可访问性、可靠性、兼容性、可审计性"
+        }
+      ]
+    },
+    {
+      "section_key": "acceptance",
+      "section_title": "验收标准",
+      "sort_order": 13,
+      "fields": [
+        {
+          "field_key": "acceptance.criteria",
+          "label": "验收标准",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "图表清单、数据源、渲染、状态、响应式、导出、数据准确性、视觉风格"
+        }
+      ]
+    },
+    {
+      "section_key": "open_questions",
+      "section_title": "待确认问题与决策",
+      "sort_order": 14,
+      "fields": [
+        {
+          "field_key": "open_questions.questions",
+          "label": "待确认问题",
+          "component": "table",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "布局决策、来源表、必交付图表、导出角色、刷新 SLA"
+        }
+      ]
+    },
+    {
+      "section_key": "additional_fields",
+      "section_title": "建议补充字段",
+      "sort_order": 15,
+      "fields": [
+        {
+          "field_key": "additional_fields.groups",
+          "label": "补充字段",
+          "component": "table",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "治理、业务定义、数据契约、图表配置、交互设计、质量发布"
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "质量运营综合看板",
+      "requirement_name": "多图联动质量运营看板"
+    },
+    "background": {
+      "summary": "质量运营团队需要把趋势、Pareto、排行和明细图整合在一个看板中。现有报表分散，无法联动筛选和下钻。",
+      "objective": "建设多图联动看板，支持共享筛选、图表联动、下钻分析和明细导出。"
+    },
+    "scope": {
+      "in_scope": [
+        "共享筛选器",
+        "趋势图、Pareto 图和排行图",
+        "图表联动下钻",
+        "异常明细表",
+        "看板导出与权限控制"
+      ],
+      "out_of_scope": [
+        "不支持拖拽式自助建模",
+        "不替代 BI 平台的数据建模能力"
+      ]
+    },
+    "users_and_scenarios": {
+      "target_users": [
+        "质量运营经理",
+        "质量工程师",
+        "生产主管",
+        "数据分析师",
+        "IT 开发人员"
+      ],
+      "core_scenarios": [
+        "经理通过共享筛选查看本月质量表现。",
+        "工程师点击 Pareto 缺陷项联动刷新趋势和明细。",
+        "主管导出异常明细用于改善追踪。"
+      ]
+    },
+    "functional_requirements": {
+      "overview": "该默认示例覆盖：共享看板筛选、图表联动交互、明细下钻与导出。",
+      "feature_details": [
+        {
+          "feature_name": "共享看板筛选",
+          "description": "支持共享看板筛选，用于满足示例业务场景的核心诉求。",
+          "trigger": "用户进入相关页面、执行查询或提交业务动作时触发。",
+          "processing_logic": "校验必填字段，应用权限规则，读取或保存业务数据，并更新相关状态、指标或明细结果。",
+          "inputs": [
+            "业务主数据",
+            "用户筛选条件或业务单据数据"
+          ],
+          "outputs": [
+            "更新后的业务记录",
+            "可查看的状态、图表或明细结果"
+          ],
+          "exception_cases": [
+            "必填数据缺失",
+            "权限不足",
+            "数据刷新延迟"
+          ]
+        },
+        {
+          "feature_name": "图表联动交互",
+          "description": "支持图表联动交互，用于满足示例业务场景的核心诉求。",
+          "trigger": "用户进入相关页面、执行查询或提交业务动作时触发。",
+          "processing_logic": "校验必填字段，应用权限规则，读取或保存业务数据，并更新相关状态、指标或明细结果。",
+          "inputs": [
+            "业务主数据",
+            "用户筛选条件或业务单据数据"
+          ],
+          "outputs": [
+            "更新后的业务记录",
+            "可查看的状态、图表或明细结果"
+          ],
+          "exception_cases": [
+            "必填数据缺失",
+            "权限不足",
+            "数据刷新延迟"
+          ]
+        },
+        {
+          "feature_name": "明细下钻与导出",
+          "description": "支持明细下钻与导出，用于满足示例业务场景的核心诉求。",
+          "trigger": "用户进入相关页面、执行查询或提交业务动作时触发。",
+          "processing_logic": "校验必填字段，应用权限规则，读取或保存业务数据，并更新相关状态、指标或明细结果。",
+          "inputs": [
+            "业务主数据",
+            "用户筛选条件或业务单据数据"
+          ],
+          "outputs": [
+            "更新后的业务记录",
+            "可查看的状态、图表或明细结果"
+          ],
+          "exception_cases": [
+            "必填数据缺失",
+            "权限不足",
+            "数据刷新延迟"
+          ]
+        }
+      ]
+    },
+    "business_rules": [
+      "只有授权角色可以查看权限范围内的数据并执行敏感操作。",
+      "核心业务操作必须保留操作人、操作时间、输入条件和结果状态，便于审计追溯。",
+      "导出数据必须遵循页面筛选条件、字段权限和数据权限范围。",
+      "页面必须展示数据刷新时间、指标口径说明和异常状态提示。"
+    ],
+    "page_and_interaction": {
+      "pages": [
+        {
+          "page_name": "共享看板筛选",
+          "entry_point": "业务工作台",
+          "page_elements": [
+            "筛选区",
+            "主内容区",
+            "明细区"
+          ],
+          "button_actions": [
+            "查询",
+            "重置",
+            "导出",
+            "查看详情"
+          ]
+        },
+        {
+          "page_name": "图表联动交互",
+          "entry_point": "业务工作台",
+          "page_elements": [
+            "筛选区",
+            "主内容区",
+            "明细区"
+          ],
+          "button_actions": [
+            "查询",
+            "重置",
+            "导出",
+            "查看详情"
+          ]
+        },
+        {
+          "page_name": "明细下钻与导出",
+          "entry_point": "业务工作台",
+          "page_elements": [
+            "筛选区",
+            "主内容区",
+            "明细区"
+          ],
+          "button_actions": [
+            "查询",
+            "重置",
+            "导出",
+            "查看详情"
+          ]
+        }
+      ],
+      "interaction_flow": [
+        "经理通过共享筛选查看本月质量表现。",
+        "工程师点击 Pareto 缺陷项联动刷新趋势和明细。",
+        "主管导出异常明细用于改善追踪。"
+      ]
+    },
+    "copywriting": [],
+    "data_and_dependencies": [
+      "质量交易数据",
+      "产品、客户、工厂主数据",
+      "缺陷分类字典",
+      "报表计算服务",
+      "导出服务",
+      "权限配置"
+    ],
+    "risks_and_notes": [
+      "指标口径和业务归属需要在项目启动时确认。",
+      "历史数据质量可能影响看板或流程上线后的验收结果。",
+      "外部系统接口准备情况可能影响首版范围。"
+    ],
+    "acceptance_criteria": [
+      "可以基于该示例直接生成完整的需求文档和设计文档。",
+      "用户可以通过后续对话修改示例业务内容，并覆盖对应需求事实。",
+      "主要角色、流程、数据、权限、业务规则和验收标准均有明确描述。"
+    ],
+    "open_questions": [
+      "是否存在必须优先支持的组织、工厂、客户或业务范围？",
+      "首版是否需要限制在 MVP 范围内上线？"
+    ],
+    "template_meta": {
+      "is_default_example": true,
+      "example_notice": "这是系统内置的默认示例业务，仅用于填充式开始，可被用户后续修改意见覆盖。"
+    }
+  }
+}

@@ -1,0 +1,530 @@
+{
+  "template_id": "abf_yield_analysis_template_de",
+  "template_key": "abf_yield_analysis",
+  "template_name": "ABF Yield-Analyse Vorlage",
+  "template_category": "business_requirement",
+  "business_domain": "data_visualization",
+  "language": "de",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "Anforderungsvorlage fuer die Yield-Analyse in der ABF-Substratfertigung mit Yield-Definitionen, Prozessschritten, Lot/Panel/Produkt-Dimensionen, Defect-Pareto, Root-Cause-Drill-down, Alert-Abschluss, Datenvertrag und Abnahmekriterien.",
+  "tags": [
+    "chart",
+    "dashboard",
+    "visualization",
+    "data-contract",
+    "uat"
+  ],
+  "applicable_scenarios": [
+    "ABF-Fertigungs-Yield-Dashboard",
+    "Yield-Verfolgung nach Lot, Panel, Produkt und Prozessschritt",
+    "Defect-Pareto und Yield-Loss-Analyse",
+    "Root-Cause-Drill-down fuer auffaellige Prozessschritte",
+    "Datenvertrag und UAT fuer Fertigungsqualitaet"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/abf-yield-analysis-template.de.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Basisinformationen",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.analysis_name",
+          "label": "Analysethema / Seitenname",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Beispiel: ABF Yield-Analyse Dashboard"
+        },
+        {
+          "field_key": "document_info.business_owner",
+          "label": "Business Owner",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Team oder Person fuer Yield-Definitionen und Abnahme"
+        }
+      ]
+    },
+    {
+      "section_key": "background_objectives",
+      "section_title": "Hintergrund und Ziele",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "background_objectives.background",
+          "label": "Business-Hintergrund",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "ABF Yield-Management, Pain Points, Nutzergruppen und Entscheidungsszenarien beschreiben"
+        },
+        {
+          "field_key": "background_objectives.objectives",
+          "label": "Analyseziele",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Yield-Trend, Verlustquelle, Anomalieerkennung, Verbesserungsabschluss, Datenstandardisierung"
+        }
+      ]
+    },
+    {
+      "section_key": "scope",
+      "section_title": "Analyseumfang",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "scope.items",
+          "label": "Umfangsdefinition",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Produktumfang, Prozessumfang, Datenumfang, Chart-Umfang, Nicht-Umfang"
+        }
+      ]
+    },
+    {
+      "section_key": "stakeholders",
+      "section_title": "Verantwortliche und Stakeholder",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "stakeholders.roles",
+          "label": "Stakeholder-Rollen",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Fertigung, Qualitaet, Prozess, Equipment, Daten, Produkt, Entwicklung, QA, Management"
+        }
+      ]
+    },
+    {
+      "section_key": "yield_definition",
+      "section_title": "Yield-Definitionen und Business-Regeln",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "yield_definition.formulas",
+          "label": "Yield-Formeln",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Gesamt-Yield, Step-Yield, First-Pass-Yield, Scrap-Rate, Rework-Rate, Loss-Rate"
+        },
+        {
+          "field_key": "yield_definition.rules",
+          "label": "Definitionsregeln",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Zaehler, Nenner, Ausschluesse, Retest/Rework, Zeitzuordnung, Einheiten, Rundung"
+        }
+      ]
+    },
+    {
+      "section_key": "data_contract",
+      "section_title": "Datenbeschreibung und Datenvertrag",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "data_contract.sources",
+          "label": "Datenquellen",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "MES, QMS, Testsystem, Equipment-Logs, Defect-Inspection, Work-Order/Lot-Stammdaten"
+        },
+        {
+          "field_key": "data_contract.fields",
+          "label": "Schluesselfelder",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "lot_id, panel_id, product_code, process_step, defect_code, pass_qty, fail_qty"
+        },
+        {
+          "field_key": "data_contract.quality_rules",
+          "label": "Datenqualitaetsregeln",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Eindeutige Schluessel, fehlende Werte, verspaetete Daten, Duplikate, Abstimmung, Refresh-SLA"
+        }
+      ]
+    },
+    {
+      "section_key": "dimensions_filters",
+      "section_title": "Analysedimensionen und Filter",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "dimensions_filters.dimensions",
+          "label": "Analysedimensionen",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Datum, Werk, Linie, Produkt, Material, Lot, Panel, Prozessschritt, Equipment, Defect-Kategorie"
+        },
+        {
+          "field_key": "dimensions_filters.filters",
+          "label": "Filter",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Defaultwert, Pflichtfeld, Berechtigungsumfang, Verknuepfungsregel, maximale Abfrageweite"
+        }
+      ]
+    },
+    {
+      "section_key": "metrics",
+      "section_title": "Kennzahlensystem",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "metrics.kpis",
+          "label": "Kernkennzahlen",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Input-Menge, Good-Menge, Defect-Menge, Yield, Ziel-Yield, Loss-Beitrag, auffaellige Lots"
+        },
+        {
+          "field_key": "metrics.thresholds",
+          "label": "Ziele und Schwellwerte",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Zielwert, Warnlinie, Rot/Gelb/Gruen-Regeln, Periodenvergleich, Owner"
+        }
+      ]
+    },
+    {
+      "section_key": "page_presentation",
+      "section_title": "Seiten- und Chart-Darstellung",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "page_presentation.layout",
+          "label": "Seitenlayout",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Filterbereich, KPI-Bereich, Trendbereich, Pareto-Bereich, Step-Matrix, Detailbereich"
+        },
+        {
+          "field_key": "page_presentation.charts",
+          "label": "Chart-Inventar",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Yield-Trend, Zielerreichung, Step-Loss, Defect-Pareto, Lot-Detail, Heatmap"
+        }
+      ]
+    },
+    {
+      "section_key": "drilldown_root_cause",
+      "section_title": "Drill-down und Root-Cause-Analyse",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "drilldown_root_cause.paths",
+          "label": "Drill-down-Pfade",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Produkt -> Lot -> Panel -> Prozessschritt -> Defect -> Equipment/Parameter"
+        },
+        {
+          "field_key": "drilldown_root_cause.rules",
+          "label": "Root-Cause-Hilfsregeln",
+          "component": "list",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "Loss-Beitragsranking, Step-Vergleich, Equipment-Lot-Korrelation, Parameterdrift, Notizen"
+        }
+      ]
+    },
+    {
+      "section_key": "alerts_workflow",
+      "section_title": "Alerts und Verbesserungsabschluss",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "alerts_workflow.alerts",
+          "label": "Alert-Regeln",
+          "component": "table",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "Ausloesebedingung, Schweregrad, Empfaenger, Reaktions-SLA, Eskalationsregel"
+        },
+        {
+          "field_key": "alerts_workflow.actions",
+          "label": "Verbesserungsmassnahmen",
+          "component": "table",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "Verantwortliche Abteilung, Ursachenklasse, Sofortmassnahme, langfristige Massnahme, Abschlussbedingung"
+        }
+      ]
+    },
+    {
+      "section_key": "interactions_permissions",
+      "section_title": "Interaktionen, Berechtigungen und Export",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "interactions_permissions.requirements",
+          "label": "Interaktions- und Berechtigungsanforderungen",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Verknuepfte Filter, Tooltip, Detail-Drill-down, Exportumfang, Datenmaskierung, Rollenrechte"
+        }
+      ]
+    },
+    {
+      "section_key": "technical_specs",
+      "section_title": "Technische Spezifikationen und nicht-funktionale Anforderungen",
+      "sort_order": 13,
+      "fields": [
+        {
+          "field_key": "technical_specs.requirements",
+          "label": "Technische Spezifikationen",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "API, Aggregationsschicht, Cache, Performance, Refresh-Strategie, Fehlerbehandlung, Browser-Support"
+        },
+        {
+          "field_key": "technical_specs.non_functional",
+          "label": "Nicht-funktionale Anforderungen",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Genauigkeit, Aktualitaet, Zuverlaessigkeit, Barrierefreiheit, Sicherheit, Auditierbarkeit, Wartbarkeit"
+        }
+      ]
+    },
+    {
+      "section_key": "acceptance",
+      "section_title": "Abnahmekriterien",
+      "sort_order": 14,
+      "fields": [
+        {
+          "field_key": "acceptance.criteria",
+          "label": "Abnahmekriterien",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Yield-Definition, Chart-Rendering, Filterverknuepfung, Detailkonsistenz, Berechtigung/Export, Performance, Fehlerzustaende"
+        }
+      ]
+    },
+    {
+      "section_key": "open_questions",
+      "section_title": "Offene Fragen und Aenderungsprotokoll",
+      "sort_order": 15,
+      "fields": [
+        {
+          "field_key": "open_questions.questions",
+          "label": "Offene Fragen",
+          "component": "table",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "Yield-Definition, Zielwerte, Quelltabellen, Refresh-Takt, Berechtigungsumfang, Alert-Owner"
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "Beispielprojekt: ABF Yield Analysis Dashboard",
+      "requirement_name": "Beispielanforderung: ABF manufacturing yield loss analysis"
+    },
+    "background": {
+      "summary": "Dies ist ein integriertes Beispielgeschaeft fuer den schnellen Start mit einer vorbefuellten Vorlage. ABF yield data is split across MES, QMS, inspection, and equipment systems. Quality and process teams need a unified view to identify yield loss by lot, panel, product, process step, equipment, and defect reason.",
+      "objective": "Aus dem Beispiel sollen PRD und Design-Dokument erzeugt werden; spaetere Nutzeraenderungen haben Vorrang."
+    },
+    "scope": {
+      "in_scope": [
+        "Yield KPI dashboard",
+        "Lot, panel, product, and process-step analysis",
+        "Defect Pareto and root-cause drill-down",
+        "Abnormal yield alerts and closure tracking",
+        "Data contract and UAT reconciliation"
+      ],
+      "out_of_scope": [
+        "Equipment maintenance execution",
+        "Recipe optimization automation",
+        "Advanced statistical modeling"
+      ]
+    },
+    "users_and_scenarios": {
+      "target_users": [
+        "Quality engineer",
+        "Process engineer",
+        "Manufacturing supervisor",
+        "Product owner",
+        "Data engineer"
+      ],
+      "core_scenarios": [
+        "Engineer reviews yield trend by product and process step.",
+        "User drills into a low-yield lot and checks defect Pareto.",
+        "Process owner creates an abnormal closure action."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "This default example includes Yield KPI and trend, Defect Pareto drill-down, Abnormal closure tracking.",
+      "feature_details": [
+        {
+          "feature_name": "Yield KPI and trend",
+          "description": "Support yield kpi and trend for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        },
+        {
+          "feature_name": "Defect Pareto drill-down",
+          "description": "Support defect pareto drill-down for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        },
+        {
+          "feature_name": "Abnormal closure tracking",
+          "description": "Support abnormal closure tracking for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        }
+      ]
+    },
+    "business_rules": [
+      "Only authorized roles can view scoped data and perform sensitive actions.",
+      "Core business actions must keep an audit trail.",
+      "Exported data must follow the same filters and permission scope as the page.",
+      "Data refresh status and calculation definitions must be visible to users."
+    ],
+    "page_and_interaction": {
+      "pages": [
+        {
+          "page_name": "Yield KPI and trend",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        },
+        {
+          "page_name": "Defect Pareto drill-down",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        },
+        {
+          "page_name": "Abnormal closure tracking",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        }
+      ],
+      "interaction_flow": [
+        "Engineer reviews yield trend by product and process step.",
+        "User drills into a low-yield lot and checks defect Pareto.",
+        "Process owner creates an abnormal closure action."
+      ]
+    },
+    "copywriting": [],
+    "data_and_dependencies": [
+      "User and organization master data",
+      "Business transaction data",
+      "Permission configuration",
+      "Reporting/export service"
+    ],
+    "risks_and_notes": [
+      "Metric ownership and data definitions must be confirmed.",
+      "Historical data quality may affect acceptance.",
+      "External system readiness may affect rollout scope."
+    ],
+    "acceptance_criteria": [
+      "The example scope can be generated into PRD and design documents.",
+      "Users can revise the seeded requirement through chat messages.",
+      "Main roles, flows, data, permissions, and acceptance criteria are represented."
+    ],
+    "open_questions": [
+      "Which roles need final approval authority?",
+      "Which fields and metrics are mandatory for MVP?",
+      "Which external systems must be integrated in the first release?"
+    ],
+    "template_meta": {
+      "example_note": "AI-generated default example business; replace with real business facts before final delivery."
+    }
+  }
+}

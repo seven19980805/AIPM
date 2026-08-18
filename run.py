@@ -1,8 +1,10 @@
+import logging
 import os
 from pathlib import Path
+
 from app import create_app
 
-# Load environment variables from .env file first
+
 def load_dotenv() -> None:
     env_path = Path(__file__).resolve().parent / ".env"
     if not env_path.exists():
@@ -22,19 +24,24 @@ def load_dotenv() -> None:
 
         os.environ.setdefault(key, value)
 
-# Load environment variables before creating app
+
 load_dotenv()
 app = create_app()
+logger = logging.getLogger(__name__)
 
 
 if __name__ == "__main__":
-    # Debug: print the actual values
-    print(f"HOST from env: {os.getenv('HOST')}")
-    print(f"PORT from env: {os.getenv('PORT')}")
-    
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "8000"))
-    debug = os.getenv("DEBUG", "True").lower() in {"1", "true", "yes", "on"}
-    
-    print(f"Using host: {host}, port: {port}")
-    app.run(debug=debug, host=host, port=port)
+    debug = os.getenv("DEBUG", "False").lower() in {"1", "true", "yes", "on"}
+
+    if debug:
+        # Flask's built-in server is dev-only; keep it behind an explicit DEBUG=True opt-in.
+        logger.warning("Starting Flask development server (DEBUG=True). Do not use this in production.")
+        app.run(debug=True, host=host, port=port)
+    else:
+        from waitress import serve
+
+        threads = int(os.getenv("WAITRESS_THREADS", "8"))
+        logger.info("Starting waitress on %s:%s with %d threads", host, port, threads)
+        serve(app, host=host, port=port, threads=threads)

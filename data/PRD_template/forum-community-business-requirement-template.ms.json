@@ -1,0 +1,671 @@
+{
+  "template_id": "forum_community_business_requirement_template_ms",
+  "template_key": "forum_community_business_requirement",
+  "template_name": "Templat Keperluan Perniagaan Sistem Forum Komuniti",
+  "template_category": "business_requirement",
+  "business_domain": "forum_community",
+  "language": "ms",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "Templat keperluan perniagaan umum untuk komuniti forum seperti Tieba, komuniti minat, ruang perbincangan Q&A, dan forum dalaman perusahaan.",
+  "tags": [
+    "forum",
+    "community",
+    "thread",
+    "post",
+    "comment",
+    "moderation"
+  ],
+  "applicable_scenarios": [
+    "Pengurusan papan dan moderator",
+    "Penerbitan dan suntingan thread",
+    "Balasan, komen, dan interaksi",
+    "Tahap pengguna dan mata",
+    "Moderasi dan pengendalian laporan",
+    "Carian, cadangan, dan analitik"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/forum-community-business-requirement-template.ms.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Maklumat Asas",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.project_name",
+          "label": "Projek",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Masukkan nama projek"
+        },
+        {
+          "field_key": "document_info.requirement_name",
+          "label": "Nama keperluan",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Contoh: Pembinaan forum komuniti minat"
+        },
+        {
+          "field_key": "template_meta.requirement_type",
+          "label": "Jenis keperluan",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "Binaan baharu",
+            "Pengoptimuman",
+            "Refaktor"
+          ]
+        },
+        {
+          "field_key": "template_meta.priority",
+          "label": "Keutamaan",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "Tinggi",
+            "Sederhana",
+            "Rendah"
+          ]
+        },
+        {
+          "field_key": "template_meta.proposing_department",
+          "label": "Jabatan pemohon",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Masukkan jabatan pemohon"
+        },
+        {
+          "field_key": "template_meta.requester",
+          "label": "Pemohon",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Masukkan pemohon"
+        },
+        {
+          "field_key": "template_meta.request_date",
+          "label": "Tarikh permintaan",
+          "component": "date",
+          "data_type": "date",
+          "required": false,
+          "placeholder": "YYYY-MM-DD"
+        },
+        {
+          "field_key": "template_meta.version",
+          "label": "Versi",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "V1.0"
+        }
+      ]
+    },
+    {
+      "section_key": "business_background",
+      "section_title": "Latar Belakang Perniagaan",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "business_background.summary",
+          "label": "Ringkasan latar belakang",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Huraikan latar belakang komuniti forum, cara komunikasi semasa, dan sebab pembinaan sistem"
+        },
+        {
+          "field_key": "business_background.pain_points",
+          "label": "Masalah semasa",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Huraikan latar belakang komuniti forum, cara komunikasi semasa, dan sebab pembinaan sistem"
+        }
+      ]
+    },
+    {
+      "section_key": "business_objectives",
+      "section_title": "Objektif Perniagaan",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "business_objectives.objectives",
+          "label": "Objektif perniagaan",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Huraikan objektif perniagaan yang perlu dicapai oleh sistem forum"
+        },
+        {
+          "field_key": "business_objectives.metrics",
+          "label": "Metrik kuantitatif",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Contoh: Kurangkan purata masa pengendalian moderasi sebanyak 50%"
+        }
+      ]
+    },
+    {
+      "section_key": "business_scope",
+      "section_title": "Skop Perniagaan",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "business_scope.in_scope",
+          "label": "Dalam skop",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem forum"
+        },
+        {
+          "field_key": "business_scope.out_scope",
+          "label": "Di luar skop",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem forum"
+        }
+      ]
+    },
+    {
+      "section_key": "roles_and_scenarios",
+      "section_title": "Peranan dan Senario Teras",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "roles_and_scenarios.target_roles",
+          "label": "Peranan sasaran",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Contoh: pelawat, pengguna berdaftar, moderator, operator, penyemak"
+        },
+        {
+          "field_key": "roles_and_scenarios.core_scenarios",
+          "label": "Senario perniagaan teras",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Contoh: pelawat, pengguna berdaftar, moderator, operator, penyemak"
+        }
+      ]
+    },
+    {
+      "section_key": "functional_requirements",
+      "section_title": "Keperluan Fungsi",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "functional_requirements.overview",
+          "label": "Gambaran fungsi",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem forum"
+        },
+        {
+          "field_key": "functional_requirements.features",
+          "label": "Butiran fungsi",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "feature": "Fungsi",
+            "description": "Penerangan",
+            "trigger": "Pencetus",
+            "logic": "Peraturan / logik perniagaan",
+            "inputs": "Input",
+            "outputs": "Output",
+            "exceptions": "Pengendalian pengecualian"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "page_and_process",
+      "section_title": "Halaman dan Proses",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "page_and_process.pages",
+          "label": "Halaman / laluan masuk",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "page": "Halaman / laluan masuk",
+            "entry": "Laluan masuk",
+            "elements": "Elemen utama",
+            "actions": "Tindakan utama",
+            "flow": "Aliran"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "business_rules_and_data",
+      "section_title": "Peraturan Perniagaan dan Data",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "business_rules_and_data.rules",
+          "label": "Peraturan / logik perniagaan",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem forum"
+        },
+        {
+          "field_key": "business_rules_and_data.key_data",
+          "label": "Objek data utama",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Contoh: papan, thread, balasan, hubungan pengguna, rekod moderasi"
+        }
+      ]
+    },
+    {
+      "section_key": "nonfunctional_requirements",
+      "section_title": "Keperluan Bukan Fungsi",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "nonfunctional_requirements.items",
+          "label": "Keperluan bukan fungsi",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem forum"
+        }
+      ]
+    },
+    {
+      "section_key": "integration_dependencies",
+      "section_title": "Integrasi dan Kebergantungan",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "integration_dependencies.external_systems",
+          "label": "Kebergantungan luaran",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem forum"
+        }
+      ]
+    },
+    {
+      "section_key": "risks_and_questions",
+      "section_title": "Risiko dan Soalan Terbuka",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "risks_and_questions.risks",
+          "label": "Risiko",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem forum"
+        },
+        {
+          "field_key": "risks_and_questions.open_questions",
+          "label": "Soalan terbuka",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Masukkan soalan terbuka"
+        }
+      ]
+    },
+    {
+      "section_key": "milestone_acceptance",
+      "section_title": "Pencapaian dan Penerimaan",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "milestone_acceptance.milestones",
+          "label": "Pencapaian",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "milestone": "Pencapaian",
+            "target_date": "Tarikh sasaran",
+            "acceptance": "Kriteria penerimaan"
+          }
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "Projek platform forum komuniti",
+      "requirement_name": "Pembinaan forum komuniti minat"
+    },
+    "template_meta": {
+      "template_name": "Templat Keperluan Perniagaan Sistem Forum Komuniti",
+      "requirement_type": "Binaan baharu",
+      "priority": "Tinggi",
+      "proposing_department": "Operasi Komuniti / Produk",
+      "requester": "Pengurus produk komuniti",
+      "request_date": "2026-05-14",
+      "version": "V1.0"
+    },
+    "business_background": {
+      "summary": "Perbincangan pengguna, perkongsian pengalaman, dan kandungan Q&A kini tersebar di kumpulan chat, hamparan, dan dokumen sementara. Kandungan sukar disimpan, carian lemah, dan pelanggaran peraturan bergantung pada rondaan manual. Sistem forum komuniti seperti Tieba diperlukan untuk menyokong perbincangan berthread, tadbir urus papan, moderasi kandungan, dan analitik komuniti.",
+      "pain_points": [
+        "Kandungan perbincangan sukar distruktur, disimpan, dan dicari semula",
+        "Papan, thread, balasan, dan hubungan pengguna tiada pengurusan bersatu",
+        "Pelanggaran ditemui dan ditangani lewat, dan moderasi kurang jejak audit",
+        "Kandungan popular, pengguna aktif, dan kualiti komuniti tiada papan pemuka"
+      ]
+    },
+    "business_objectives": {
+      "objectives": [
+        "Bina struktur papan dan thread mengikut minat atau topik perniagaan",
+        "Sokong gelung interaksi lengkap untuk siaran, balasan, suka, simpan, ikuti, dan notifikasi",
+        "Bina tadbir urus kandungan untuk laporan, moderasi, sekatan, rayuan, dan audit operasi",
+        "Kumpul data operasi komuniti untuk cadangan dan keputusan operasi"
+      ],
+      "metrics": [
+        "Purata masa daripada penerbitan hingga kelihatan dalam 3 saat",
+        "Kurangkan purata masa pengendalian moderasi sebanyak 50%",
+        "Tingkatkan kadar hit carian komuniti kepada 90%",
+        "Jejak pengguna aktif harian dan jumlah siaran mengikut papan teras"
+      ]
+    },
+    "business_scope": {
+      "in_scope": [
+        "Pengurusan papan dan konfigurasi kebenaran",
+        "Penerbitan, suntingan, padam, pin, dan sorotan thread",
+        "Balasan, komen, balasan bersarang, dan interaksi",
+        "Profil pengguna, ikutan, tahap, mata, dan lencana",
+        "Laporan, moderasi, sembunyi, sekatan, dan rayuan",
+        "Carian, susunan, cadangan, dan papan pemuka analitik"
+      ],
+      "out_scope": [
+        "Chat kumpulan mesej segera",
+        "Alat penciptaan video pendek yang kompleks",
+        "Sistem penyampaian iklan luaran",
+        "Penghakiman kandungan AI sepenuhnya automatik"
+      ]
+    },
+    "roles_and_scenarios": {
+      "target_roles": [
+        "Pelawat: semak papan dan thread awam, cari kandungan",
+        "Pengguna berdaftar: terbit thread, balas, suka, simpan, ikuti, dan lapor",
+        "Moderator papan: urus peraturan papan, pin/sorot siaran, dan tangani pelanggaran",
+        "Penyemak: semak siaran baharu, laporan, dan kandungan sensitif",
+        "Operator: konfigurasi cadangan, kempen, tag, dan papan pemuka",
+        "Pentadbir sistem: selenggara kebenaran, kamus, kata sensitif, dan parameter sistem"
+      ],
+      "core_scenarios": [
+        "Pengguna masuk ke halaman utama forum dan menuju ke thread menarik melalui papan, senarai panas, atau carian.",
+        "Pengguna berdaftar menerbitkan thread dalam papan sasaran dan memuat naik imej atau lampiran.",
+        "Pengguna lain membalas, suka, simpan, atau mengikuti penulis, dan sistem menghantar notifikasi interaksi.",
+        "Pengguna melaporkan kandungan melanggar peraturan, dan penyemak memprosesnya dalam konsol moderasi dengan sebab direkodkan.",
+        "Moderator mempin atau menyorot siaran berkualiti, sementara operator mengkonfigurasi slot cadangan.",
+        "Pengurusan melihat jumlah siaran, jumlah balasan, pengguna aktif, laporan, dan kecekapan moderasi."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "Keperluan ini merangkumi tujuh kumpulan keupayaan: tadbir urus papan, penerbitan kandungan, interaksi, pertumbuhan pengguna, moderasi dan kawalan risiko, carian dan cadangan, serta analitik komuniti.",
+      "features": [
+        {
+          "feature": "Pengurusan papan dan moderator",
+          "description": "Menyelenggara kategori papan, profil papan, peraturan, moderator, dan kebenaran akses.",
+          "trigger": "Operator mencipta atau melaras papan.",
+          "logic": [
+            "Sokong penciptaan, nyahaktif, gabung, susun, dan konfigurasi keterlihatan papan",
+            "Sokong peraturan papan, pengumuman, tag, dan kebenaran moderator",
+            "Sokong statistik papan dan amaran anomali"
+          ],
+          "inputs": "Nama papan, kategori, peraturan, moderator, skop kebenaran",
+          "outputs": "Butiran papan, pengumuman, senarai moderator, statistik",
+          "exceptions": "Nama papan berulang, padam disekat apabila ada siaran, konflik kebenaran"
+        },
+        {
+          "feature": "Penerbitan thread dan suntingan kandungan",
+          "description": "Sokong penerbitan thread, draf, teks kaya, imej, lampiran, dan tag.",
+          "trigger": "Pengguna klik terbit atau edit.",
+          "logic": [
+            "Sokong tajuk, isi, imej, lampiran, tag, dan pilihan tanpa nama",
+            "Sokong simpan draf, sejarah suntingan, padam, dan pulih",
+            "Sokong pin, sorot, kunci, dan turunkan siaran"
+          ],
+          "inputs": "Tajuk, isi, papan, tag, lampiran, penulis",
+          "outputs": "Thread, draf, rekod suntingan, status pengurusan",
+          "exceptions": "Kata sensitif dikesan, had lampiran melebihi, siaran berulang, tiada kebenaran"
+        },
+        {
+          "feature": "Balasan, komen, dan interaksi",
+          "description": "Sokong balasan, komen bersarang, suka, simpan, ikuti, dan notifikasi.",
+          "trigger": "Pengguna berinteraksi dengan thread atau balasan.",
+          "logic": [
+            "Sokong susunan, petikan, lipat, dan padam balasan",
+            "Sokong suka, simpan, ikuti penulis/thread, dan notifikasi interaksi",
+            "Sokong sekat pengguna dan maklum balas tidak berminat"
+          ],
+          "inputs": "Thread, balasan, pengguna, jenis interaksi",
+          "outputs": "Senarai balasan, rekod interaksi, notifikasi",
+          "exceptions": "Had tindakan kerap, sekatan pengguna disekat, kandungan telah dipadam"
+        },
+        {
+          "feature": "Pertumbuhan pengguna dan aset komuniti",
+          "description": "Menyelenggara profil pengguna, tahap, mata, lencana, dan rekod sumbangan.",
+          "trigger": "Pengguna melengkapkan siaran, interaksi, daftar masuk, atau tugasan kempen.",
+          "logic": [
+            "Sokong peraturan mata, peraturan tahap, pengeluaran lencana, dan konfigurasi tugasan",
+            "Paparkan siaran, simpanan, ikutan, dan pengikut dalam profil pengguna",
+            "Sokong potongan mata pelanggaran, senyap, dan pemulihan kredit"
+          ],
+          "inputs": "Profil pengguna, rekod tingkah laku, peraturan mata, peraturan lencana",
+          "outputs": "Profil pengguna, lejar mata, keputusan tahap, rekod lencana",
+          "exceptions": "Perladangan mata, undur mata, anomali akaun"
+        },
+        {
+          "feature": "Moderasi dan pengendalian laporan",
+          "description": "Mengendalikan kandungan sensitif, laporan, semakan manual, sekatan, dan rayuan.",
+          "trigger": "Kandungan diterbitkan, dilaporkan, atau terkena peraturan.",
+          "logic": [
+            "Sokong moderasi sebelum/selepas terbit, kata sensitif, dan semakan imej",
+            "Sokong penerimaan laporan, kesimpulan, tindakan hukuman, dan notifikasi",
+            "Sokong sekatan, senyap, sembunyi kandungan, rayuan, dan audit operasi"
+          ],
+          "inputs": "Kandungan, sebab laporan, peraturan moderasi, pengendali",
+          "outputs": "Keputusan moderasi, rekod hukuman, rekod rayuan, log audit",
+          "exceptions": "Rayuan salah nilai, laporan berulang, tamat masa moderasi, pembatalan hukuman"
+        },
+        {
+          "feature": "Carian, cadangan, dan analitik",
+          "description": "Menyediakan carian kandungan, senarai panas, slot cadangan, dan data komuniti.",
+          "trigger": "Pengguna mencari kandungan atau operator melihat data.",
+          "logic": [
+            "Sokong carian mengikut papan, kata kunci, tag, penulis, dan masa",
+            "Sokong senarai thread panas, slot cadangan, kawasan sorotan, dan laluan kempen",
+            "Sokong papan pemuka untuk siaran, pengguna aktif, laporan, dan kecekapan moderasi"
+          ],
+          "inputs": "Thread, balasan, tag, tingkah laku pengguna, rekod moderasi",
+          "outputs": "Hasil carian, senarai panas, senarai cadangan, laporan analitik",
+          "exceptions": "Kelewatan indeks, kandungan disyorkan melanggar peraturan, penapisan kebenaran tidak lengkap"
+        }
+      ]
+    },
+    "page_and_process": {
+      "pages": [
+        {
+          "page": "Laman utama forum",
+          "entry": "Laluan masuk pengguna",
+          "elements": "Papan disyorkan, senarai panas, kotak carian, laluan kempen",
+          "actions": "Cari, masuk papan, lihat thread panas, log masuk/daftar",
+          "flow": "Pengguna masuk ke laman utama dan membuka thread mengikut minat atau senarai panas."
+        },
+        {
+          "page": "Butiran papan",
+          "entry": "Laluan masuk papan",
+          "elements": "Pengumuman papan, peraturan, senarai thread, penapis dan susunan",
+          "actions": "Terbit thread, ikuti papan, tapis, lihat thread",
+          "flow": "Pengguna menyemak thread dalam papan dan memulakan perbincangan."
+        },
+        {
+          "page": "Butiran thread",
+          "entry": "Senarai thread / hasil carian",
+          "elements": "Siaran utama, balasan, balasan bersarang, interaksi, cadangan",
+          "actions": "Balas, suka, simpan, lapor, ikuti penulis",
+          "flow": "Pengguna membaca dan berinteraksi dengan thread; sistem merekod hubungan dan notifikasi."
+        },
+        {
+          "page": "Editor siaran",
+          "entry": "Butang terbit",
+          "elements": "Tajuk, isi, imej, lampiran, tag, tetapan terbit",
+          "actions": "Simpan draf, pratonton, terbit, edit",
+          "flow": "Pengguna mengedit kandungan, dan sistem mengesahkan kata sensitif serta kebenaran sebelum terbit."
+        },
+        {
+          "page": "Konsol moderasi",
+          "entry": "Backend pentadbir",
+          "elements": "Kandungan menunggu, senarai laporan, rekod pengendalian, tindakan hukuman",
+          "actions": "Semak, sembunyi, sekat, tolak, lulus, maklumkan",
+          "flow": "Penyemak mengendalikan kandungan dan meninggalkan rekod operasi."
+        },
+        {
+          "page": "Papan pemuka analitik komuniti",
+          "entry": "Backend operasi",
+          "elements": "Jumlah siaran, pengguna aktif, thread panas, jumlah laporan, kecekapan moderasi",
+          "actions": "Tapis, telusuri, eksport, konfigurasi cadangan",
+          "flow": "Operator menyemak kualiti dan pertumbuhan komuniti."
+        }
+      ]
+    },
+    "business_rules_and_data": {
+      "rules": [
+        "Had kekerapan siaran boleh dikonfigurasi mengikut tahap pengguna dalam setiap papan.",
+        "Penerbitan memerlukan semakan kata sensitif, keselamatan imej, dan kebenaran.",
+        "Kandungan dipadam atau disembunyikan tidak kelihatan kepada pengguna biasa, tetapi rekod audit kekal di backend pentadbir.",
+        "Pengendalian laporan mesti merekod pengendali, masa, kesimpulan, dan tindakan hukuman.",
+        "Pin, sorotan, dan slot cadangan mesti dibenarkan mengikut peranan."
+      ],
+      "key_data": [
+        "Papan: id, nama, kategori, peraturan, moderator, status, skop keterlihatan",
+        "Thread: id, papan, tajuk, isi, penulis, status, kiraan interaksi, masa terbit",
+        "Balasan: id, thread, balasan induk, penulis, isi, status, nombor tingkat",
+        "Hubungan pengguna: ikuti, sekat, simpan, suka, rekod lihat",
+        "Rekod moderasi: kandungan, peraturan, item terkena, pengendali, kesimpulan, tindakan hukuman",
+        "Konfigurasi operasi: slot cadangan, peraturan senarai panas, tag, laluan kempen"
+      ]
+    },
+    "nonfunctional_requirements": {
+      "items": [
+        "Prestasi: pertanyaan lazim halaman utama dan butiran thread kembali dalam 3 saat; senarai panas boleh dicache.",
+        "Keselamatan: lindungi identiti, kata sensitif, kandungan imej, dan kekerapan API.",
+        "Kebolehgunaan: aliran siaran, balasan, dan laporan memerlukan cuba semula dan petunjuk jelas.",
+        "Audit: moderasi, sekatan, padam, pulih, dan operasi cadangan mesti direkodkan.",
+        "Kebolehkembangan: papan, tag, mata, dan peraturan moderasi perlu boleh dikonfigurasi."
+      ]
+    },
+    "integration_dependencies": {
+      "external_systems": [
+        "Identiti bersatu / SSO",
+        "Storan objek atau perkhidmatan lampiran",
+        "Perkhidmatan notifikasi mesej",
+        "Keselamatan kandungan / semakan imej",
+        "Perkhidmatan enjin carian",
+        "Gudang data perusahaan / BI"
+      ]
+    },
+    "risks_and_questions": {
+      "risks": [
+        "Komuniti terbuka boleh menghasilkan spam, iklan, dan kandungan melanggar peraturan; strategi tadbir urus mesti jelas.",
+        "Kata sensitif dan peraturan moderasi terlalu ketat boleh menjejaskan perbincangan biasa.",
+        "Peraturan senarai panas dan cadangan yang tidak telus boleh mencetuskan pertikaian operasi.",
+        "Migrasi kandungan sejarah mungkin memerlukan pembersihan data dan pemetaan kebenaran."
+      ],
+      "open_questions": [
+        "Adakah pelawat dibenarkan menyiarkan kandungan, atau hanya pengguna berdaftar?",
+        "Adakah siaran perlu disemak sebelum terbit atau diperiksa selepas terbit?",
+        "Apakah sempadan kebenaran dan proses pelantikan untuk moderator papan?",
+        "Adakah tahap, mata, lencana, dan daftar masuk diperlukan?",
+        "Siapa menyelenggara peraturan senarai panas, slot cadangan, dan ranking carian?"
+      ]
+    },
+    "milestone_acceptance": {
+      "milestones": [
+        {
+          "milestone": "Pengesahan keperluan",
+          "target_date": "T+1 minggu",
+          "acceptance": "Sahkan peranan, skop, aliran teras, dan strategi moderasi"
+        },
+        {
+          "milestone": "Semakan prototaip",
+          "target_date": "T+3 minggu",
+          "acceptance": "Lengkapkan prototaip halaman utama, papan, thread, editor, dan konsol moderasi"
+        },
+        {
+          "milestone": "Pembangunan dan integrasi",
+          "target_date": "T+8 minggu",
+          "acceptance": "Lengkapkan fungsi teras serta integrasi keselamatan kandungan dan carian"
+        },
+        {
+          "milestone": "Pelancaran rintis",
+          "target_date": "T+10 minggu",
+          "acceptance": "Rintiskan papan terpilih dan tutup isu"
+        },
+        {
+          "milestone": "Pelancaran produksi",
+          "target_date": "T+12 minggu",
+          "acceptance": "Lengkapkan pelancaran penuh, konfigurasi operasi, dan penerimaan"
+        }
+      ]
+    },
+    "summary": "Perbincangan pengguna, perkongsian pengalaman, dan kandungan Q&A kini tersebar di kumpulan chat, hamparan, dan dokumen sementara. Kandungan sukar disimpan, carian lemah, dan pelanggaran peraturan bergantung pada rondaan manual. Sistem forum komuniti seperti Tieba diperlukan untuk menyokong perbincangan berthread, tadbir urus papan, moderasi kandungan, dan analitik komuniti.",
+    "objective": "Bina struktur papan dan thread mengikut minat atau topik perniagaan; Sokong gelung interaksi lengkap untuk siaran, balasan, suka, simpan, ikuti, dan notifikasi; Bina tadbir urus kandungan untuk laporan, moderasi, sekatan, rayuan, dan audit operasi; Kumpul data operasi komuniti untuk cadangan dan keputusan operasi"
+  },
+  "prompt_hints": [
+    {
+      "hint_key": "forum_hint_1",
+      "content": "Templat ini mengandungi peranan, papan, thread, interaksi, dan keupayaan moderasi lazim untuk komuniti forum."
+    },
+    {
+      "hint_key": "forum_hint_2",
+      "content": "Sahkan dahulu tadbir urus kandungan termasuk masa moderasi, hukuman, dan rayuan."
+    },
+    {
+      "hint_key": "forum_hint_3",
+      "content": "Peraturan cadangan, senarai panas, tahap, dan mata memerlukan laluan penyelenggaraan operasi yang jelas."
+    }
+  ],
+  "prompt_questions": [
+    {
+      "question_key": "forum_question_1",
+      "content": "Adakah pelawat dibenarkan menyiarkan kandungan, atau hanya pengguna berdaftar?"
+    },
+    {
+      "question_key": "forum_question_2",
+      "content": "Adakah siaran perlu disemak sebelum terbit atau diperiksa selepas terbit?"
+    },
+    {
+      "question_key": "forum_question_3",
+      "content": "Apakah sempadan kebenaran dan proses pelantikan untuk moderator papan?"
+    },
+    {
+      "question_key": "forum_question_4",
+      "content": "Adakah tahap, mata, lencana, dan daftar masuk diperlukan?"
+    },
+    {
+      "question_key": "forum_question_5",
+      "content": "Siapa menyelenggara peraturan senarai panas, slot cadangan, dan ranking carian?"
+    }
+  ]
+}

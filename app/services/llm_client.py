@@ -29,6 +29,34 @@ class LLMConfig:
     google_location: str = "global"
     google_credentials_path: str = ""
 
+    def validate_for_startup(self) -> None:
+        provider = (self.provider or "").strip().lower()
+        if not self.model:
+            raise LLMError("LLM_MODEL is required.")
+        if provider == "openai_compatible":
+            missing = []
+            if not self.base_url:
+                missing.append("LLM_BASE_URL")
+            if not self.api_key:
+                missing.append("LLM_API_KEY")
+            if missing:
+                raise LLMError(
+                    f"openai_compatible provider requires: {', '.join(missing)}."
+                )
+        elif provider == "vertex_gemini":
+            if not self.google_project_id:
+                raise LLMError("vertex_gemini provider requires LLM_GCP_PROJECT_ID.")
+            credentials_path = self.google_credentials_path
+            if credentials_path and not Path(credentials_path).is_file():
+                raise LLMError(
+                    f"vertex_gemini credentials path not found: {credentials_path}."
+                )
+        else:
+            raise LLMError(
+                f"Unsupported LLM_PROVIDER: {self.provider!r}. "
+                "Use 'openai_compatible' or 'vertex_gemini'."
+            )
+
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +85,7 @@ class MiniMaxChatClient:
         if self.provider == "vertex_gemini":
             self._init_vertex_state()
 
-    def chat(self, messages: list[dict[str, str]], temperature: float = 0.3) -> str:
+    def chat(self, messages: list[dict[str, Any]], temperature: float = 0.3) -> str:
         if self.provider == "vertex_gemini":
             return self._vertex_chat(messages=messages, temperature=temperature)
 
@@ -78,37 +106,49 @@ class MiniMaxChatClient:
         inline_data: list[dict[str, Any]],
         temperature: float = 0.2,
     ) -> str:
-        if self.provider != "vertex_gemini":
-            raise LLMError("Multimodal attachment analysis requires Vertex Gemini provider.")
-        token = self._get_vertex_access_token()
-        payload = self._build_vertex_multimodal_payload(
-            prompt=prompt,
-            inline_data=inline_data,
-            temperature=temperature,
-        )
-        url = (
-            "https://aiplatform.googleapis.com/v1/"
-            f"projects/{self.google_project_id}/locations/{self.google_location}/publishers/google/models/{self.config.model}:generateContent"
-        )
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-        }
-        response = self._post_with_retries(url=url, headers=headers, json_payload=payload, stream=False)
+        if self.provider == "vertex_gemini":
+            token = self._get_vertex_access_token()
+            payload = self._build_vertex_multimodal_payload(
+                prompt=prompt,
+                inline_data=inline_data,
+                temperature=temperature,
+            )
+            url = (
+                "https://aiplatform.googleapis.com/v1/"
+                f"projects/{self.google_project_id}/locations/{self.google_location}/publishers/google/models/{self.config.model}:generateContent"
+            )
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            }
+            response = self._post_with_retries(url=url, headers=headers, json_payload=payload, stream=False)
+            if response.status_code >= 400:
+                raise LLMError(f"Gemini multimodal request failed ({response.status_code}): {response.text}")
+
+            data = response.json()
+            content = self._extract_vertex_text(data).strip()
+            if not content:
+                prompt_feedback = data.get("promptFeedback")
+                if prompt_feedback:
+                    raise LLMError(f"Gemini returned no multimodal text. Prompt feedback: {prompt_feedback}")
+                raise LLMError("Gemini returned empty multimodal content.")
+            return content
+
+        messages = self._build_openai_compatible_multimodal_messages(prompt, inline_data)
+        response = self._request_openai_compatible(messages=messages, temperature=temperature, stream=False)
         if response.status_code >= 400:
-            raise LLMError(f"Gemini multimodal request failed ({response.status_code}): {response.text}")
+            raise LLMError(f"OpenAI-compatible multimodal request failed ({response.status_code}): {response.text}")
 
         data = response.json()
-        content = self._extract_vertex_text(data).strip()
+        content = data.get("choices", [{}])[0].get("message", {}).get("content")
+        if isinstance(content, list):
+            content = "".join(str(part.get("text", "")) for part in content if isinstance(part, dict))
         if not content:
-            prompt_feedback = data.get("promptFeedback")
-            if prompt_feedback:
-                raise LLMError(f"Gemini returned no multimodal text. Prompt feedback: {prompt_feedback}")
-            raise LLMError("Gemini returned empty multimodal content.")
-        return content
+            raise LLMError("OpenAI-compatible model returned empty multimodal content.")
+        return str(content)
 
     def stream_chat(
-        self, messages: list[dict[str, str]], temperature: float = 0.3
+        self, messages: list[dict[str, Any]], temperature: float = 0.3
     ) -> Iterator[dict[str, str]]:
         if self.provider == "vertex_gemini":
             yield from self._vertex_stream_chat(messages=messages, temperature=temperature)
@@ -193,7 +233,7 @@ class MiniMaxChatClient:
             tag_state["pending"] = ""
 
     def _request_openai_compatible(
-        self, messages: list[dict[str, str]], temperature: float, stream: bool
+        self, messages: list[dict[str, Any]], temperature: float, stream: bool
     ) -> requests.Response:
         url = f"{self.config.base_url.rstrip('/')}/chat/completions"
         headers = {
@@ -211,6 +251,41 @@ class MiniMaxChatClient:
         }
 
         return self._post_with_retries(url=url, headers=headers, json_payload=payload, stream=stream)
+
+    def _build_openai_compatible_multimodal_messages(
+        self,
+        prompt: str,
+        inline_data: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        content_parts: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
+        for item in inline_data:
+            filename = str(item.get("filename", "")).strip() or "attachment"
+            mime_type = str(item.get("mime_type", "")).strip() or "application/octet-stream"
+            data = item.get("data", b"")
+            raw_data = data.encode("utf-8") if isinstance(data, str) else bytes(data)
+            if not raw_data:
+                continue
+
+            encoded = base64.b64encode(raw_data).decode("ascii")
+            data_url = f"data:{mime_type};base64,{encoded}"
+            if mime_type.startswith("image/"):
+                content_parts.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": data_url},
+                    }
+                )
+            else:
+                content_parts.append(
+                    {
+                        "type": "file",
+                        "file": {
+                            "filename": filename,
+                            "file_data": data_url,
+                        },
+                    }
+                )
+        return [{"role": "user", "content": content_parts}]
 
     def _post_with_retries(
         self,

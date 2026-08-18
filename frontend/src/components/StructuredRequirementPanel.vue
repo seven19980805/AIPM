@@ -1,10 +1,17 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
+import DeliveryReadinessCard from './delivery/DeliveryReadinessCard.vue'
 import { structuredRequirementPanelCopy } from './structuredRequirementCopy'
-import { computeStructuredRequirementProgress } from '../lib/structuredRequirementProgress'
+import { summarizePMMethodologyDisplay } from '../lib/pmMethodologyDisplay'
 import type { LanguageCode } from '../types/session'
+import type { InterviewStateV2 } from '../types/interviewState'
 import type {
+  ICSubstrateEvidenceCheck,
+  ICSubstrateEvidenceState,
+  PMMethodologyCheck,
+  PMMethodologyCheckStatus,
+  PMMethodologyState,
   RequirementCollectionItem,
   RequirementCollectionStatus,
   StructuredRequirementFeature,
@@ -15,14 +22,16 @@ import type {
 const props = withDefaults(
   defineProps<{
     language: LanguageCode
+    interviewState: InterviewStateV2 | null
     model: StructuredRequirementModel
+    pmMethodologyState: PMMethodologyState
+    icSubstrateEvidenceState: ICSubstrateEvidenceState
     loading?: boolean
     syncing?: boolean
     generatingDocuments?: boolean
     openingGoCoding?: boolean
     generationDisabled?: boolean
-    hasPrdDocument?: boolean
-    hasDesignDocument?: boolean
+    generationLabel?: string
     error?: string
   }>(),
   {
@@ -31,8 +40,7 @@ const props = withDefaults(
     generatingDocuments: false,
     openingGoCoding: false,
     generationDisabled: false,
-    hasPrdDocument: false,
-    hasDesignDocument: false,
+    generationLabel: '',
     error: '',
   },
 )
@@ -78,6 +86,14 @@ const requirementRows = computed<RequirementRow[]>(() => {
       status.users,
     ),
     buildRow(
+      'ownership',
+      copy.value.rows.ownership,
+      summarizeList(
+        [model.product_context.business_owner, model.product_context.acceptance_owner].filter(Boolean),
+      ),
+      status.ownership,
+    ),
+    buildRow(
       'scenarios',
       copy.value.rows.scenarios,
       summarizeList(model.users_and_scenarios.core_scenarios),
@@ -116,13 +132,73 @@ const requirementRows = computed<RequirementRow[]>(() => {
   ].sort((left, right) => statusPriority(left.status) - statusPriority(right.status))
 })
 
-const progress = computed(() => computeStructuredRequirementProgress(props.model))
+// PM Methodology is advisory (a quality score), not a hard gate. Generate unlocks on the
+// structured "Fully Confirmed" gate alone; Go Coding additionally needs the document.
+// Secondary advisory cards collapse by default so the readiness gate (Progress) and
+// the structured model stay in view without a tall scroll. The header shows a one-line
+// summary; clicking it expands the full card.
+const methodologyExpanded = ref(false)
+const icEvidenceExpanded = ref(false)
 
-const progressStyle = computed(() => {
-  const progressValue = progress.value.readinessPercentage * 3.6
-  return {
-    background: `conic-gradient(var(--accent) 0deg ${progressValue}deg, #e7eefb ${progressValue}deg 360deg)`,
-  }
+const methodologyVisible = computed(() => props.pmMethodologyState.checks.length > 0)
+
+const methodologyDisplay = computed(() =>
+  summarizePMMethodologyDisplay(props.pmMethodologyState, Boolean(props.interviewState?.review.ready)),
+)
+
+const collectedDetailsLabel = computed(
+  () =>
+    ({
+      en: 'View collected details',
+      zh: '查看已采集详情',
+      de: 'Erfasste Details anzeigen',
+      ms: 'Lihat butiran yang dikumpul',
+    })[props.language],
+)
+
+const methodologyReadyCount = computed(
+  () => methodologyDisplay.value.readyCount,
+)
+
+const methodologyMissingCount = computed(() => methodologyDisplay.value.missingCount)
+
+const methodologyTopChecks = computed(() => methodologyDisplay.value.checks)
+
+const methodologyShowNextQuestions = computed(() => methodologyDisplay.value.showNextQuestions)
+
+const icEvidenceVisible = computed(
+  () => props.icSubstrateEvidenceState.enabled && props.icSubstrateEvidenceState.checks.length > 0,
+)
+
+const icEvidenceReadyCount = computed(
+  () => props.icSubstrateEvidenceState.checks.filter((check) => check.ready).length,
+)
+
+const icEvidenceTopChecks = computed(() =>
+  [...props.icSubstrateEvidenceState.checks]
+    .sort((left, right) => methodologyStatusPriority(left.status) - methodologyStatusPriority(right.status))
+    .slice(0, 4),
+)
+
+const icEvidenceContextRows = computed(() => {
+  const context = props.icSubstrateEvidenceState.domain_context
+  return [
+    {
+      key: 'objects',
+      label: copy.value.icEvidenceLabels.objects,
+      value: summarizeList(context.business_objects, 3),
+    },
+    {
+      key: 'grain',
+      label: copy.value.icEvidenceLabels.grain,
+      value: summarizeText(context.object_grain),
+    },
+    {
+      key: 'source',
+      label: copy.value.icEvidenceLabels.source,
+      value: summarizeText(context.source_of_truth),
+    },
+  ].filter((item) => item.value)
 })
 
 function buildRow(
@@ -181,6 +257,43 @@ function statusClass(status: RequirementCollectionStatus): string {
   return status
 }
 
+function methodologyStatusLabel(status: PMMethodologyCheckStatus): string {
+  return copy.value.methodologyStatus[status] ?? copy.value.methodologyStatus.missing
+}
+
+function methodologyStatusPriority(status: PMMethodologyCheckStatus): number {
+  if (status === 'conflict') {
+    return 0
+  }
+  if (status === 'missing') {
+    return 1
+  }
+  if (status === 'partial') {
+    return 2
+  }
+  return 3
+}
+
+function methodologyEvidenceSummary(check: PMMethodologyCheck): string {
+  if (check.evidence.length) {
+    return summarizeList(check.evidence, 1)
+  }
+  if (check.missing.length) {
+    return summarizeList(check.missing, 2)
+  }
+  return copy.value.notCaptured
+}
+
+function icEvidenceSummary(check: ICSubstrateEvidenceCheck): string {
+  if (check.evidence.length) {
+    return summarizeList(check.evidence, 1)
+  }
+  if (check.missing.length) {
+    return summarizeList(check.missing, 1)
+  }
+  return copy.value.notCaptured
+}
+
 function summarizeScope(inScope: string[], outOfScope: string[]): string {
   const include = summarizeList(inScope, 2)
   const exclude = summarizeList(outOfScope, 2)
@@ -234,70 +347,167 @@ function summarizeText(value: string): string {
 
 <template>
   <aside class="requirement-panel-stack">
-    <section class="requirement-card progress-card">
-      <header class="card-head compact">
+    <DeliveryReadinessCard
+      :language="language"
+      :interview-state="interviewState"
+      :loading="loading"
+      :syncing="syncing"
+      :generating-documents="generatingDocuments"
+      :opening-go-coding="openingGoCoding"
+      :generation-disabled="generationDisabled"
+      :generation-label="generationLabel"
+      @generate-documents="emit('generate-documents')"
+      @go-coding="emit('go-coding')"
+    />
+
+    <details class="collected-details">
+      <summary>
+        <span>{{ collectedDetailsLabel }}</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 9l6 6 6-6"/>
+        </svg>
+      </summary>
+      <div class="collected-details-body">
+    <section v-if="methodologyVisible" class="requirement-card methodology-card">
+      <button
+        type="button"
+        class="card-head card-head-toggle"
+        :aria-expanded="methodologyExpanded"
+        @click="methodologyExpanded = !methodologyExpanded"
+      >
         <div class="card-title">
           <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="9" y="2" width="6" height="4" rx="1"/>
-            <path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3"/>
-            <path d="M9 12h6"/>
-            <path d="M9 16h4"/>
+            <path d="M12 3v18"/>
+            <path d="M4 8h16"/>
+            <path d="M5 16h14"/>
+            <path d="M7 3h10"/>
+            <path d="M7 21h10"/>
           </svg>
-          <h3>{{ copy.progressTitle }}</h3>
+          <h3>{{ copy.methodologyTitle }}</h3>
         </div>
-        <span v-if="syncing" class="sync-badge">{{ copy.syncing }}</span>
-      </header>
-
-      <div class="progress-body">
-        <div class="progress-visual">
-          <div class="progress-ring" :style="progressStyle">
-            <div class="progress-ring-inner">
-              <span>{{ progress.readinessPercentage }}%</span>
-            </div>
-          </div>
-          <p class="progress-caption">{{ copy.progressLabels.readiness }}</p>
+        <div class="card-head-meta">
+          <span class="card-head-summary">{{ methodologyReadyCount }}/{{ pmMethodologyState.checks.length }}</span>
+          <svg class="card-chevron" :class="{ open: methodologyExpanded }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 9l6 6 6-6"/>
+          </svg>
         </div>
+      </button>
 
-        <div class="progress-meta">
-          <div class="progress-row">
-            <span>{{ copy.progressLabels.coverage }}</span>
-            <strong>{{ progress.collectedCount }}/{{ progress.totalCount }}</strong>
-          </div>
-          <div class="progress-row">
-            <span>{{ copy.progressLabels.confirmationRate }}</span>
-            <strong>{{ progress.confirmationPercentage }}%</strong>
-          </div>
-          <div class="progress-row">
-            <span>{{ copy.progressLabels.pendingConfirmation }}</span>
-            <strong>{{ progress.pendingConfirmationCount }}</strong>
-          </div>
-          <div class="progress-row">
-            <span>{{ copy.progressLabels.conflict }}</span>
-            <strong>{{ progress.conflictCount }}</strong>
-          </div>
+      <div v-show="methodologyExpanded" class="card-collapsible">
+      <div class="methodology-summary">
+        <div>
+          <span>{{ copy.methodologyLabels.ready }}</span>
+          <strong>{{ methodologyReadyCount }}/{{ pmMethodologyState.checks.length }}</strong>
+        </div>
+        <div>
+          <span>{{ copy.methodologyLabels.missing }}</span>
+          <strong>{{ methodologyMissingCount }}</strong>
         </div>
       </div>
 
-      <div class="progress-actions">
-        <button
-          class="generate-prd-btn"
-          :class="{ ready: progress.readyToGenerate }"
-          type="button"
-          :disabled="loading || generatingDocuments || generationDisabled"
-          @click="emit('generate-documents')"
+      <div class="methodology-list">
+        <article
+          v-for="check in methodologyTopChecks"
+          :key="check.key"
+          class="methodology-item"
+          :class="check.status"
         >
-          {{ generatingDocuments ? copy.generatingDocuments : copy.generateDocuments }}
-        </button>
-        <div v-if="hasPrdDocument && hasDesignDocument" class="document-ready-actions">
-          <button
-            class="go-coding-btn"
-            type="button"
-            :disabled="generationDisabled || openingGoCoding"
-            @click="emit('go-coding')"
+          <header class="methodology-item-head">
+            <div>
+              <h4>{{ check.label }}</h4>
+              <p>{{ check.method }}</p>
+            </div>
+            <span class="methodology-status" :class="check.status">
+              {{ methodologyStatusLabel(check.status) }}
+            </span>
+          </header>
+          <p class="methodology-evidence">
+            {{ methodologyEvidenceSummary(check) }}
+          </p>
+          <div
+            v-if="methodologyShowNextQuestions && !check.ready && check.next_question"
+            class="methodology-question"
           >
-            {{ openingGoCoding ? copy.openingGoCoding : copy.goCoding }}
-          </button>
+            <span>{{ copy.methodologyLabels.nextQuestion }}</span>
+            <p>{{ check.next_question }}</p>
+          </div>
+        </article>
+      </div>
+      </div>
+    </section>
+
+    <section v-if="icEvidenceVisible" class="requirement-card ic-evidence-card">
+      <button
+        type="button"
+        class="card-head card-head-toggle"
+        :aria-expanded="icEvidenceExpanded"
+        @click="icEvidenceExpanded = !icEvidenceExpanded"
+      >
+        <div class="card-title">
+          <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 7h16"/>
+            <path d="M4 12h16"/>
+            <path d="M4 17h16"/>
+            <path d="M8 4v16"/>
+            <path d="M16 4v16"/>
+          </svg>
+          <h3>{{ copy.icEvidenceTitle }}</h3>
         </div>
+        <div class="card-head-meta">
+          <span class="card-head-summary">{{ icEvidenceReadyCount }}/{{ icSubstrateEvidenceState.checks.length }}</span>
+          <svg class="card-chevron" :class="{ open: icEvidenceExpanded }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 9l6 6 6-6"/>
+          </svg>
+        </div>
+      </button>
+
+      <div v-show="icEvidenceExpanded" class="card-collapsible">
+      <div class="methodology-summary ic-evidence-summary">
+        <div>
+          <span>{{ copy.icEvidenceLabels.ready }}</span>
+          <strong>{{ icEvidenceReadyCount }}/{{ icSubstrateEvidenceState.checks.length }}</strong>
+        </div>
+        <div>
+          <span>{{ copy.icEvidenceLabels.context }}</span>
+          <strong>{{ icSubstrateEvidenceState.department || copy.notCaptured }}</strong>
+        </div>
+      </div>
+
+      <div v-if="icSubstrateEvidenceState.product_shape_label || icEvidenceContextRows.length" class="ic-context-strip">
+        <div v-if="icSubstrateEvidenceState.product_shape_label">
+          <span>{{ copy.icEvidenceLabels.shape }}</span>
+          <strong>{{ icSubstrateEvidenceState.product_shape_label }}</strong>
+        </div>
+        <div v-for="item in icEvidenceContextRows" :key="item.key">
+          <span>{{ item.label }}</span>
+          <strong>{{ item.value }}</strong>
+        </div>
+      </div>
+
+      <div class="methodology-list">
+        <article
+          v-for="check in icEvidenceTopChecks"
+          :key="check.key"
+          class="methodology-item ic-evidence-item"
+          :class="check.status"
+        >
+          <header class="methodology-item-head">
+            <div>
+              <h4>{{ check.label }}</h4>
+            </div>
+            <span class="methodology-status" :class="check.status">
+              {{ methodologyStatusLabel(check.status) }}
+            </span>
+          </header>
+          <p class="methodology-evidence">
+            {{ icEvidenceSummary(check) }}
+          </p>
+          <div v-if="!check.ready && check.next_question" class="methodology-question">
+            <span>{{ copy.icEvidenceLabels.nextQuestion }}</span>
+            <p>{{ check.next_question }}</p>
+          </div>
+        </article>
+      </div>
       </div>
     </section>
 
@@ -355,6 +565,8 @@ function summarizeText(value: string): string {
         </div>
       </div>
     </section>
+      </div>
+    </details>
   </aside>
 </template>
 
@@ -366,32 +578,75 @@ function summarizeText(value: string): string {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 12px;
+  gap: 14px;
   overflow: visible;
 }
 
 .requirement-card {
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #ffffff;
-  box-shadow: var(--shadow-soft, 0 8px 22px rgba(38, 55, 70, 0.08));
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.74);
+  backdrop-filter: blur(14px);
+  box-shadow: var(--shadow-soft, 0 2px 8px rgba(38, 55, 70, 0.06));
   overflow: hidden;
   height: auto;
 }
 
+.collected-details {
+  order: 2;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.collected-details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 13px 15px;
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  list-style: none;
+}
+
+.collected-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.collected-details > summary svg {
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  transition: transform 0.18s ease;
+}
+
+.collected-details[open] > summary svg {
+  transform: rotate(180deg);
+}
+
+.collected-details > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.collected-details-body {
+  display: grid;
+  gap: 12px;
+  padding: 0 10px 10px;
+}
+
 .table-card {
+  order: 2;
   flex: 0 0 auto;
   width: 100%;
   min-height: 0;
   height: auto;
   display: flex;
   flex-direction: column;
-}
-
-.progress-card {
-  flex: 0 0 auto;
-  align-self: start;
-  width: 100%;
 }
 
 .card-head {
@@ -403,7 +658,7 @@ function summarizeText(value: string): string {
 }
 
 .card-head.compact {
-  padding-bottom: 6px;
+  padding-bottom: 8px;
 }
 
 .card-title {
@@ -415,7 +670,7 @@ function summarizeText(value: string): string {
 
 .card-title h3 {
   margin: 0;
-  font-size: 0.92rem;
+  font-size: 0.86rem;
   line-height: 1.25;
   overflow-wrap: break-word;
 }
@@ -424,11 +679,11 @@ function summarizeText(value: string): string {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
+  padding: 5px 8px;
   border-radius: 8px;
-  background: rgba(37, 99, 235, 0.12);
-  color: #173f9f;
-  font-size: 0.76rem;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 0.7rem;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -443,10 +698,58 @@ function summarizeText(value: string): string {
 }
 
 .card-icon {
-  width: 22px;
-  height: 22px;
-  color: var(--accent-strong);
+  width: 20px;
+  height: 20px;
+  color: var(--accent);
   flex-shrink: 0;
+}
+
+/* Collapsible secondary cards (Document QA / PM Methodology / IC Evidence) */
+.card-head-toggle {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 12px;
+}
+
+.card-head-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.card-head-toggle:hover .card-chevron {
+  color: var(--accent);
+}
+
+.card-head-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.card-head-summary {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.card-chevron {
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  flex-shrink: 0;
+  transition: transform 0.18s ease;
+}
+
+.card-chevron.open {
+  transform: rotate(180deg);
 }
 
 .card-state {
@@ -455,195 +758,238 @@ function summarizeText(value: string): string {
   border-radius: 8px;
   border: 1px dashed rgba(37, 99, 235, 0.34);
   color: var(--muted);
-  background: #fbfdfe;
+  background: rgba(247, 250, 255, 0.66);
   line-height: 1.45;
   font-size: 0.84rem;
 }
 
 .card-state.error {
   border-style: solid;
-  border-color: rgba(220, 38, 38, 0.38);
-  color: #991b1b;
-  background: rgba(220, 38, 38, 0.13);
+  border-color: var(--status-danger-border);
+  color: var(--status-danger-ink);
+  background: var(--status-danger-bg);
 }
 
-.progress-body {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 12px;
-  padding: 0 16px 16px;
+.methodology-card {
+  order: 5;
+  flex: 0 0 auto;
+  width: 100%;
 }
 
-.progress-visual {
+.ic-evidence-card {
+  order: 4;
+  flex: 0 0 auto;
+  width: 100%;
+}
+
+.methodology-summary {
   display: grid;
-  justify-items: center;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 0 14px 10px;
+}
+
+.methodology-summary div {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(247, 250, 255, 0.66);
+}
+
+.methodology-summary span,
+.methodology-question span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.methodology-summary strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.ic-context-strip {
+  display: grid;
+  gap: 8px;
+  padding: 0 16px 12px;
+}
+
+.ic-context-strip div {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(247, 250, 255, 0.66);
+}
+
+.ic-context-strip span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.ic-context-strip strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.methodology-list {
+  display: grid;
+  gap: 8px;
+  padding: 0 14px 14px;
+}
+
+.methodology-item {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.methodology-item.missing {
+  border-color: var(--status-warning-border);
+  background: var(--status-warning-bg);
+}
+
+.methodology-item.partial {
+  border-color: var(--status-info-border);
+  background: var(--status-info-bg);
+}
+
+.methodology-item.ready {
+  border-color: var(--status-success-border);
+  background: var(--status-success-bg);
+}
+
+.methodology-item.conflict {
+  border-color: var(--status-danger-border);
+  background: var(--status-danger-bg);
+}
+
+.methodology-item-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   gap: 10px;
 }
 
-.progress-ring {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-}
-
-.progress-ring-inner {
-  width: 66px;
-  height: 66px;
-  border-radius: 50%;
-  background: #fff;
-  display: grid;
-  place-items: center;
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-
-.progress-ring-inner span {
-  font-size: 1.2rem;
-  font-weight: 800;
-  letter-spacing: 0;
-  color: var(--ink);
-}
-
-.progress-caption {
+.methodology-item-head h4 {
   margin: 0;
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 700;
-}
-
-.progress-meta {
-  display: grid;
-  gap: 8px;
-}
-
-.progress-actions {
-  padding: 0 16px 16px;
-}
-
-.generate-prd-btn {
-  width: 100%;
-  min-height: 40px;
-  border: 1px solid rgba(37, 99, 235, 0.16);
-  border-radius: 8px;
-  padding: 11px 14px;
-  background: #ffffff;
-  color: var(--accent-strong);
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
-}
-
-.generate-prd-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  border-color: rgba(37, 99, 235, 0.34);
-  box-shadow: 0 10px 18px rgba(38, 55, 70, 0.08);
-}
-
-.generate-prd-btn.ready {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-  box-shadow: 0 12px 26px rgba(37, 99, 235, 0.22);
-}
-
-.generate-prd-btn:disabled {
-  opacity: 0.72;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-.document-ready-actions {
-  display: grid;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.go-coding-btn {
-  width: 100%;
-  min-height: 40px;
-  border: 1px solid var(--accent);
-  border-radius: 8px;
-  padding: 10px 12px;
-  background: var(--accent);
-  color: #fff;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
-  box-shadow: 0 12px 26px rgba(37, 99, 235, 0.22);
-}
-
-.go-coding-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  background: var(--accent-strong);
-  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.24);
-}
-
-.go-coding-btn:disabled {
-  opacity: 0.72;
-  cursor: not-allowed;
-  box-shadow: none;
-  transform: none;
-}
-
-.progress-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 0.84rem;
-}
-
-.progress-row strong {
   color: var(--ink);
-  font-size: 0.92rem;
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.methodology-item-head p,
+.methodology-evidence,
+.methodology-question p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.methodology-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.methodology-status.missing {
+  background: var(--status-warning-bg);
+  color: var(--status-warning-ink);
+}
+
+.methodology-status.partial {
+  background: var(--status-info-bg);
+  color: var(--status-info-ink);
+}
+
+.methodology-status.ready {
+  background: var(--status-success-bg);
+  color: var(--status-success-ink);
+}
+
+.methodology-status.conflict {
+  background: var(--status-danger-bg);
+  color: var(--status-danger-ink);
+}
+
+.methodology-question {
+  margin-top: 9px;
+  padding: 9px 10px;
+  border: 1px solid var(--status-warning-border);
+  border-radius: 8px;
+  background: var(--status-warning-bg);
+}
+
+.ic-evidence-item .methodology-evidence {
+  color: var(--ink);
 }
 
 .card-list-shell {
   flex: 0 0 auto;
   min-height: auto;
   overflow: visible;
-  padding: 0 16px 16px;
+  padding: 0 14px 14px;
 }
 
 .requirement-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .requirement-item-card {
-  padding: 12px;
+  padding: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.72);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 
 .requirement-item-card.missing {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .requirement-item-card.captured {
-  border-color: rgba(37, 99, 235, 0.34);
-  background: rgba(37, 99, 235, 0.05);
+  border-color: var(--status-info-border);
+  background: var(--status-info-bg);
 }
 
 .requirement-item-card.pending {
-  border-color: #eadfb9;
-  background: rgba(178, 122, 0, 0.08);
+  border-color: var(--status-warning-border);
+  background: var(--status-warning-bg);
 }
 
 .requirement-item-card.confirmed {
-  border-color: rgba(37, 99, 235, 0.42);
-  background: rgba(37, 99, 235, 0.08);
+  border-color: var(--status-success-border);
+  background: var(--status-success-bg);
 }
 
 .requirement-item-card.conflict {
-  border-color: #efc7c7;
-  background: rgba(220, 38, 38, 0.06);
+  border-color: var(--status-danger-border);
+  background: var(--status-danger-bg);
 }
 
 .requirement-item-head {
@@ -655,16 +1001,16 @@ function summarizeText(value: string): string {
 
 .requirement-item-head h4 {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   line-height: 1.35;
   color: var(--ink);
 }
 
 .requirement-item-content {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   color: var(--ink);
   line-height: 1.55;
-  font-size: 0.84rem;
+  font-size: 0.8rem;
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -673,19 +1019,19 @@ function summarizeText(value: string): string {
 .requirement-item-notes {
   display: grid;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .requirement-note {
   padding: 9px 10px;
   border-radius: 8px;
-  background: #fbfdfe;
+  background: rgba(247, 250, 255, 0.66);
   border: 1px solid var(--line);
 }
 
 .requirement-note.question {
-  background: rgba(178, 122, 0, 0.08);
-  border-color: #eadfb9;
+  background: var(--status-warning-bg);
+  border-color: var(--status-warning-border);
 }
 
 .requirement-note-label {
@@ -707,48 +1053,118 @@ function summarizeText(value: string): string {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 62px;
-  padding: 5px 9px;
-  border-radius: 999px;
-  font-size: 0.72rem;
+  min-width: 58px;
+  padding: 4px 7px;
+  border-radius: 6px;
+  font-size: 0.68rem;
   font-weight: 700;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .status-pill.missing {
-  background: #f0f3f8;
-  color: #647280;
+  background: var(--status-muted-bg);
+  color: var(--status-muted-ink);
 }
 
 .status-pill.captured {
-  background: rgba(59, 130, 246, 0.14);
-  color: #1e40af;
+  background: var(--status-info-bg);
+  color: var(--status-info-ink);
 }
 
 .status-pill.pending {
-  background: rgba(178, 122, 0, 0.16);
-  color: #674300;
+  background: var(--status-warning-bg);
+  color: var(--status-warning-ink);
 }
 
 .status-pill.confirmed {
-  background: rgba(37, 99, 235, 0.16);
-  color: #1d4ed8;
+  background: var(--status-success-bg);
+  color: var(--status-success-ink);
 }
 
 .status-pill.conflict {
-  background: rgba(220, 38, 38, 0.13);
-  color: #991b1b;
+  background: var(--status-danger-bg);
+  color: var(--status-danger-ink);
+}
+
+:global(.app-shell[data-theme='dark'] .requirement-card),
+:global(.app-shell[data-theme='dark'] .methodology-item),
+:global(.app-shell[data-theme='dark'] .requirement-item-card),
+:global(.app-shell[data-theme='dark'] .methodology-summary div),
+:global(.app-shell[data-theme='dark'] .ic-context-strip div),
+:global(.app-shell[data-theme='dark'] .requirement-note) {
+  background: rgba(17, 27, 40, 0.7);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+:global(.app-shell[data-theme='dark'] .card-state) {
+  background: rgba(18, 29, 42, 0.76);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+:global(.app-shell[data-theme='dark'] .requirement-card),
+:global(.app-shell[data-theme='dark'] .methodology-item),
+:global(.app-shell[data-theme='dark'] .requirement-item-card),
+:global(.app-shell[data-theme='dark'] .requirement-item-card.missing) {
+  background: rgba(17, 27, 40, 0.74);
+}
+
+:global(.app-shell[data-theme='dark'] .requirement-item-card.captured),
+:global(.app-shell[data-theme='dark'] .methodology-item.partial) {
+  background: var(--status-info-bg);
+  border-color: var(--status-info-border);
+}
+
+:global(.app-shell[data-theme='dark'] .requirement-item-card.confirmed),
+:global(.app-shell[data-theme='dark'] .methodology-item.ready) {
+  background: var(--status-success-bg);
+  border-color: var(--status-success-border);
+}
+
+:global(.app-shell[data-theme='dark'] .requirement-item-card.pending),
+:global(.app-shell[data-theme='dark'] .methodology-item.missing),
+:global(.app-shell[data-theme='dark'] .methodology-question),
+:global(.app-shell[data-theme='dark'] .requirement-note.question) {
+  background: var(--status-warning-bg);
+  border-color: var(--status-warning-border);
+}
+
+:global(.app-shell[data-theme='dark'] .requirement-item-card.conflict),
+:global(.app-shell[data-theme='dark'] .methodology-item.conflict) {
+  background: var(--status-danger-bg);
+  border-color: var(--status-danger-border);
+}
+
+:global(.app-shell[data-theme='dark'] .card-title h3),
+:global(.app-shell[data-theme='dark'] .methodology-summary strong),
+:global(.app-shell[data-theme='dark'] .ic-context-strip strong),
+:global(.app-shell[data-theme='dark'] .methodology-item-head h4),
+:global(.app-shell[data-theme='dark'] .requirement-item-head h4),
+:global(.app-shell[data-theme='dark'] .requirement-item-content),
+:global(.app-shell[data-theme='dark'] .requirement-note p),
+:global(.app-shell[data-theme='dark'] .ic-evidence-item .methodology-evidence) {
+  color: var(--ink);
+}
+
+:global(.app-shell[data-theme='dark'] .methodology-summary span),
+:global(.app-shell[data-theme='dark'] .methodology-question span),
+:global(.app-shell[data-theme='dark'] .ic-context-strip span),
+:global(.app-shell[data-theme='dark'] .methodology-item-head p),
+:global(.app-shell[data-theme='dark'] .methodology-evidence),
+:global(.app-shell[data-theme='dark'] .methodology-question p),
+:global(.app-shell[data-theme='dark'] .requirement-note-label) {
+  color: var(--muted);
 }
 
 @media (max-width: 1200px) {
-  .progress-body {
+  .methodology-summary {
     grid-template-columns: 1fr;
-    justify-items: center;
   }
 
-  .progress-meta {
-    width: 100%;
+  .ic-context-strip {
+    grid-template-columns: 1fr;
   }
 }
 

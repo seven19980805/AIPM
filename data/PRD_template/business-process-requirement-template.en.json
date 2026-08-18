@@ -1,0 +1,561 @@
+{
+  "template_id": "business_process_requirement_template_en",
+  "template_key": "business_process_requirement",
+  "template_name": "Business Process Requirement Template",
+  "template_category": "business_requirement",
+  "business_domain": "business_process",
+  "language": "en",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "A business process requirement template for workflow initiation, review, approval, task handling, permission control, audit history, integrations, and UAT acceptance.",
+  "tags": [
+    "business-process",
+    "workflow",
+    "approval",
+    "permissions",
+    "audit",
+    "uat"
+  ],
+  "applicable_scenarios": [
+    "Workflow or approval process requirements",
+    "Task to-do list and process history pages",
+    "Role-based permission and audit control",
+    "Data-driven process validation",
+    "Business process UAT and sign-off",
+    "Configuration-driven process management"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/business-process-requirement-template.en.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Basic Document Information",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.document_name",
+          "label": "Document name",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Example: D.CHQ.QDM Business Process Requirement"
+        },
+        {
+          "field_key": "document_info.process_name",
+          "label": "Business process name",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Enter the business process name"
+        },
+        {
+          "field_key": "document_info.owner",
+          "label": "Business owner",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Enter the business owner"
+        },
+        {
+          "field_key": "document_info.status",
+          "label": "Document status",
+          "component": "select",
+          "data_type": "string",
+          "required": false,
+          "options": [
+            "Draft",
+            "Under Review",
+            "Approved"
+          ]
+        }
+      ]
+    },
+    {
+      "section_key": "background_objectives",
+      "section_title": "Background and Objectives",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "background_objectives.background",
+          "label": "Background",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Describe the current process background, pain points, and reason for system support"
+        },
+        {
+          "field_key": "background_objectives.objectives",
+          "label": "Objectives",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Define the expected business outcomes"
+        }
+      ]
+    },
+    {
+      "section_key": "scope",
+      "section_title": "Scope",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "scope.in_scope",
+          "label": "Included scope",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "List workflow, data, UI, reporting, and configuration items in scope"
+        },
+        {
+          "field_key": "scope.out_of_scope",
+          "label": "Out of scope",
+          "component": "list",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "List items explicitly excluded from this requirement"
+        }
+      ]
+    },
+    {
+      "section_key": "stakeholders",
+      "section_title": "Responsible Parties and Stakeholders",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "stakeholders.roles",
+          "label": "Stakeholder roles",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Business sponsor, business owner, operator, IT owner, data owner, QA, security"
+        }
+      ]
+    },
+    {
+      "section_key": "data_description",
+      "section_title": "Data Description",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "data_description.sources",
+          "label": "Data sources",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Source name, type, owner, refresh frequency, usage, notes"
+        },
+        {
+          "field_key": "data_description.fields",
+          "label": "Key fields and data dictionary",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Field name, business definition, type, required, validation, example"
+        },
+        {
+          "field_key": "data_description.quality_rules",
+          "label": "Data logic and quality rules",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Required fields, status transition validation, error messages"
+        }
+      ]
+    },
+    {
+      "section_key": "process_description",
+      "section_title": "Process Description",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "process_description.flowchart",
+          "label": "Flowchart illustration",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Describe or attach the confirmed process flowchart"
+        },
+        {
+          "field_key": "process_description.step_matrix",
+          "label": "Workflow step matrix",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Step, actor, input, activity, output, next status"
+        }
+      ]
+    },
+    {
+      "section_key": "business_rules",
+      "section_title": "Business Rules",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "business_rules.rules",
+          "label": "Business rules",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Rule ID, rule, owner, priority, remarks"
+        }
+      ]
+    },
+    {
+      "section_key": "pages_functions",
+      "section_title": "Page / Function Presentation",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "pages_functions.page_list",
+          "label": "Page and function list",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Initiation page, to-do list, details/history, configuration, permission management"
+        },
+        {
+          "field_key": "pages_functions.ui_behavior",
+          "label": "UI behavior and layout requirements",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Responsiveness, validation, search/filter, audit visibility, empty/error states"
+        }
+      ]
+    },
+    {
+      "section_key": "permissions_controls",
+      "section_title": "Permissions and Controls",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "permissions_controls.matrix",
+          "label": "Permission matrix",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Requester, reviewer, approver, admin, security permissions"
+        }
+      ]
+    },
+    {
+      "section_key": "audit_compliance",
+      "section_title": "Audit and Compliance Requirements",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "audit_compliance.requirements",
+          "label": "Audit and compliance requirements",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Audit trail, sensitive data access, retention, export controls"
+        }
+      ]
+    },
+    {
+      "section_key": "development_requirements",
+      "section_title": "Development Requirements",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "development_requirements.technical_specs",
+          "label": "Technical specifications",
+          "component": "textarea",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "HTML, Bootstrap, JavaScript, jQuery, or the confirmed project stack"
+        },
+        {
+          "field_key": "development_requirements.color_system",
+          "label": "Color system",
+          "component": "table",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "Color tokens, values, and usage"
+        }
+      ]
+    },
+    {
+      "section_key": "integrations",
+      "section_title": "Integration and Interface Requirements",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "integrations.interfaces",
+          "label": "Interfaces",
+          "component": "table",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "Interface, direction, payload, frequency, failure handling, owner"
+        }
+      ]
+    },
+    {
+      "section_key": "non_functional",
+      "section_title": "Non-Functional Requirements",
+      "sort_order": 13,
+      "fields": [
+        {
+          "field_key": "non_functional.requirements",
+          "label": "Non-functional requirements",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Performance, availability, security, usability, maintainability"
+        }
+      ]
+    },
+    {
+      "section_key": "acceptance_testing",
+      "section_title": "Acceptance Criteria and Testing",
+      "sort_order": 14,
+      "fields": [
+        {
+          "field_key": "acceptance_testing.criteria",
+          "label": "Acceptance criteria",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "AC ID, acceptance criteria, test method, owner, status"
+        },
+        {
+          "field_key": "acceptance_testing.uat_signoff",
+          "label": "UAT sign-off",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Business, IT, and security sign-off decisions"
+        }
+      ]
+    },
+    {
+      "section_key": "risks_open_questions",
+      "section_title": "Risks, Dependencies, and Open Questions",
+      "sort_order": 15,
+      "fields": [
+        {
+          "field_key": "risks_open_questions.risks",
+          "label": "Risks and dependencies",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Risk/dependency ID, impact, mitigation, owner"
+        },
+        {
+          "field_key": "risks_open_questions.questions",
+          "label": "Open questions",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Question, owner, target date, resolution"
+        }
+      ]
+    },
+    {
+      "section_key": "completion_checklist",
+      "section_title": "Suggested Completion Checklist",
+      "sort_order": 16,
+      "fields": [
+        {
+          "field_key": "completion_checklist.items",
+          "label": "Completion checklist",
+          "component": "table",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "Document, scope, data, workflow, pages, development, testing"
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "Procurement Approval Workflow Digitization",
+      "requirement_name": "Purchase request approval process optimization"
+    },
+    "background": {
+      "summary": "Purchase requests are currently handled through email, spreadsheets, and offline signatures. Requesters cannot see approval status, approvers lack one task queue, and finance has difficulty tracing approval evidence during audits.",
+      "objective": "Create a standardized online approval workflow for purchase requests, improve approval transparency, reduce cycle time, and preserve full audit history."
+    },
+    "scope": {
+      "in_scope": [
+        "Purchase request initiation and validation",
+        "Multi-level approval routing by amount and department",
+        "Approver task queue and process history",
+        "Return, withdraw, reject, and resubmit handling",
+        "Permission control and audit trail"
+      ],
+      "out_of_scope": [
+        "Supplier bidding management",
+        "Contract lifecycle management",
+        "ERP payment execution"
+      ]
+    },
+    "users_and_scenarios": {
+      "target_users": [
+        "Requester: submits purchase requests and tracks progress",
+        "Department approver: reviews team requests",
+        "Finance reviewer: checks budget and account rules",
+        "Procurement specialist: confirms purchasing category",
+        "System administrator: maintains workflow configuration"
+      ],
+      "core_scenarios": [
+        "A requester submits a purchase request and attaches quotation evidence.",
+        "The system routes the request to department and finance approvers based on amount.",
+        "An approver returns the request with comments and the requester resubmits it.",
+        "Finance exports approval history during monthly audit review."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "This default example includes Workflow initiation and validation, Approval task queue, Process history and audit export.",
+      "feature_details": [
+        {
+          "feature_name": "Workflow initiation and validation",
+          "description": "Support workflow initiation and validation for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        },
+        {
+          "feature_name": "Approval task queue",
+          "description": "Support approval task queue for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        },
+        {
+          "feature_name": "Process history and audit export",
+          "description": "Support process history and audit export for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        }
+      ]
+    },
+    "business_rules": [
+      "Only authorized roles can view scoped data and perform sensitive actions.",
+      "Core business actions must keep an audit trail.",
+      "Exported data must follow the same filters and permission scope as the page.",
+      "Data refresh status and calculation definitions must be visible to users."
+    ],
+    "page_and_interaction": {
+      "pages": [
+        {
+          "page_name": "Workflow initiation and validation",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        },
+        {
+          "page_name": "Approval task queue",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        },
+        {
+          "page_name": "Process history and audit export",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        }
+      ],
+      "interaction_flow": [
+        "A requester submits a purchase request and attaches quotation evidence.",
+        "The system routes the request to department and finance approvers based on amount.",
+        "An approver returns the request with comments and the requester resubmits it.",
+        "Finance exports approval history during monthly audit review."
+      ]
+    },
+    "copywriting": [],
+    "data_and_dependencies": [
+      "User and organization master data",
+      "Business transaction data",
+      "Permission configuration",
+      "Reporting/export service"
+    ],
+    "risks_and_notes": [
+      "Metric ownership and data definitions must be confirmed.",
+      "Historical data quality may affect acceptance.",
+      "External system readiness may affect rollout scope."
+    ],
+    "acceptance_criteria": [
+      "The example scope can be generated into PRD and design documents.",
+      "Users can revise the seeded requirement through chat messages.",
+      "Main roles, flows, data, permissions, and acceptance criteria are represented."
+    ],
+    "open_questions": [
+      "Which roles need final approval authority?",
+      "Which fields and metrics are mandatory for MVP?",
+      "Which external systems must be integrated in the first release?"
+    ],
+    "template_meta": {
+      "example_note": "AI-generated default example business; replace with real business facts before final delivery."
+    }
+  }
+}

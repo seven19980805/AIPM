@@ -1,0 +1,665 @@
+{
+  "template_id": "shopping_mall_business_requirement_template_en",
+  "template_key": "shopping_mall_business_requirement",
+  "template_name": "Shopping Mall Business Requirement Template",
+  "template_category": "business_requirement",
+  "business_domain": "shopping_mall",
+  "language": "en",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "A general business requirement template for B2C shopping malls, brand stores, membership stores, and multi-channel ecommerce transaction systems.",
+  "tags": [
+    "ecommerce",
+    "product",
+    "order",
+    "cart",
+    "promotion",
+    "customer"
+  ],
+  "applicable_scenarios": [
+    "Product and category management",
+    "Cart and checkout",
+    "Orders and payment",
+    "Promotions and coupons",
+    "Membership and customer operations",
+    "After-sales and commerce analytics"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/shopping-mall-business-requirement-template.en.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Basic Information",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.project_name",
+          "label": "Project",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Enter the project name"
+        },
+        {
+          "field_key": "document_info.requirement_name",
+          "label": "Requirement name",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Example: Brand shopping mall build"
+        },
+        {
+          "field_key": "template_meta.requirement_type",
+          "label": "Requirement type",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "New build",
+            "Optimization",
+            "Refactor"
+          ]
+        },
+        {
+          "field_key": "template_meta.priority",
+          "label": "Priority",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "High",
+            "Medium",
+            "Low"
+          ]
+        },
+        {
+          "field_key": "template_meta.proposing_department",
+          "label": "Proposing department",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Enter the proposing department"
+        },
+        {
+          "field_key": "template_meta.requester",
+          "label": "Requester",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Enter the requester"
+        },
+        {
+          "field_key": "template_meta.request_date",
+          "label": "Request date",
+          "component": "date",
+          "data_type": "date",
+          "required": false,
+          "placeholder": "YYYY-MM-DD"
+        },
+        {
+          "field_key": "template_meta.version",
+          "label": "Version",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "V1.0"
+        }
+      ]
+    },
+    {
+      "section_key": "business_background",
+      "section_title": "Business Background",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "business_background.summary",
+          "label": "Background summary",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Describe the commerce background, sales channels, and reason for building the mall"
+        },
+        {
+          "field_key": "business_background.pain_points",
+          "label": "Current pain points",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Describe the commerce background, sales channels, and reason for building the mall"
+        }
+      ]
+    },
+    {
+      "section_key": "business_objectives",
+      "section_title": "Business Objectives",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "business_objectives.objectives",
+          "label": "Business objectives",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Describe the business goals this shopping mall should achieve"
+        },
+        {
+          "field_key": "business_objectives.metrics",
+          "label": "Quantified metrics",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Example: Increase checkout conversion by 15%"
+        }
+      ]
+    },
+    {
+      "section_key": "business_scope",
+      "section_title": "Business Scope",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "business_scope.in_scope",
+          "label": "In scope",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the mall system"
+        },
+        {
+          "field_key": "business_scope.out_scope",
+          "label": "Out of scope",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the mall system"
+        }
+      ]
+    },
+    {
+      "section_key": "roles_and_scenarios",
+      "section_title": "Roles and Core Scenarios",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "roles_and_scenarios.target_roles",
+          "label": "Target roles",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Example: visitors, members, operators, customer service, warehouse, finance"
+        },
+        {
+          "field_key": "roles_and_scenarios.core_scenarios",
+          "label": "Core business scenarios",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Example: visitors, members, operators, customer service, warehouse, finance"
+        }
+      ]
+    },
+    {
+      "section_key": "functional_requirements",
+      "section_title": "Functional Requirements",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "functional_requirements.overview",
+          "label": "Feature overview",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the mall system"
+        },
+        {
+          "field_key": "functional_requirements.features",
+          "label": "Feature details",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "feature": "Feature",
+            "description": "Description",
+            "trigger": "Trigger",
+            "logic": "Business rules / logic",
+            "inputs": "Inputs",
+            "outputs": "Outputs",
+            "exceptions": "Exceptions"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "page_and_process",
+      "section_title": "Pages and Processes",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "page_and_process.pages",
+          "label": "Page / entry",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "page": "Page / entry",
+            "entry": "Entry",
+            "elements": "Key elements",
+            "actions": "Main actions",
+            "flow": "Flow"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "business_rules_and_data",
+      "section_title": "Business Rules and Data",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "business_rules_and_data.rules",
+          "label": "Business rules / logic",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the mall system"
+        },
+        {
+          "field_key": "business_rules_and_data.key_data",
+          "label": "Key data objects",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Example: product, SKU, cart, order, payment, after-sales case"
+        }
+      ]
+    },
+    {
+      "section_key": "nonfunctional_requirements",
+      "section_title": "Non-functional Requirements",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "nonfunctional_requirements.items",
+          "label": "Non-functional requirements",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the mall system"
+        }
+      ]
+    },
+    {
+      "section_key": "integration_dependencies",
+      "section_title": "Integrations and Dependencies",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "integration_dependencies.external_systems",
+          "label": "External dependencies",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the mall system"
+        }
+      ]
+    },
+    {
+      "section_key": "risks_and_questions",
+      "section_title": "Risks and Open Questions",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "risks_and_questions.risks",
+          "label": "Risks",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the mall system"
+        },
+        {
+          "field_key": "risks_and_questions.open_questions",
+          "label": "Open questions",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Enter an open question"
+        }
+      ]
+    },
+    {
+      "section_key": "milestone_acceptance",
+      "section_title": "Milestones and Acceptance",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "milestone_acceptance.milestones",
+          "label": "Milestone",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "milestone": "Milestone",
+            "target_date": "Target date",
+            "acceptance": "Acceptance criteria"
+          }
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "Ecommerce mall platform project",
+      "requirement_name": "Brand shopping mall build"
+    },
+    "template_meta": {
+      "template_name": "Shopping Mall Business Requirement Template",
+      "requirement_type": "New build",
+      "priority": "High",
+      "proposing_department": "Ecommerce Operations / Product",
+      "requester": "Mall product manager",
+      "request_date": "2026-05-14",
+      "version": "V1.0"
+    },
+    "business_background": {
+      "summary": "Product sales currently rely on offline stores, communities, and manual ordering. Product information, inventory, discounts, orders, and after-sales are managed separately. A unified shopping mall is needed to support product display, member purchase, online payment, order fulfillment, after-sales service, and operations analytics.",
+      "pain_points": [
+        "Product information and price maintenance are scattered and inconsistent across frontend and backend",
+        "Ordering, payment collection, inventory deduction, and shipping lack a closed loop",
+        "Promotions rely on manual setup and settlement and are error-prone",
+        "After-sales refunds, customer service handling, and operational data lack unified tracking"
+      ]
+    },
+    "business_objectives": {
+      "objectives": [
+        "Build a unified product, SKU, price, and inventory display system",
+        "Connect cart, order, payment, shipment, and after-sales into a transaction loop",
+        "Support coupons, full reductions, flash sales, member prices, and campaign mechanics",
+        "Accumulate customer, order, conversion, and repurchase data for operations decisions"
+      ],
+      "metrics": [
+        "Increase checkout conversion by 15%",
+        "Reach 98% successful payment rate",
+        "Reduce average after-sales handling time by 40%",
+        "Reduce promotion setup time by 60%"
+      ]
+    },
+    "business_scope": {
+      "in_scope": [
+        "Product category, SPU/SKU, price, and listing management",
+        "Search, filters, product detail, cart, and checkout",
+        "Order creation, payment, cancellation, shipping, and receipt confirmation",
+        "Coupons, full reductions, flash sales, member prices, and campaign pages",
+        "Member profile, address, collections, browsing, and customer operations",
+        "Refunds/returns, customer service collaboration, and commerce dashboards"
+      ],
+      "out_scope": [
+        "Cross-border customs and international tax calculation",
+        "Complex marketplace merchant onboarding and settlement",
+        "Offline POS reconstruction",
+        "Building live commerce engine from scratch"
+      ]
+    },
+    "roles_and_scenarios": {
+      "target_roles": [
+        "Visitor: browse products, search, view campaigns, and sign in/up",
+        "Member: add to cart, order, pay, view orders, and request after-sales",
+        "Operator: maintain products, campaigns, recommendations, and content pages",
+        "Customer service: handle inquiries, order exceptions, refunds/returns, and complaints",
+        "Warehouse staff: receive orders, pick, ship, and sync tracking numbers",
+        "Finance: view payments, refunds, reconciliation, and invoice data",
+        "System administrator: maintain permissions, dictionaries, payment, and mall parameters"
+      ],
+      "core_scenarios": [
+        "An operator lists products and configures inventory, prices, and campaign tags.",
+        "A user searches products, enters the detail page, adds items to cart, and submits an order.",
+        "The system calculates discounts, freight, and payable amount, and the user completes online payment.",
+        "Warehouse receives orders to ship, completes picking and shipping, and returns tracking numbers.",
+        "A user requests refund/return, and customer service reviews and triggers payment refund.",
+        "Operators view conversion, average order value, repurchase, inventory, and campaign performance data."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "This requirement covers seven capability groups: products, cart, orders and payment, promotions, members and customers, after-sales, and analytics, forming a sellable, fulfillable, and operable commerce loop.",
+      "features": [
+        {
+          "feature": "Product and SKU management",
+          "description": "Maintain categories, brands, SPU/SKU, images, specs, prices, inventory, and listing status.",
+          "trigger": "An operator creates or updates a product.",
+          "logic": [
+            "Support category hierarchy, brand, spec attributes, and SKU combinations",
+            "Support drafts, preview, listing/unlisting, sorting, and recommendation tags",
+            "Support price, inventory, purchase limits, and sales regions"
+          ],
+          "inputs": "Product data, SKU, price, inventory, images, tags",
+          "outputs": "Product detail, SKU list, listing status",
+          "exceptions": "SKU conflict, insufficient inventory, abnormal price, product referenced by orders"
+        },
+        {
+          "feature": "Cart and checkout",
+          "description": "Support adding to cart, selecting items, changing quantity, calculating discounts, and submitting orders.",
+          "trigger": "A user clicks add to cart or checkout.",
+          "logic": [
+            "Support cart quantity, selected state, and invalid item prompts",
+            "Support coupons, full reductions, member prices, points deduction, and freight calculation",
+            "Support address, invoice, remarks, and delivery method selection"
+          ],
+          "inputs": "User, SKU, quantity, discount, address, delivery method",
+          "outputs": "Cart, checkout sheet, payable amount",
+          "exceptions": "Insufficient inventory, price change, unavailable discount, undeliverable address"
+        },
+        {
+          "feature": "Orders and payment",
+          "description": "Manage order creation, payment, cancellation, timeout closing, shipping, and receipt confirmation.",
+          "trigger": "A user submits an order or payment callback arrives.",
+          "logic": [
+            "Support order state machine, payment record, refund record, and operation log",
+            "Support multiple payment methods, callback verification, and timeout close",
+            "Support split orders, partial shipping, and order remarks"
+          ],
+          "inputs": "Order, payment record, user, product, amount, status",
+          "outputs": "Order detail, payment result, shipping task",
+          "exceptions": "Duplicate payment, payment failure, order timeout, amount mismatch"
+        },
+        {
+          "feature": "Promotion and member operations",
+          "description": "Configure coupons, full reductions, flash sales, member prices, recommendation slots, and campaign pages.",
+          "trigger": "An operator creates a campaign or a user participates.",
+          "logic": [
+            "Support campaign time, product scope, user scope, and stacking rules",
+            "Support coupon claiming, redemption, expiry, and threshold",
+            "Support campaign performance statistics and audience tags"
+          ],
+          "inputs": "Campaign, coupon, member level, audience, product scope",
+          "outputs": "Discount result, campaign page, marketing report",
+          "exceptions": "Campaign conflict, wrong stacking, inventory reservation"
+        },
+        {
+          "feature": "After-sales and service collaboration",
+          "description": "Handle refunds, returns, exchanges, complaints, and order exceptions.",
+          "trigger": "A user submits after-sales request or service creates a ticket.",
+          "logic": [
+            "Support reason, evidence, review, return shipment, and refund",
+            "Support service notes, negotiation records, and timeout reminders",
+            "Support after-sales state flow and responsibility attribution"
+          ],
+          "inputs": "After-sales case, order, payment, evidence, service record",
+          "outputs": "Review result, refund result, after-sales progress",
+          "exceptions": "Out of after-sales period, item not returnable, refund failure, lost shipment"
+        },
+        {
+          "feature": "Commerce analytics",
+          "description": "Provide dashboards for sales, conversion, inventory, customers, and campaigns.",
+          "trigger": "An operator or manager views data.",
+          "logic": [
+            "Support order amount, average order value, conversion, and repurchase statistics",
+            "Support product sales, inventory turnover, campaign ROI, and channel analysis",
+            "Support report export and metric definitions"
+          ],
+          "inputs": "Orders, payments, products, user behavior, campaign data",
+          "outputs": "Operations dashboard, product report, customer analysis",
+          "exceptions": "Data delay, insufficient permission, metric definition change"
+        }
+      ]
+    },
+    "page_and_process": {
+      "pages": [
+        {
+          "page": "Mall home",
+          "entry": "Customer entry",
+          "elements": "Search, banners, categories, recommended products, campaign entry",
+          "actions": "Search, browse, open product, sign in/up",
+          "flow": "A user enters products from category, search, or campaign."
+        },
+        {
+          "page": "Product detail",
+          "entry": "Product list / search result",
+          "elements": "Images, price, specs, inventory, reviews, recommendations",
+          "actions": "Select spec, add to cart, buy now, collect",
+          "flow": "A user confirms product information and adds to cart or buys directly."
+        },
+        {
+          "page": "Cart and checkout",
+          "entry": "Cart entry",
+          "elements": "Items, discounts, address, delivery, invoice, amount details",
+          "actions": "Change quantity, select discount, submit order",
+          "flow": "The system validates inventory and price before creating an unpaid order."
+        },
+        {
+          "page": "Order center",
+          "entry": "Member center",
+          "elements": "Order list, status, tracking, payment, after-sales entry",
+          "actions": "Pay, cancel, confirm receipt, request after-sales",
+          "flow": "A user views order progress and handles payment or after-sales."
+        },
+        {
+          "page": "Mall operations backend",
+          "entry": "Admin entry",
+          "elements": "Products, campaigns, orders, after-sales, customers, reports",
+          "actions": "List product, configure campaign, handle exceptions, export reports",
+          "flow": "Operators maintain commerce operations and track results."
+        }
+      ]
+    },
+    "business_rules_and_data": {
+      "rules": [
+        "Order submission must lock price, discounts, and inventory snapshots.",
+        "Only paid orders can enter pending shipment; timed-out orders close and release inventory.",
+        "Promotions must validate product scope, user scope, time, and stacking rules.",
+        "Refund amount cannot exceed paid amount and must keep payment channel transaction records.",
+        "Product price, inventory, order amount, and after-sales handling must keep operation logs."
+      ],
+      "key_data": [
+        "Product/SPU: id, name, category, brand, status, main image",
+        "SKU: specs, price, inventory, purchase limit, sales region",
+        "Cart: user, SKU, quantity, selected state, invalid state",
+        "Order: order number, user, item details, amount, status, shipping address",
+        "Payment: payment number, channel, amount, status, callback transaction",
+        "After-sales case: order, reason, evidence, review status, refund status"
+      ]
+    },
+    "nonfunctional_requirements": {
+      "items": [
+        "Performance: common home and product detail queries return within 3 seconds.",
+        "Consistency: order, payment, inventory, and refund states need eventual consistency and traceability.",
+        "Security: payment callbacks, user addresses, and order amounts require signature and permission checks.",
+        "Usability: ordering, payment, and refund flows need retry handling and clear prompts.",
+        "Audit: price, inventory, order, and after-sales changes must record operator and time."
+      ]
+    },
+    "integration_dependencies": {
+      "external_systems": [
+        "Payment gateway",
+        "Logistics tracking service",
+        "Inventory / warehouse system",
+        "SMS or message notification service",
+        "Invoice / tax service",
+        "Data warehouse / BI"
+      ]
+    },
+    "risks_and_questions": {
+      "risks": [
+        "Complex promotion stacking may cause pricing errors.",
+        "Payment and inventory inconsistency can affect fulfillment and service experience.",
+        "Peak campaigns may create inventory reservation and ordering pressure.",
+        "Unclear after-sales policy can cause service handling disputes."
+      ],
+      "open_questions": [
+        "Should multi-warehouse inventory and split shipment be supported?",
+        "Can coupons, full reductions, and member prices be stacked?",
+        "How should order timeout closing and inventory release time be configured?",
+        "Do refunds require original-route refund and manual review?",
+        "Are invoices, points, member levels, and reviews required?"
+      ]
+    },
+    "milestone_acceptance": {
+      "milestones": [
+        {
+          "milestone": "Requirement confirmation",
+          "target_date": "T+1 week",
+          "acceptance": "Confirm transaction loop, promotion rules, inventory, and after-sales policy"
+        },
+        {
+          "milestone": "Prototype review",
+          "target_date": "T+3 weeks",
+          "acceptance": "Complete home, detail, checkout, order, and backend prototypes"
+        },
+        {
+          "milestone": "Development and integration",
+          "target_date": "T+8 weeks",
+          "acceptance": "Complete integrations with payment, inventory, logistics, and notifications"
+        },
+        {
+          "milestone": "Pilot launch",
+          "target_date": "T+10 weeks",
+          "acceptance": "Gray launch selected products and users"
+        },
+        {
+          "milestone": "Production launch",
+          "target_date": "T+12 weeks",
+          "acceptance": "Complete full release, operation configuration, and acceptance"
+        }
+      ]
+    },
+    "summary": "Product sales currently rely on offline stores, communities, and manual ordering. Product information, inventory, discounts, orders, and after-sales are managed separately. A unified shopping mall is needed to support product display, member purchase, online payment, order fulfillment, after-sales service, and operations analytics.",
+    "objective": "Build a unified product, SKU, price, and inventory display system; Connect cart, order, payment, shipment, and after-sales into a transaction loop; Support coupons, full reductions, flash sales, member prices, and campaign mechanics; Accumulate customer, order, conversion, and repurchase data for operations decisions"
+  },
+  "prompt_hints": [
+    {
+      "hint_key": "shopping_hint_1",
+      "content": "The template includes common commerce capabilities for products, orders, payment, promotion, and after-sales."
+    },
+    {
+      "hint_key": "shopping_hint_2",
+      "content": "Confirm consistency rules among price, inventory, promotion, and payment first."
+    },
+    {
+      "hint_key": "shopping_hint_3",
+      "content": "Peak campaign scenarios need limits, inventory locking, and exception compensation plans."
+    }
+  ],
+  "prompt_questions": [
+    {
+      "question_key": "shopping_question_1",
+      "content": "Should multi-warehouse inventory and split shipment be supported?"
+    },
+    {
+      "question_key": "shopping_question_2",
+      "content": "Can coupons, full reductions, and member prices be stacked?"
+    },
+    {
+      "question_key": "shopping_question_3",
+      "content": "How should order timeout closing and inventory release time be configured?"
+    },
+    {
+      "question_key": "shopping_question_4",
+      "content": "Do refunds require original-route refund and manual review?"
+    },
+    {
+      "question_key": "shopping_question_5",
+      "content": "Are invoices, points, member levels, and reviews required?"
+    }
+  ]
+}

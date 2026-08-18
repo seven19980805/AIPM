@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+import logging
+import threading
 import zipfile
 from io import BytesIO
 import json
@@ -12,10 +14,14 @@ from xml.etree import ElementTree
 from flask import Blueprint, Response, current_app, jsonify, request, send_file, stream_with_context
 
 from .services.llm_client import LLMError
+from .services.coding_contract import render_coding_contract_markdown
 from .services.requirement_collector import RequirementCollectorService
 from .services.asr_client import ASRError
 
 api = Blueprint("api", __name__, url_prefix="/api")
+logger = logging.getLogger(__name__)
+_structured_requirement_refresh_lock = threading.Lock()
+_structured_requirement_refresh_jobs: set[tuple[str, str]] = set()
 MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024
 MAX_EXTRACTED_ATTACHMENT_CHARS = 12000
 MAX_MULTIMODAL_INLINE_BYTES = 7 * 1024 * 1024
@@ -80,10 +86,71 @@ def _get_asr_client():
     return asr_client
 
 
+def _is_truthy_request_arg(name: str) -> bool:
+    return str(request.args.get(name, "")).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _start_structured_requirement_refresh(
+    service: RequirementCollectorService,
+    session_id: str,
+    language: str,
+) -> None:
+    job_key = (session_id, language.strip().lower() or "zh")
+    with _structured_requirement_refresh_lock:
+        if job_key in _structured_requirement_refresh_jobs:
+            return
+        _structured_requirement_refresh_jobs.add(job_key)
+
+    def refresh() -> None:
+        try:
+            service.build_structured_requirement_model(session_id, language, force_refresh=True)
+        except Exception:
+            logger.exception("Background structured requirement refresh failed for session %s", session_id)
+        finally:
+            with _structured_requirement_refresh_lock:
+                _structured_requirement_refresh_jobs.discard(job_key)
+
+    threading.Thread(
+        target=refresh,
+        name=f"structured-requirement-refresh-{session_id[:8]}",
+        daemon=True,
+    ).start()
+
+
 def _request_language(default: str = "zh") -> str:
     payload = request.get_json(silent=True) or {}
     language = str(payload.get("language", request.args.get("language", default))).strip().lower()
     return language or default
+
+
+def _reply_context_from_payload(
+    payload: dict[str, object],
+) -> tuple[dict[str, str] | None, str]:
+    raw_context = payload.get("reply_context")
+    if raw_context is None:
+        return None, ""
+    if not isinstance(raw_context, dict):
+        return None, "Field `reply_context` must be an object."
+    action = str(raw_context.get("action", "")).strip()
+    decision_id = str(raw_context.get("decision_id", "")).strip()
+    proposal_id = str(raw_context.get("proposal_id", "")).strip()
+    if action not in {
+        "request_example",
+        "accept_proposal",
+        "defer_decision",
+    }:
+        return None, "Unsupported `reply_context.action`."
+    if not decision_id:
+        return None, "Field `reply_context.decision_id` is required."
+    if action == "accept_proposal" and not proposal_id:
+        return None, "Field `reply_context.proposal_id` is required."
+    context = {
+        "action": action,
+        "decision_id": decision_id,
+    }
+    if proposal_id:
+        context["proposal_id"] = proposal_id
+    return context, ""
 
 
 def _truncate_attachment_text(text: str) -> tuple[str, bool]:
@@ -186,21 +253,39 @@ def _attachment_inline_data(filename: str, file_bytes: bytes) -> list[dict[str, 
     return []
 
 
-def _attachment_analysis_prompt(filename: str, extracted_text: str, inline_data: list[dict[str, object]]) -> str:
+def _attachment_analysis_prompt(
+    filename: str,
+    extracted_text: str,
+    inline_data: list[dict[str, object]],
+    language: str = "zh",
+    visual_unavailable_note: str = "",
+) -> str:
     media_names = [str(item.get("filename", "")) for item in inline_data if item.get("filename")]
     media_note = "\n".join(f"- {name}" for name in media_names) or "- None"
+    output_language = {
+        "zh": "Chinese",
+        "de": "German",
+        "ms": "Bahasa Melayu",
+        "en": "English",
+    }.get(language, "Chinese")
+    unavailable_section = (
+        f"\nVisual analysis fallback note: {visual_unavailable_note}\n"
+        if visual_unavailable_note
+        else ""
+    )
     return (
         "You are an expert AI product manager helping users turn business attachments into software requirements.\n"
-        "Analyze the attachment content and any images/charts provided. Focus on what a PM should ask next.\n\n"
+        "Analyze the attachment content and any images/charts provided. Focus on PRD completion gaps and what a PM should ask next.\n\n"
         f"File name: {filename}\n"
         f"Visual parts provided to the model:\n{media_note}\n\n"
+        f"{unavailable_section}"
         "Extracted text and chart XML text, if any:\n"
         f"{extracted_text or '(No readable text extracted.)'}\n\n"
-        "Return a concise Chinese summary with these sections:\n"
-        "1. 附件里已经明确的业务目标/场景\n"
-        "2. 可能涉及的软件形态（dashboard/workflow/report/data query/alert/admin）\n"
-        "3. 图表或图片里能看出的 KPI、维度、流程、字段或异常点\n"
-        "4. 还需要 AI PM 下一轮追问的一个最关键问题\n"
+        f"Return a concise {output_language} summary with these sections:\n"
+        "1. Already clear facts for the PRD\n"
+        "2. Inferred but pending-confirmation assumptions\n"
+        "3. Missing or conflicting PRD gaps\n"
+        "4. The single most important next AI PM question\n"
         "Do not invent exact numbers or internal system names if they are not visible."
     )
 
@@ -233,7 +318,7 @@ def extract_attachment_text(filename: str, file_bytes: bytes) -> dict[str, objec
         kind = "spreadsheet"
 
     text, truncated = _truncate_attachment_text(raw_text)
-    if not text and kind not in {"pdf", "image"}:
+    if not text and kind not in {"pdf", "image", "presentation"}:
         raise ValueError("No readable text was found in this attachment.")
     return {
         "filename": filename,
@@ -244,21 +329,111 @@ def extract_attachment_text(filename: str, file_bytes: bytes) -> dict[str, objec
     }
 
 
-def analyze_attachment_with_gemini(filename: str, file_bytes: bytes) -> dict[str, object]:
+def _attachment_visual_fallback_text(filename: str, language: str, reason: str) -> str:
+    if language == "zh":
+        return (
+            f"附件 {filename} 包含图片、PDF 或图表内容，但当前模型未能完成视觉分析。"
+            "我会先基于可抽取文字继续梳理；图片里的字段、数值、流程或图表含义需要你下一步确认。"
+            f"\n\n降级原因：{reason}"
+        )
+    if language == "de":
+        return (
+            f"Der Anhang {filename} enthaelt Bilder, PDF- oder Chart-Inhalte, aber das aktuelle Modell konnte sie nicht visuell analysieren. "
+            "Ich nutze zuerst den extrahierbaren Text; Felder, Zahlen, Prozesse oder Chart-Bedeutungen aus Bildern muessen bestaetigt werden."
+            f"\n\nFallback-Grund: {reason}"
+        )
+    if language == "ms":
+        return (
+            f"Lampiran {filename} mengandungi imej, PDF atau carta, tetapi model semasa tidak dapat menganalisis visual tersebut. "
+            "Saya akan gunakan teks yang boleh diekstrak dahulu; field, nombor, proses atau maksud carta dalam imej perlu disahkan."
+            f"\n\nSebab fallback: {reason}"
+        )
+    return (
+        f"The attachment {filename} contains image, PDF, or chart content, but the current model could not analyze the visual parts. "
+        "I will continue from extracted text first; fields, numbers, process steps, or chart meaning in images need user confirmation."
+        f"\n\nFallback reason: {reason}"
+    )
+
+
+def _attachment_text_with_visual_note(
+    filename: str,
+    extraction: dict[str, object],
+    language: str,
+    reason: str,
+) -> str:
+    fallback_text = _attachment_visual_fallback_text(filename, language, reason)
+    extracted_text = str(extraction.get("text", "")).strip()
+    if not extracted_text:
+        return fallback_text
+    if language == "zh":
+        return f"{fallback_text}\n\n已保留可抽取文字：\n{extracted_text}"
+    if language == "de":
+        return f"{fallback_text}\n\nExtrahierbarer Text wurde beibehalten:\n{extracted_text}"
+    if language == "ms":
+        return f"{fallback_text}\n\nTeks yang boleh diekstrak dikekalkan:\n{extracted_text}"
+    return f"{fallback_text}\n\nExtracted text preserved:\n{extracted_text}"
+
+
+def _analyze_attachment_text_only(
+    filename: str,
+    extraction: dict[str, object],
+    language: str,
+    visual_unavailable_note: str = "",
+) -> str:
+    extracted_text = str(extraction.get("text", "")).strip()
+    if not extracted_text:
+        return _attachment_visual_fallback_text(filename, language, visual_unavailable_note or "No readable text was extracted.")
+
+    service = _get_service()
+    prompt = _attachment_analysis_prompt(
+        filename,
+        extracted_text,
+        [],
+        language=language,
+        visual_unavailable_note=visual_unavailable_note,
+    )
+    return service.llm_client.chat([{"role": "user", "content": prompt}], temperature=0.2)
+
+
+def analyze_attachment_with_model(filename: str, file_bytes: bytes, language: str = "zh") -> dict[str, object]:
     extraction = extract_attachment_text(filename, file_bytes)
     inline_data = _attachment_inline_data(filename, file_bytes)
+    normalized_language = language if language in {"en", "de", "zh", "ms"} else "zh"
     if not inline_data:
-        extraction["multimodal"] = False
+        try:
+            extraction["text"] = _analyze_attachment_text_only(filename, extraction, normalized_language)
+            extraction["analysis_note"] = "Analyzed from extracted text only."
+        except LLMError as exc:
+            extraction["analysis_note"] = f"Text-only attachment analysis unavailable: {exc}"
         extraction["visual_count"] = 0
-        extraction["analysis_note"] = "No supported visual parts were available for multimodal analysis."
+        extraction["multimodal"] = False
         return extraction
 
     service = _get_service()
-    prompt = _attachment_analysis_prompt(filename, str(extraction.get("text", "")), inline_data)
-    analysis = service.llm_client.chat_multimodal(prompt, inline_data, temperature=0.2)
-    extraction["text"] = analysis
-    extraction["multimodal"] = True
     extraction["visual_count"] = len(inline_data)
+    prompt = _attachment_analysis_prompt(
+        filename,
+        str(extraction.get("text", "")),
+        inline_data,
+        language=normalized_language,
+    )
+    try:
+        analysis = service.llm_client.chat_multimodal(prompt, inline_data, temperature=0.2)
+        extraction["text"] = analysis
+        extraction["multimodal"] = True
+    except LLMError as exc:
+        fallback_note = str(exc)
+        try:
+            extraction["text"] = _analyze_attachment_text_only(
+                filename,
+                extraction,
+                normalized_language,
+                visual_unavailable_note=fallback_note,
+            )
+        except LLMError:
+            extraction["text"] = _attachment_text_with_visual_note(filename, extraction, normalized_language, fallback_note)
+        extraction["analysis_note"] = f"Visual analysis fell back to text-only mode: {fallback_note}"
+        extraction["multimodal"] = False
     return extraction
 
 
@@ -267,6 +442,8 @@ def _structured_requirement_response(
     structured_requirement_model: dict[str, object],
     sync_status: str = "ready",
     conversation_chain_state: dict[str, object] | None = None,
+    pm_methodology_state: dict[str, object] | None = None,
+    ic_substrate_evidence_state: dict[str, object] | None = None,
 ):
     response = {
         "session_id": session_id,
@@ -276,7 +453,49 @@ def _structured_requirement_response(
     }
     if conversation_chain_state is not None:
         response["conversation_chain_state"] = conversation_chain_state
+    if pm_methodology_state is not None:
+        response["pm_methodology_state"] = pm_methodology_state
+    if ic_substrate_evidence_state is not None:
+        response["ic_substrate_evidence_state"] = ic_substrate_evidence_state
     return response
+
+
+def _session_detail_payload(
+    service: RequirementCollectorService,
+    session,
+    language: str,
+) -> dict[str, object]:
+    snapshot = service.get_structured_requirement_snapshot(session.id, language)
+    structured_requirement_model = snapshot["structured_requirement_model"]
+    conversation_chain_state = snapshot["conversation_chain_state"]
+    launch_context = service.build_session_launch_context(
+        session,
+        language,
+        structured_requirement_model=structured_requirement_model,
+        conversation_chain_state=conversation_chain_state,
+    )
+    return {
+        "session_id": session.id,
+        "title": session.title,
+        "language": session.language,
+        "prompt_template": session.prompt_template,
+        "applied_template_id": session.applied_template_id,
+        "applied_template_name": session.applied_template_name,
+        "start_function": session.start_function,
+        "intake_mode": launch_context["mode"],
+        "business_route": launch_context["business_route"],
+        "created_at": session.created_at,
+        "updated_at": session.updated_at,
+        "messages": session.messages,
+        "summary": structured_requirement_model,
+        "structured_requirement_model": structured_requirement_model,
+        "structured_requirement_sync_status": snapshot["structured_requirement_sync_status"],
+        "conversation_chain_state": conversation_chain_state,
+        "pm_methodology_state": snapshot["pm_methodology_state"],
+        "ic_substrate_evidence_state": snapshot["ic_substrate_evidence_state"],
+        "interview_state": snapshot["interview_state"],
+        "launch_context": launch_context,
+    }
 
 
 @api.post("/sessions")
@@ -285,35 +504,27 @@ def create_session():
     payload = request.get_json(silent=True) or {}
     template_id = str(payload.get("template_id", "")).strip() or None
     template_start_mode = str(payload.get("template_start_mode", "guided")).strip().lower()
+    starter_department = str(payload.get("starter_department", "")).strip()
+    start_function = str(payload.get("start_function", "from_scratch")).strip().lower()
+    intake_mode = str(payload.get("intake_mode", "")).strip().lower()
+    business_route = str(payload.get("business_route", "")).strip().lower()
     language = _request_language()
     try:
         session = service.create_session(
             template_id=template_id,
             language=language,
             template_start_mode=template_start_mode,
+            starter_department=starter_department,
+            start_function=start_function,
+            intake_mode=intake_mode or None,
+            business_route=business_route or None,
         )
     except KeyError:
         return jsonify({"error": "Business template not found."}), HTTPStatus.NOT_FOUND
     except ValueError as exc:
         return jsonify({"error": str(exc)}), HTTPStatus.BAD_REQUEST
-    structured_requirement_snapshot = service.get_structured_requirement_snapshot(session.id, language)
     return (
-        jsonify(
-            {
-                "session_id": session.id,
-                "title": session.title,
-                "prompt_template": session.prompt_template,
-                "applied_template_id": session.applied_template_id,
-                "applied_template_name": session.applied_template_name,
-                "created_at": session.created_at,
-                "updated_at": session.updated_at,
-                "messages": session.messages,
-                "summary": structured_requirement_snapshot["structured_requirement_model"],
-                "structured_requirement_model": structured_requirement_snapshot["structured_requirement_model"],
-                "structured_requirement_sync_status": structured_requirement_snapshot["structured_requirement_sync_status"],
-                "conversation_chain_state": structured_requirement_snapshot["conversation_chain_state"],
-            }
-        ),
+        jsonify(_session_detail_payload(service, session, language)),
         HTTPStatus.CREATED,
     )
 
@@ -360,12 +571,11 @@ def analyze_attachment():
         return jsonify({"error": "Field `file` is required."}), HTTPStatus.BAD_REQUEST
 
     file_bytes = file.read()
+    language = str(request.form.get("language", request.args.get("language", "zh"))).strip().lower()
     try:
-        result = analyze_attachment_with_gemini(file.filename, file_bytes)
+        result = analyze_attachment_with_model(file.filename, file_bytes, language)
     except (ValueError, zipfile.BadZipFile) as exc:
         return jsonify({"error": str(exc)}), HTTPStatus.BAD_REQUEST
-    except LLMError as exc:
-        return jsonify({"error": str(exc)}), HTTPStatus.BAD_GATEWAY
     return jsonify(result)
 
 
@@ -375,27 +585,25 @@ def get_session(session_id: str):
     session = service.get_session(session_id)
     if session is None:
         return jsonify({"error": "Session not found."}), HTTPStatus.NOT_FOUND
-    structured_requirement_snapshot = service.get_structured_requirement_snapshot(
-        session_id,
-        _request_language(),
-    )
+    return jsonify(_session_detail_payload(service, session, _request_language()))
 
-    return jsonify(
-        {
-            "session_id": session.id,
-            "title": session.title,
-            "prompt_template": session.prompt_template,
-            "applied_template_id": session.applied_template_id,
-            "applied_template_name": session.applied_template_name,
-            "created_at": session.created_at,
-            "updated_at": session.updated_at,
-            "messages": session.messages,
-            "summary": structured_requirement_snapshot["structured_requirement_model"],
-            "structured_requirement_model": structured_requirement_snapshot["structured_requirement_model"],
-            "structured_requirement_sync_status": structured_requirement_snapshot["structured_requirement_sync_status"],
-            "conversation_chain_state": structured_requirement_snapshot["conversation_chain_state"],
-        }
-    )
+
+@api.patch("/sessions/<session_id>/language")
+def update_session_language(session_id: str):
+    payload = request.get_json(silent=True) or {}
+    language = str(payload.get("language", "")).strip().lower()
+    if language not in {"en", "de", "zh", "ms"}:
+        return (
+            jsonify({"error": "Field `language` must be one of: en, de, zh, ms."}),
+            HTTPStatus.BAD_REQUEST,
+        )
+
+    service = _get_service()
+    try:
+        session = service.set_session_language(session_id, language)
+    except KeyError:
+        return jsonify({"error": "Session not found."}), HTTPStatus.NOT_FOUND
+    return jsonify(_session_detail_payload(service, session, session.language))
 
 
 @api.delete("/sessions/<session_id>")
@@ -429,6 +637,7 @@ def update_session_prompt_template(session_id: str):
             "prompt_template": session.prompt_template,
             "applied_template_id": session.applied_template_id,
             "applied_template_name": session.applied_template_name,
+            "start_function": session.start_function,
             "created_at": session.created_at,
             "updated_at": session.updated_at,
             "messages": session.messages,
@@ -442,14 +651,25 @@ def send_message(session_id: str):
     user_message = str(payload.get("message", "")).strip()
     display_message = str(payload.get("display_message", "")).strip()
     language = str(payload.get("language", "zh")).strip()
-    if not user_message:
+    reply_context, reply_context_error = _reply_context_from_payload(payload)
+    if reply_context_error:
+        return jsonify({"error": reply_context_error}), HTTPStatus.BAD_REQUEST
+    if not user_message and reply_context is None:
         return jsonify({"error": "Field `message` is required."}), HTTPStatus.BAD_REQUEST
 
     service = _get_service()
     try:
-        result = service.send_user_message(session_id, user_message, language, display_message)
+        result = service.send_user_message(
+            session_id,
+            user_message,
+            language,
+            display_message,
+            reply_context=reply_context,
+        )
     except KeyError:
         return jsonify({"error": "Session not found."}), HTTPStatus.NOT_FOUND
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), HTTPStatus.BAD_REQUEST
     except LLMError as exc:
         return jsonify({"error": str(exc)}), HTTPStatus.BAD_GATEWAY
 
@@ -462,14 +682,23 @@ def stream_message(session_id: str):
     user_message = str(payload.get("message", "")).strip()
     display_message = str(payload.get("display_message", "")).strip()
     language = str(payload.get("language", "zh")).strip()
-    if not user_message:
+    reply_context, reply_context_error = _reply_context_from_payload(payload)
+    if reply_context_error:
+        return jsonify({"error": reply_context_error}), HTTPStatus.BAD_REQUEST
+    if not user_message and reply_context is None:
         return jsonify({"error": "Field `message` is required."}), HTTPStatus.BAD_REQUEST
 
     service = _get_service()
 
     def event_stream():
         try:
-            for item in service.stream_user_message(session_id, user_message, language, display_message):
+            for item in service.stream_user_message(
+                session_id,
+                user_message,
+                language,
+                display_message,
+                reply_context=reply_context,
+            ):
                 event_name = item.get("event", "message")
                 data = json.dumps(item, ensure_ascii=False)
                 yield f"event: {event_name}\n"
@@ -508,30 +737,11 @@ def get_summary(session_id: str):
             structured_requirement_model,
             language,
         )
-    except KeyError:
-        return jsonify({"error": "Session not found."}), HTTPStatus.NOT_FOUND
-    except LLMError as exc:
-        return jsonify({"error": str(exc)}), HTTPStatus.BAD_GATEWAY
-    return jsonify(
-        _structured_requirement_response(
-            session_id,
+        pm_methodology_state = service.build_pm_methodology_state(
             structured_requirement_model,
-            "ready",
-            conversation_chain_state,
+            language,
         )
-    )
-
-
-@api.get("/sessions/<session_id>/structured-requirement")
-def get_structured_requirement(session_id: str):
-    language = _request_language()
-    service = _get_service()
-    try:
-        structured_requirement_model = service.build_structured_requirement_model(session_id, language)
-        session = service.get_session(session_id)
-        if session is None:
-            raise KeyError("Session not found.")
-        conversation_chain_state = service.build_conversation_chain_state(
+        ic_substrate_evidence_state = service.build_ic_substrate_evidence_state(
             session,
             structured_requirement_model,
             language,
@@ -546,6 +756,63 @@ def get_structured_requirement(session_id: str):
             structured_requirement_model,
             "ready",
             conversation_chain_state,
+            pm_methodology_state,
+            ic_substrate_evidence_state,
+        )
+    )
+
+
+@api.get("/sessions/<session_id>/structured-requirement")
+def get_structured_requirement(session_id: str):
+    language = _request_language()
+    background = _is_truthy_request_arg("background")
+    service = _get_service()
+    try:
+        if background:
+            snapshot = service.get_structured_requirement_snapshot(session_id, language)
+            if snapshot["structured_requirement_sync_status"] in {"missing", "stale"}:
+                _start_structured_requirement_refresh(service, session_id, language)
+            return jsonify(
+                _structured_requirement_response(
+                    session_id,
+                    snapshot["structured_requirement_model"],
+                    snapshot["structured_requirement_sync_status"],
+                    snapshot["conversation_chain_state"],
+                    snapshot["pm_methodology_state"],
+                    snapshot["ic_substrate_evidence_state"],
+                )
+            )
+
+        structured_requirement_model = service.build_structured_requirement_model(session_id, language)
+        session = service.get_session(session_id)
+        if session is None:
+            raise KeyError("Session not found.")
+        conversation_chain_state = service.build_conversation_chain_state(
+            session,
+            structured_requirement_model,
+            language,
+        )
+        pm_methodology_state = service.build_pm_methodology_state(
+            structured_requirement_model,
+            language,
+        )
+        ic_substrate_evidence_state = service.build_ic_substrate_evidence_state(
+            session,
+            structured_requirement_model,
+            language,
+        )
+    except KeyError:
+        return jsonify({"error": "Session not found."}), HTTPStatus.NOT_FOUND
+    except LLMError as exc:
+        return jsonify({"error": str(exc)}), HTTPStatus.BAD_GATEWAY
+    return jsonify(
+        _structured_requirement_response(
+            session_id,
+            structured_requirement_model,
+            "ready",
+            conversation_chain_state,
+            pm_methodology_state,
+            ic_substrate_evidence_state,
         )
     )
 
@@ -708,6 +975,24 @@ def download_prd_doc(session_id: str):
     return _send_generated_document_file(service, result)
 
 
+@api.get("/sessions/<session_id>/coding-contract")
+def get_coding_contract(session_id: str):
+    language = _request_language()
+    service = _get_service()
+    try:
+        contract = service.build_coding_contract(session_id, language)
+    except KeyError:
+        return jsonify({"error": "Session not found."}), HTTPStatus.NOT_FOUND
+
+    if request.args.get("format", "").strip().lower() == "json":
+        return jsonify(contract)
+
+    markdown = render_coding_contract_markdown(contract)
+    response = Response(markdown, mimetype="text/markdown")
+    response.headers["Content-Disposition"] = "attachment; filename=coding-contract.md"
+    return response
+
+
 @api.get("/sessions/<session_id>/implementation-context")
 def get_implementation_context(session_id: str):
     language = _request_language()
@@ -756,10 +1041,39 @@ def create_coding_handoff(session_id: str):
             HTTPStatus.NOT_FOUND,
         )
 
+    payload = result.get("payload") if isinstance(result.get("payload"), dict) else result
+    if not payload.get("handoff_ready", True):
+        handoff_gaps = payload.get("handoff_gaps") or payload.get("methodology_gaps", [])
+        gap_summary = ", ".join(
+            str(item.get("label") or item.get("key") or item.get("status") or item)
+            if isinstance(item, dict)
+            else str(item)
+            for item in handoff_gaps
+        ) or "handoff gate not ready"
+        return (
+            jsonify(
+                {
+                    "error": f"Go Coding handoff is not ready: {gap_summary}.",
+                    **payload,
+                }
+            ),
+            HTTPStatus.CONFLICT,
+        )
+
     open_url = request.args.get("open_url", "").strip()
     response_payload = {
         "handoff_token": result["handoff_token"],
         "expires_at": result["expires_at"],
+        "documents_ready": payload.get("documents_ready", True),
+        "handoff_ready": payload.get("handoff_ready", True),
+        "handoff_gaps": payload.get("handoff_gaps", []),
+        "methodology_ready": payload.get("methodology_ready", True),
+        "workflow_mode": payload.get("workflow_mode", "scratch"),
+        "coding_contract": payload.get("coding_contract", {}),
+        "coding_contract_markdown": payload.get("coding_contract_markdown", ""),
+        "implementation_prompt": payload.get("implementation_prompt", ""),
+        "documents": payload.get("documents", []),
+        "ic_substrate_evidence": payload.get("ic_substrate_evidence", {}),
     }
     if open_url:
         response_payload["open_url"] = open_url

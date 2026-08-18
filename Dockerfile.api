@@ -1,0 +1,25 @@
+FROM python:3.11-alpine
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+ARG PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+ARG PIP_TRUSTED_HOST=mirrors.aliyun.com
+ENV PIP_INDEX_URL=${PIP_INDEX_URL} \
+    PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST}
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN python -m pip install --no-cache-dir --timeout 120 --retries 5 -r requirements.txt
+
+COPY app ./app
+COPY data/PRD_template ./data/PRD_template
+COPY data/ic_substrate ./data/ic_substrate
+COPY run.py .
+
+RUN mkdir -p /app/data/prd_docs /app/data/design_docs /app/recordings
+
+EXPOSE 8000
+
+CMD ["python", "run.py"]

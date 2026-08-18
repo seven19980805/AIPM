@@ -1,0 +1,427 @@
+{
+  "template_id": "multiple_chart_requirement_template_de",
+  "template_key": "multiple_chart_requirement",
+  "template_name": "Vorlage fuer Mehrfachchart-Anforderungen",
+  "template_category": "business_requirement",
+  "business_domain": "data_visualization",
+  "language": "de",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "Eine Vorlage fuer responsive Mehrfachchart-Dashboards mit mehreren Datenquellen, Chart-Inventar, Layoutauswahl, verknuepften Interaktionen, Filtern, UI-Regeln, technischen Spezifikationen und Abnahmekriterien.",
+  "tags": [
+    "multiple-charts",
+    "dashboard",
+    "visualization",
+    "drill-down",
+    "data-contract"
+  ],
+  "applicable_scenarios": [
+    "Mehrfachchart-Dashboard-Seite",
+    "Mehrere verwandte QDM-Datenquellen",
+    "Primary-Detail- oder Uniform-Grid-Layout",
+    "Chart-Drill-down und Cross-Filtering",
+    "Dashboard-Export und Datenvalidierung"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/multiple-chart-requirement-template.de.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Grundlegende Dokumentinformationen",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.name",
+          "label": "Dokumentname",
+          "component": "input",
+          "data_type": "string",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "background_objectives",
+      "section_title": "Hintergrund und Ziele",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "background_objectives.summary",
+          "label": "Hintergrund und Ziele",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "scope",
+      "section_title": "Umfang",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "scope.items",
+          "label": "Umfang",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "stakeholders",
+      "section_title": "Verantwortliche und Stakeholder",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "stakeholders.roles",
+          "label": "Stakeholder",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "data_contract",
+      "section_title": "Datenbeschreibung und Datenvertrag",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "data_contract.items",
+          "label": "Datenvertrag",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "layout",
+      "section_title": "Seiten- / Funktionslayout",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "layout.options",
+          "label": "Layoutoptionen",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "page_presentation",
+      "section_title": "Seiten- / Funktionsdarstellung",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "page_presentation.areas",
+          "label": "Seitenbereiche",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "chart_inventory",
+      "section_title": "Chart-Inventar und Konfiguration",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "chart_inventory.items",
+          "label": "Chart-Inventar",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "filters_interactions",
+      "section_title": "Filter und Benutzerinteraktionen",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "filters_interactions.items",
+          "label": "Filter und Interaktionen",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "ui_design",
+      "section_title": "UI- und visuelle Anforderungen",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "ui_design.requirements",
+          "label": "UI-Anforderungen",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "technical_specs",
+      "section_title": "Technische Spezifikationen",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "technical_specs.requirements",
+          "label": "Technische Spezifikationen",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "non_functional",
+      "section_title": "Nicht-funktionale Anforderungen",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "non_functional.requirements",
+          "label": "Nicht-funktionale Anforderungen",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "acceptance",
+      "section_title": "Abnahmekriterien",
+      "sort_order": 13,
+      "fields": [
+        {
+          "field_key": "acceptance.criteria",
+          "label": "Abnahmekriterien",
+          "component": "list",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "open_questions",
+      "section_title": "Offene Fragen und Entscheidungen",
+      "sort_order": 14,
+      "fields": [
+        {
+          "field_key": "open_questions.questions",
+          "label": "Offene Fragen",
+          "component": "table",
+          "data_type": "array",
+          "required": false
+        }
+      ]
+    },
+    {
+      "section_key": "additional_fields",
+      "section_title": "Empfohlene Zusatzfelder",
+      "sort_order": 15,
+      "fields": [
+        {
+          "field_key": "additional_fields.groups",
+          "label": "Zusatzfelder",
+          "component": "table",
+          "data_type": "array",
+          "required": false
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "Beispielprojekt: Quality Operations Dashboard",
+      "requirement_name": "Beispielanforderung: Multi-chart dashboard for quality operations"
+    },
+    "background": {
+      "summary": "Dies ist ein integriertes Beispielgeschaeft fuer den schnellen Start mit einer vorbefuellten Vorlage. Quality operations teams need a dashboard combining trend, Pareto, ranking, and detail charts. Existing reports are separated and cannot cross-filter.",
+      "objective": "Aus dem Beispiel sollen PRD und Design-Dokument erzeugt werden; spaetere Nutzeraenderungen haben Vorrang."
+    },
+    "scope": {
+      "in_scope": [
+        "Shared filter area",
+        "KPI cards and trend chart",
+        "Defect Pareto chart",
+        "Product/line ranking chart",
+        "Linked detail table and export"
+      ],
+      "out_of_scope": [
+        "Real-time streaming alerts",
+        "Machine-learning root-cause recommendation",
+        "Mobile native app"
+      ]
+    },
+    "users_and_scenarios": {
+      "target_users": [
+        "Quality manager",
+        "Process engineer",
+        "Production supervisor",
+        "Data owner",
+        "Dashboard developer"
+      ],
+      "core_scenarios": [
+        "Manager checks daily quality KPIs.",
+        "Engineer selects a defect category and related charts update.",
+        "Supervisor exports affected lot details."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "This default example includes Shared dashboard filters, Linked chart interactions, Detail drill-down and export.",
+      "feature_details": [
+        {
+          "feature_name": "Shared dashboard filters",
+          "description": "Support shared dashboard filters for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        },
+        {
+          "feature_name": "Linked chart interactions",
+          "description": "Support linked chart interactions for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        },
+        {
+          "feature_name": "Detail drill-down and export",
+          "description": "Support detail drill-down and export for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        }
+      ]
+    },
+    "business_rules": [
+      "Only authorized roles can view scoped data and perform sensitive actions.",
+      "Core business actions must keep an audit trail.",
+      "Exported data must follow the same filters and permission scope as the page.",
+      "Data refresh status and calculation definitions must be visible to users."
+    ],
+    "page_and_interaction": {
+      "pages": [
+        {
+          "page_name": "Shared dashboard filters",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        },
+        {
+          "page_name": "Linked chart interactions",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        },
+        {
+          "page_name": "Detail drill-down and export",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        }
+      ],
+      "interaction_flow": [
+        "Manager checks daily quality KPIs.",
+        "Engineer selects a defect category and related charts update.",
+        "Supervisor exports affected lot details."
+      ]
+    },
+    "copywriting": [],
+    "data_and_dependencies": [
+      "User and organization master data",
+      "Business transaction data",
+      "Permission configuration",
+      "Reporting/export service"
+    ],
+    "risks_and_notes": [
+      "Metric ownership and data definitions must be confirmed.",
+      "Historical data quality may affect acceptance.",
+      "External system readiness may affect rollout scope."
+    ],
+    "acceptance_criteria": [
+      "The example scope can be generated into PRD and design documents.",
+      "Users can revise the seeded requirement through chat messages.",
+      "Main roles, flows, data, permissions, and acceptance criteria are represented."
+    ],
+    "open_questions": [
+      "Which roles need final approval authority?",
+      "Which fields and metrics are mandatory for MVP?",
+      "Which external systems must be integrated in the first release?"
+    ],
+    "template_meta": {
+      "example_note": "AI-generated default example business; replace with real business facts before final delivery."
+    }
+  }
+}

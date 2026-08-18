@@ -1,0 +1,1013 @@
+{
+  "template_id": "finance_management_business_requirement_template_ms",
+  "template_key": "finance_management_business_requirement",
+  "template_name": "Templat Keperluan Perniagaan Pengurusan Kewangan",
+  "template_category": "business_requirement",
+  "business_domain": "finance_management",
+  "language": "ms",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "Templat keperluan perniagaan umum untuk bayaran balik perbelanjaan, kawalan bajet, permohonan bayaran, pengurusan invois, akaun belum terima/belum bayar, dan analitik kewangan.",
+  "tags": [
+    "finance",
+    "budget",
+    "expense",
+    "payment",
+    "invoice",
+    "reporting"
+  ],
+  "applicable_scenarios": [
+    "Pengurusan bayaran balik perbelanjaan",
+    "Kawalan bajet",
+    "Permohonan bayaran",
+    "Pengurusan invois",
+    "Pengurusan akaun belum terima dan belum bayar",
+    "Pelaporan dan analitik kewangan"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/finance-management-business-requirement-template.ms.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Maklumat Asas",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.project_name",
+          "label": "Projek",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Masukkan nama projek"
+        },
+        {
+          "field_key": "document_info.requirement_name",
+          "label": "Nama keperluan",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Contoh: Pengoptimuman pengurusan bayaran balik perbelanjaan"
+        },
+        {
+          "field_key": "template_meta.requirement_type",
+          "label": "Jenis keperluan",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "Binaan baharu",
+            "Pengoptimuman",
+            "Refaktor"
+          ]
+        },
+        {
+          "field_key": "template_meta.priority",
+          "label": "Keutamaan",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "Tinggi",
+            "Sederhana",
+            "Rendah"
+          ]
+        },
+        {
+          "field_key": "template_meta.proposing_department",
+          "label": "Jabatan pencadang",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Masukkan jabatan pencadang"
+        },
+        {
+          "field_key": "template_meta.requester",
+          "label": "Pemohon",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Masukkan pemohon"
+        },
+        {
+          "field_key": "template_meta.request_date",
+          "label": "Tarikh permohonan",
+          "component": "date",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "YYYY-MM-DD"
+        }
+      ]
+    },
+    {
+      "section_key": "background",
+      "section_title": "Latar Belakang Perniagaan",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "background.summary",
+          "label": "Ringkasan latar belakang",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Terangkan latar operasi, proses sedia ada, dan sebab membina keupayaan pengurusan kewangan"
+        },
+        {
+          "field_key": "template_meta.current_pain_points",
+          "label": "Titik masalah semasa",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "Masukkan satu titik masalah setiap baris"
+        },
+        {
+          "field_key": "background.objective",
+          "label": "Objektif perniagaan",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Terangkan objektif perniagaan yang ingin dicapai"
+        },
+        {
+          "field_key": "template_meta.goal_metrics",
+          "label": "Metrik terukur",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "Contoh: Kurangkan purata masa kelulusan sebanyak 50%"
+        }
+      ]
+    },
+    {
+      "section_key": "scope",
+      "section_title": "Skop Perniagaan",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "scope.in_scope",
+          "label": "Dalam skop",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "Masukkan satu item dalam skop setiap baris"
+        },
+        {
+          "field_key": "scope.out_of_scope",
+          "label": "Di luar skop",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "Masukkan satu item di luar skop setiap baris"
+        }
+      ]
+    },
+    {
+      "section_key": "users_and_scenarios",
+      "section_title": "Peranan dan Senario Teras",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "users_and_scenarios.target_users",
+          "label": "Peranan sasaran",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "Contoh: pekerja, ketua jabatan, pakar kewangan"
+        },
+        {
+          "field_key": "users_and_scenarios.core_scenarios",
+          "label": "Senario perniagaan teras",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "Masukkan satu senario perniagaan teras setiap baris"
+        }
+      ]
+    },
+    {
+      "section_key": "functional_requirements",
+      "section_title": "Keperluan Fungsi",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "functional_requirements.overview",
+          "label": "Gambaran fungsi",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk pengurusan kewangan"
+        },
+        {
+          "field_key": "functional_requirements.feature_details",
+          "label": "Butiran fungsi",
+          "component": "object_array",
+          "data_type": "array<object>",
+          "required": true,
+          "item_schema": [
+            {
+              "field_key": "feature_name",
+              "label": "Nama fungsi",
+              "component": "input",
+              "data_type": "string",
+              "required": true
+            },
+            {
+              "field_key": "description",
+              "label": "Penerangan",
+              "component": "textarea",
+              "data_type": "string",
+              "required": true
+            },
+            {
+              "field_key": "trigger",
+              "label": "Cara dicetuskan",
+              "component": "input",
+              "data_type": "string",
+              "required": false
+            },
+            {
+              "field_key": "processing_logic",
+              "label": "Logik pemprosesan",
+              "component": "textarea",
+              "data_type": "string",
+              "required": true
+            },
+            {
+              "field_key": "inputs",
+              "label": "Input",
+              "component": "string_array",
+              "data_type": "array<string>",
+              "required": false
+            },
+            {
+              "field_key": "outputs",
+              "label": "Output",
+              "component": "string_array",
+              "data_type": "array<string>",
+              "required": false
+            },
+            {
+              "field_key": "exception_cases",
+              "label": "Kes pengecualian",
+              "component": "string_array",
+              "data_type": "array<string>",
+              "required": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "section_key": "business_rules",
+      "section_title": "Peraturan Perniagaan",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "business_rules",
+          "label": "Senarai peraturan perniagaan",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "Masukkan satu peraturan perniagaan setiap baris"
+        }
+      ]
+    },
+    {
+      "section_key": "page_and_interaction",
+      "section_title": "Halaman dan Interaksi",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "page_and_interaction.pages",
+          "label": "Senarai halaman",
+          "component": "object_array",
+          "data_type": "array<object>",
+          "required": false,
+          "item_schema": [
+            {
+              "field_key": "page_name",
+              "label": "Nama halaman",
+              "component": "input",
+              "data_type": "string",
+              "required": true
+            },
+            {
+              "field_key": "entry_point",
+              "label": "Titik masuk",
+              "component": "input",
+              "data_type": "string",
+              "required": false
+            },
+            {
+              "field_key": "page_elements",
+              "label": "Elemen halaman",
+              "component": "string_array",
+              "data_type": "array<string>",
+              "required": false
+            },
+            {
+              "field_key": "button_actions",
+              "label": "Tindakan butang",
+              "component": "string_array",
+              "data_type": "array<string>",
+              "required": false
+            }
+          ]
+        },
+        {
+          "field_key": "page_and_interaction.interaction_flow",
+          "label": "Aliran interaksi",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "Masukkan satu langkah proses setiap baris"
+        }
+      ]
+    },
+    {
+      "section_key": "data_and_dependencies",
+      "section_title": "Data dan Kebergantungan",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "data_and_dependencies",
+          "label": "Data utama dan kebergantungan luaran",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "Contoh: data induk bajet, data induk pembekal, antara muka ERP"
+        }
+      ]
+    },
+    {
+      "section_key": "risks_and_notes",
+      "section_title": "Risiko dan Nota",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "risks_and_notes",
+          "label": "Risiko dan nota",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "Masukkan satu risiko atau nota setiap baris"
+        },
+        {
+          "field_key": "open_questions",
+          "label": "Soalan terbuka",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "Masukkan satu soalan terbuka setiap baris"
+        }
+      ]
+    },
+    {
+      "section_key": "acceptance_criteria",
+      "section_title": "Kriteria Penerimaan",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "acceptance_criteria",
+          "label": "Kriteria penerimaan",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "Masukkan satu kriteria penerimaan yang boleh disahkan setiap baris"
+        }
+      ]
+    }
+  ],
+  "default_structured_requirement_model": {
+    "document_info": {
+      "project_name": "",
+      "requirement_name": ""
+    },
+    "background": {
+      "summary": "",
+      "objective": ""
+    },
+    "scope": {
+      "in_scope": [],
+      "out_of_scope": []
+    },
+    "users_and_scenarios": {
+      "target_users": [],
+      "core_scenarios": []
+    },
+    "functional_requirements": {
+      "overview": "",
+      "feature_details": []
+    },
+    "business_rules": [],
+    "page_and_interaction": {
+      "pages": [],
+      "interaction_flow": []
+    },
+    "copywriting": [],
+    "data_and_dependencies": [],
+    "risks_and_notes": [],
+    "acceptance_criteria": [],
+    "open_questions": [],
+    "collection_status": {
+      "objective": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "scope": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "users": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "scenarios": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "features": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "pages": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "rules": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "integrations": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "acceptance": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      }
+    }
+  },
+  "example_structured_requirement_model": {
+    "document_info": {
+      "project_name": "Platform Pengurusan Kewangan",
+      "requirement_name": "Templat Keperluan Perniagaan Pengurusan Kewangan"
+    },
+    "background": {
+      "summary": "Aliran kewangan semasa tersebar di Excel, e-mel, ERP, dan kelulusan manual, menyebabkan data tidak seragam, kecekapan kelulusan rendah, dan kawalan bajet lewat.",
+      "objective": "Mewujudkan titik masuk tunggal untuk kewangan, meningkatkan kecekapan kelulusan dan bayaran, melaksanakan kawalan bajet hujung ke hujung, dan memenuhi keperluan audit."
+    },
+    "scope": {
+      "in_scope": [
+        "Permohonan perbelanjaan",
+        "Kelulusan bayaran balik",
+        "Muat naik dan pengesahan invois",
+        "Penempahan dan kawalan bajet",
+        "Permohonan dan penjejakan bayaran",
+        "Lejar kewangan dan pelaporan"
+      ],
+      "out_of_scope": [
+        "Perakaunan lejar am",
+        "Pemfailan cukai",
+        "Integrasi terus dengan bank",
+        "Pelaporan konsolidasi"
+      ]
+    },
+    "users_and_scenarios": {
+      "target_users": [
+        "Pekerja",
+        "Ketua jabatan",
+        "Pakar kewangan",
+        "Pengurus kewangan",
+        "Pengurusan",
+        "Pentadbir sistem"
+      ],
+      "core_scenarios": [
+        "Pekerja memulakan permohonan perbelanjaan atau bayaran dan menjejak status.",
+        "Ketua jabatan meluluskan permohonan dan mengesahkan bajet.",
+        "Kewangan menyemak dokumen, invois, dan lampiran kontrak.",
+        "Permohonan diluluskan masuk ke proses bayaran dan keputusan direkodkan.",
+        "Data mengalir ke lejar dan laporan untuk analisis serta audit."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "Keperluan ini merangkumi permohonan, kelulusan, kawalan bajet, pengurusan invois/dokumen, pengurusan bayaran, dan pelaporan.",
+      "feature_details": [
+        {
+          "feature_name": "Pengurusan Permohonan",
+          "description": "Menyokong permulaan, simpan draf, penghantaran, penarikan balik, dan salinan permohonan perbelanjaan, bayaran balik, dan bayaran.",
+          "trigger": "Pengguna menekan Permohonan Baharu dan menghantar borang.",
+          "processing_logic": "Sistem mengesahkan medan wajib, format amaun, dan kelengkapan lampiran, menjana nombor permohonan, lalu menghala ke proses seterusnya.",
+          "inputs": [
+            "Jenis permohonan",
+            "Jabatan",
+            "Kategori perbelanjaan",
+            "Amaun",
+            "Maklumat projek/kontrak/pembekal",
+            "Lampiran"
+          ],
+          "outputs": [
+            "Borang permohonan",
+            "Status permohonan",
+            "Rekod operasi"
+          ],
+          "exception_cases": [
+            "Medan wajib tiada",
+            "Format amaun tidak sah",
+            "Lampiran tiada"
+          ]
+        },
+        {
+          "feature_name": "Pengurusan Kelulusan",
+          "description": "Menyokong kelulusan berperingkat, kelulusan bersama, penandatangan tambahan, penolakan, dan peringatan lewat.",
+          "trigger": "Permohonan yang dihantar masuk secara automatik ke aliran kelulusan.",
+          "processing_logic": "Sistem menghala mengikut struktur organisasi dan peraturan kelulusan; keputusan kelulusan memacu perubahan status.",
+          "inputs": [
+            "Konfigurasi nod kelulusan",
+            "Ulasan kelulusan",
+            "Keputusan kelulusan"
+          ],
+          "outputs": [
+            "Rekod kelulusan",
+            "Status aliran kerja",
+            "Pemberitahuan"
+          ],
+          "exception_cases": [
+            "Pelulus tiada",
+            "Kelulusan lewat",
+            "Konfigurasi aliran kerja tidak sah"
+          ]
+        },
+        {
+          "feature_name": "Kawalan Bajet",
+          "description": "Melaksanakan pengesahan, penempahan, pelepasan, dan amaran bajet semasa permohonan dan semakan kewangan.",
+          "trigger": "Dicetuskan apabila permohonan dihantar atau disemak oleh kewangan.",
+          "processing_logic": "Sistem menyemak baki bajet mengikut jabatan, projek, dan kategori perbelanjaan. Item melebihi bajet masuk ke kelulusan khas atau aliran amaran.",
+          "inputs": [
+            "Dimensi bajet",
+            "Amaun bajet",
+            "Amaun permohonan semasa"
+          ],
+          "outputs": [
+            "Keputusan pengesahan bajet",
+            "Rekod penempahan bajet",
+            "Amaran bajet"
+          ],
+          "exception_cases": [
+            "Bajet belum dikonfigurasi",
+            "Baki bajet tidak mencukupi",
+            "Dimensi bajet tidak sepadan"
+          ]
+        },
+        {
+          "feature_name": "Pengurusan Invois dan Dokumen",
+          "description": "Menyokong kemasukan maklumat invois, muat naik lampiran, semakan pendua, dan pautan dokumen.",
+          "trigger": "Dicetuskan apabila pengguna memuat naik dokumen atau kewangan menyemak dokumen.",
+          "processing_logic": "Sistem mengesahkan kelengkapan dan konsistensi dokumen, menyelenggara status dokumen, dan mengaitkan dokumen dengan permohonan.",
+          "inputs": [
+            "Nombor invois",
+            "Amaun invois",
+            "Tarikh terbitan",
+            "Fail lampiran",
+            "Nombor kontrak berkaitan"
+          ],
+          "outputs": [
+            "Rekod dokumen",
+            "Keputusan semakan pendua",
+            "Status semakan"
+          ],
+          "exception_cases": [
+            "Invois pendua",
+            "Amaun invois tidak konsisten dengan permohonan",
+            "Lampiran dokumen rosak atau tiada"
+          ]
+        },
+        {
+          "feature_name": "Pengurusan Bayaran",
+          "description": "Menyokong semakan bayaran, pelaksanaan bayaran, tulis balik status, dan arkib baucar.",
+          "trigger": "Bermula selepas semakan kewangan diluluskan.",
+          "processing_logic": "Sistem mengesahkan maklumat penerima dan syarat bayaran, merekod status bayaran, dan mengarkibkan baucar bayaran.",
+          "inputs": [
+            "Maklumat penerima",
+            "Amaun bayaran",
+            "Akaun bayaran",
+            "Nota bayaran"
+          ],
+          "outputs": [
+            "Arahan bayaran",
+            "Status bayaran",
+            "Baucar bayaran"
+          ],
+          "exception_cases": [
+            "Maklumat penerima tiada",
+            "Bayaran gagal",
+            "Risiko bayaran pendua"
+          ]
+        },
+        {
+          "feature_name": "Pelaporan dan Analitik",
+          "description": "Menyediakan pertanyaan laporan dan eksport mengikut dimensi perbelanjaan, bajet, dan bayaran.",
+          "trigger": "Dicetuskan apabila pengguna menyoal laporan atau sistem menjalankan ringkasan berjadual.",
+          "processing_logic": "Menyokong penapisan berbilang dimensi, paparan ringkasan, dan eksport untuk analisis kewangan serta keputusan pengurusan.",
+          "inputs": [
+            "Syarat carian",
+            "Dimensi statistik",
+            "Julat masa"
+          ],
+          "outputs": [
+            "Laporan ringkasan perbelanjaan",
+            "Laporan pelaksanaan bajet",
+            "Laporan kemajuan bayaran"
+          ],
+          "exception_cases": [
+            "Data tiada",
+            "Definisi data tidak konsisten",
+            "Eksport gagal"
+          ]
+        }
+      ]
+    },
+    "business_rules": [
+      "Setiap permohonan mesti dikaitkan dengan kategori perbelanjaan, jabatan, dan tarikh berlaku.",
+      "Permohonan melebihi bajet mesti melalui kelulusan khas atau aliran amaran.",
+      "Invois, kontrak, dan baucar bayaran mesti dikaitkan dengan permohonan dan diarkibkan.",
+      "Bayaran hanya bermula selepas semakan kewangan diluluskan.",
+      "Permohonan yang sama tidak boleh dihantar untuk bayaran berulang kali.",
+      "Selepas bayaran, status mesti berubah kepada Dibayar."
+    ],
+    "page_and_interaction": {
+      "pages": [
+        {
+          "page_name": "Senarai Permohonan",
+          "entry_point": "Laman Utama Pengurusan Kewangan / Permohonan Saya",
+          "page_elements": [
+            "Kawasan penapis",
+            "Senarai permohonan",
+            "Label status",
+            "Butang eksport"
+          ],
+          "button_actions": [
+            "Cipta permohonan",
+            "Lihat butiran",
+            "Tarik balik",
+            "Eksport"
+          ]
+        },
+        {
+          "page_name": "Butiran Permohonan",
+          "entry_point": "Klik daripada senarai permohonan",
+          "page_elements": [
+            "Maklumat asas",
+            "Butiran perbelanjaan",
+            "Kawasan lampiran",
+            "Rekod kelulusan",
+            "Keputusan pengesahan bajet"
+          ],
+          "button_actions": [
+            "Hantar",
+            "Simpan draf",
+            "Edit",
+            "Muat naik lampiran"
+          ]
+        },
+        {
+          "page_name": "Halaman Pemprosesan Kelulusan",
+          "entry_point": "Pusat tugasan / Tugasan kelulusan",
+          "page_elements": [
+            "Maklumat permohonan",
+            "Maklumat lampiran",
+            "Kotak ulasan kelulusan",
+            "Peringatan bajet",
+            "Nod aliran kerja"
+          ],
+          "button_actions": [
+            "Lulus",
+            "Tolak",
+            "Pindah",
+            "Tambah penandatangan"
+          ]
+        },
+        {
+          "page_name": "Halaman Pemprosesan Bayaran",
+          "entry_point": "Meja kerja kewangan / Bayaran menunggu",
+          "page_elements": [
+            "Maklumat bayaran",
+            "Maklumat penerima",
+            "Kawasan muat naik baucar",
+            "Status bayaran"
+          ],
+          "button_actions": [
+            "Sahkan bayaran",
+            "Muat naik baucar",
+            "Tanda gagal"
+          ]
+        },
+        {
+          "page_name": "Halaman Laporan Kewangan",
+          "entry_point": "Analitik Kewangan / Pusat Laporan",
+          "page_elements": [
+            "Penapis",
+            "Kad metrik",
+            "Carta",
+            "Jadual butiran"
+          ],
+          "button_actions": [
+            "Cari",
+            "Eksport",
+            "Tukar dimensi statistik"
+          ]
+        }
+      ],
+      "interaction_flow": [
+        "Pengguna mencipta dan menghantar permohonan.",
+        "Sistem mengesahkan medan wajib, bajet, dan kelengkapan lampiran.",
+        "Pelulus melengkapkan kelulusan, kemudian kewangan menjalankan semakan.",
+        "Selepas semakan lulus, permohonan masuk ke pemprosesan bayaran dan keputusan akhir ditulis balik.",
+        "Data disegerakkan ke dalam laporan dan lejar."
+      ]
+    },
+    "copywriting": [],
+    "data_and_dependencies": [
+      "Data struktur organisasi",
+      "Data pekerja",
+      "Data induk bajet",
+      "Data induk pembekal dan penerima bayaran",
+      "Sistem luaran ERP / OA / HR"
+    ],
+    "risks_and_notes": [
+      "Data kewangan sejarah yang tidak konsisten boleh menjejaskan migrasi dan penyesuaian.",
+      "Peraturan kelulusan yang kompleks boleh menjejaskan pelancaran.",
+      "Antara muka luaran tidak stabil boleh menjejaskan penyegerakan bajet atau bayaran."
+    ],
+    "acceptance_criteria": [
+      "Proses dari permohonan hingga arkib berjalan hujung ke hujung.",
+      "Logik pengesahan bajet memenuhi jangkaan perniagaan.",
+      "Semakan invois pendua dan lampiran berfungsi.",
+      "Data laporan konsisten dengan dokumen perniagaan.",
+      "Pengasingan kebenaran betul.",
+      "Semua nod penting mempunyai log audit."
+    ],
+    "open_questions": [
+      "Adakah penyegerakan dua hala masa nyata dengan ERP diperlukan?",
+      "Patutkah lebihan bajet disekat atau melalui kelulusan khas?",
+      "Adakah pengesahan invois perlu dihubungkan dengan pihak luar?",
+      "Patutkah laporan mengikut definisi kewangan atau perniagaan?"
+    ],
+    "collection_status": {
+      "objective": {
+        "status": "confirmed",
+        "reason": "Templat mentakrifkan objektif biasa untuk jenis keperluan ini.",
+        "pending_questions": []
+      },
+      "scope": {
+        "status": "confirmed",
+        "reason": "Templat menyediakan contoh skop dan luar skop.",
+        "pending_questions": []
+      },
+      "users": {
+        "status": "confirmed",
+        "reason": "Templat merangkumi peranan lazim dalam pengurusan kewangan.",
+        "pending_questions": []
+      },
+      "scenarios": {
+        "status": "confirmed",
+        "reason": "Templat menyediakan aliran perniagaan tipikal yang lengkap.",
+        "pending_questions": []
+      },
+      "features": {
+        "status": "confirmed",
+        "reason": "Templat mengandungi gambaran dan contoh butiran fungsi.",
+        "pending_questions": []
+      },
+      "pages": {
+        "status": "captured",
+        "reason": "Templat menyediakan cadangan halaman, tetapi halaman akhir perlu disesuaikan dengan produk sebenar.",
+        "pending_questions": [
+          "Adakah produk akhir memerlukan pusat laporan dan halaman pemprosesan bayaran yang berasingan?"
+        ]
+      },
+      "rules": {
+        "status": "confirmed",
+        "reason": "Templat merangkumi peraturan lazim pengurusan kewangan.",
+        "pending_questions": []
+      },
+      "integrations": {
+        "status": "captured",
+        "reason": "Templat menyenaraikan kebergantungan luaran tipikal, tetapi sempadan antara muka perlu disahkan.",
+        "pending_questions": [
+          "Adakah ERP, OA, HR atau sistem bank perlu diintegrasikan?"
+        ]
+      },
+      "acceptance": {
+        "status": "confirmed",
+        "reason": "Templat menyediakan kriteria penerimaan umum yang boleh disahkan.",
+        "pending_questions": []
+      }
+    }
+  },
+  "template_meta": {
+    "requirement_type": "",
+    "priority": "",
+    "proposing_department": "",
+    "requester": "",
+    "request_date": "",
+    "current_pain_points": [],
+    "goal_metrics": []
+  },
+  "example_model": {
+    "document_info": {
+      "project_name": "Projek contoh: Finance Management Portal",
+      "requirement_name": "Keperluan contoh: Budget, expense, and settlement management"
+    },
+    "background": {
+      "summary": "Ini ialah contoh perniagaan terbina dalam untuk memulakan templat berisi dengan pantas. Budget execution, expense claims, settlement records, and financial reports are maintained in multiple tools, causing delayed reconciliation and weak process traceability.",
+      "objective": "Jana dokumen PRD dan reka bentuk berdasarkan contoh; perubahan pengguna kemudian mengatasi contoh."
+    },
+    "scope": {
+      "in_scope": [
+        "Budget master data and quota control",
+        "Expense application and approval",
+        "Settlement and reimbursement tracking",
+        "Financial report export",
+        "Permission and audit control"
+      ],
+      "out_of_scope": [
+        "Core accounting engine replacement",
+        "Tax filing automation",
+        "Bank payment gateway build"
+      ]
+    },
+    "users_and_scenarios": {
+      "target_users": [
+        "Requester",
+        "Finance reviewer",
+        "Department manager",
+        "Budget owner",
+        "System administrator"
+      ],
+      "core_scenarios": [
+        "Requester submits an expense claim.",
+        "Finance checks budget and invoice evidence.",
+        "Manager approves and settlement status is updated."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "This default example includes Budget control, Expense approval, Settlement tracking.",
+      "feature_details": [
+        {
+          "feature_name": "Budget control",
+          "description": "Support budget control for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        },
+        {
+          "feature_name": "Expense approval",
+          "description": "Support expense approval for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        },
+        {
+          "feature_name": "Settlement tracking",
+          "description": "Support settlement tracking for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        }
+      ]
+    },
+    "business_rules": [
+      "Only authorized roles can view scoped data and perform sensitive actions.",
+      "Core business actions must keep an audit trail.",
+      "Exported data must follow the same filters and permission scope as the page.",
+      "Data refresh status and calculation definitions must be visible to users."
+    ],
+    "page_and_interaction": {
+      "pages": [
+        {
+          "page_name": "Budget control",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        },
+        {
+          "page_name": "Expense approval",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        },
+        {
+          "page_name": "Settlement tracking",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        }
+      ],
+      "interaction_flow": [
+        "Requester submits an expense claim.",
+        "Finance checks budget and invoice evidence.",
+        "Manager approves and settlement status is updated."
+      ]
+    },
+    "copywriting": [],
+    "data_and_dependencies": [
+      "User and organization master data",
+      "Business transaction data",
+      "Permission configuration",
+      "Reporting/export service"
+    ],
+    "risks_and_notes": [
+      "Metric ownership and data definitions must be confirmed.",
+      "Historical data quality may affect acceptance.",
+      "External system readiness may affect rollout scope."
+    ],
+    "acceptance_criteria": [
+      "The example scope can be generated into PRD and design documents.",
+      "Users can revise the seeded requirement through chat messages.",
+      "Main roles, flows, data, permissions, and acceptance criteria are represented."
+    ],
+    "open_questions": [
+      "Which roles need final approval authority?",
+      "Which fields and metrics are mandatory for MVP?",
+      "Which external systems must be integrated in the first release?"
+    ],
+    "template_meta": {
+      "example_note": "AI-generated default example business; replace with real business facts before final delivery."
+    }
+  }
+}

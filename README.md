@@ -4,6 +4,8 @@
 
 本文档面向后续接手维护的人，优先说明如何跑起来、系统如何工作、关键文件在哪里、改功能时应该从哪里入手。
 
+IC Substrate 专家 AI PM 的上线验收清单见 [deploy/IC_Substrate_专家PM验收说明.md](deploy/IC_Substrate_专家PM验收说明.md)。
+
 ## 1. 功能概览
 
 - AI PM 对话：围绕项目目标、角色、场景、规则、数据、验收标准等持续追问。
@@ -22,7 +24,7 @@
 
 - Python 3
 - Flask 3
-- SQLite
+- PostgreSQL 17
 - requests
 - google-auth，供 Vertex Gemini 模式使用
 - pydub、websocket-client，供语音相关能力使用
@@ -54,11 +56,11 @@
 │       ├── business_template_library.py    # 业务模板读取、语言变体选择、Markdown/示例模型读取
 │       ├── llm_client.py                   # LLM 客户端，支持 openai_compatible 和 vertex_gemini
 │       ├── requirement_collector.py        # 核心业务服务：会话、对话、结构化需求、文档生成、handoff
-│       ├── session_store.py                # SQLite 持久化，会自动建表和补列
+│       ├── session_store.py                # PostgreSQL 持久化、连接池与 JSONB 缓存
+│       ├── sqlite_migration.py             # 一次性读取旧 SQLite 数据的迁移器
 │       └── structured_requirement_model.py # 结构化需求模型 schema、prompt 和规范化逻辑
 ├── data/
 │   ├── PRD_template/                       # 多语言 PRD/业务模板，包含 .md 和 .json
-│   ├── rqmd.sqlite3                        # 默认 SQLite 数据库，运行后生成
 │   ├── prd_docs/                           # 生成的 PRD Markdown，运行后生成
 │   └── design_docs/                        # 生成的设计文档 Markdown，运行后生成
 ├── frontend/
@@ -156,7 +158,8 @@ http://127.0.0.1:9530
 | `PORT` | `8000` | Flask 监听端口 |
 | `DEBUG` | `True` | 是否开启 Flask debug |
 | `CORS_ORIGINS` | `http://localhost:3000,http://localhost:5173,http://localhost:9530` | 允许的前端来源，当前实现会对 `/api/` 请求补 CORS 头 |
-| `SQLITE_DB_PATH` | `data/rqmd.sqlite3` | SQLite 数据库路径 |
+| `DATABASE_URL` | 必填 | PostgreSQL 连接 URL |
+| `DOCUMENT_STORAGE_PATH` | `data` | PRD 和设计文档目录 |
 | `LOG_LEVEL` | `INFO` | Python logging 级别 |
 | `LOG_FILE` | `app.log` | 示例配置，当前代码未统一写文件日志 |
 
@@ -228,8 +231,8 @@ flowchart LR
   User["User in browser"] --> Vue["Vue/Vite frontend"]
   Vue -->|REST / SSE / file upload| API["Flask API"]
   API --> Service["RequirementCollectorService"]
-  Service --> Store["SQLiteSessionStore"]
-  Store --> DB["data/rqmd.sqlite3"]
+  Service --> Store["PostgreSQLSessionStore"]
+  Store --> DB["PostgreSQL 17 / persistent volume"]
   Service --> Templates["BusinessTemplateLibrary"]
   Templates --> TemplateFiles["data/PRD_template/*.json, *.md"]
   Service --> LLM["MiniMaxChatClient"]
@@ -256,8 +259,8 @@ flowchart LR
 负责创建 Flask app：
 
 - 加载 `.env`
-- 设置 CORS、SQLite、LLM、ASR 配置
-- 初始化 `SQLiteSessionStore`
+- 设置 CORS、PostgreSQL、LLM、ASR 配置
+- 初始化 `PostgreSQLSessionStore` 连接池
 - 初始化 `MiniMaxChatClient`
 - 初始化 `RequirementCollectorService`
 - 初始化 `DoubaoASRClient`
@@ -303,13 +306,14 @@ flowchart LR
 
 ### 7.4 `app/services/session_store.py`
 
-SQLite 持久化层，启动时会自动建表：
+PostgreSQL 持久化层，启动时会自动建表并使用连接池：
 
 - `sessions`
 - `messages`
 - `coding_handoffs`
 
-它还会通过 `_ensure_session_columns` 和 `_ensure_message_columns` 给旧库补列，所以本地已有数据库通常可以平滑升级。
+结构化需求缓存和 coding handoff payload 使用 JSONB。旧 SQLite 数据可通过
+`scripts/migrate-sqlite-to-postgres.py` 一次性迁移；应用运行时不读取 SQLite。
 
 ### 7.5 `app/services/llm_client.py`
 
@@ -481,7 +485,7 @@ audio=<wav file>
 
 | 路径 | 说明 |
 | --- | --- |
-| `data/rqmd.sqlite3` | SQLite 数据库 |
+| PostgreSQL `postgres_data` volume | 会话、消息和 coding handoff 持久化 |
 | `data/prd_docs/{session_id}.md` | 某 session 最近一次 PRD |
 | `data/prd_docs/{document-label}-{timestamp}.md` | 版本化 PRD 文件 |
 | `data/design_docs/{session_id}.md` | 某 session 最近一次设计文档 |
@@ -491,7 +495,8 @@ audio=<wav file>
 接手时需要注意：
 
 - `data/PRD_template` 是模板源数据，应该纳入版本管理。
-- `data/rqmd.sqlite3`、`data/prd_docs`、`data/design_docs`、`recordings` 更像运行时产物，是否提交取决于团队约定。
+- PostgreSQL `postgres_data` volume、`data/prd_docs`、`data/design_docs`、`recordings`
+  是运行时数据，应纳入备份策略而不是提交到版本库。
 - 生成文档时，后端既会写入版本化文件，也会覆盖 `{session_id}.md` 作为最近版本。
 
 ## 11. 测试
@@ -530,7 +535,7 @@ npm run build
 
 1. 在 `app/api.py` 添加路由，解析 payload/query。
 2. 在 `RequirementCollectorService` 添加业务方法。
-3. 如需持久化，扩展 `SQLiteSessionStore`，并考虑旧库自动补列。
+3. 如需持久化，扩展 `PostgreSQLSessionStore`，并补充 PostgreSQL schema 迁移。
 4. 前端新增调用时，同步更新 `frontend/src/types`。
 5. 补测试。
 
@@ -698,7 +703,7 @@ LOG_LEVEL=INFO
 - 后端默认端口是 `8000`，不是旧 README 中提到的 `5000`。
 - `RequirementCollectorService` 文件很大，改动前建议先用方法名定位，不要直接大范围重构。
 - 前端 `App.vue` 也很大，适合后续逐步拆分，但短期改动应保持行为稳定。
-- SQLite schema 会自动补列，但复杂迁移仍建议写一次性迁移脚本或明确升级步骤。
+- PostgreSQL schema 变更应配套显式迁移脚本，并在独立测试 schema 中验证。
 - 流式接口返回的是 SSE，前端不是使用 `EventSource`，而是用 `fetch` 读取 response stream。
 - 文档生成会调用 LLM，测试里使用 fake client，避免真实外部调用。
 

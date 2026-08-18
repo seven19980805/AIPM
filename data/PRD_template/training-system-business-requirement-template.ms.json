@@ -1,0 +1,664 @@
+{
+  "template_id": "training_system_business_requirement_template_ms",
+  "template_key": "training_system_business_requirement",
+  "template_name": "Templat Keperluan Perniagaan Sistem Latihan",
+  "template_category": "business_requirement",
+  "business_domain": "training_system",
+  "language": "ms",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "Templat keperluan perniagaan umum untuk pengurusan kursus, pendaftaran latihan, pembelajaran dalam talian, peperiksaan dan penilaian, sijil, profil pembelajaran, dan analitik latihan.",
+  "tags": [
+    "training",
+    "course",
+    "learning",
+    "exam",
+    "certificate",
+    "enrollment"
+  ],
+  "applicable_scenarios": [
+    "Pengurusan kursus dan kandungan",
+    "Pelan latihan dan pendaftaran",
+    "Pembelajaran dalam talian dan jejak kemajuan",
+    "Peperiksaan dan penilaian",
+    "Pengurusan sijil",
+    "Analitik data pembelajaran"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/training-system-business-requirement-template.ms.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Maklumat Asas",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.project_name",
+          "label": "Projek",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Masukkan nama projek"
+        },
+        {
+          "field_key": "document_info.requirement_name",
+          "label": "Nama keperluan",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Contoh: Pembinaan platform latihan perusahaan"
+        },
+        {
+          "field_key": "template_meta.requirement_type",
+          "label": "Jenis keperluan",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "Binaan baharu",
+            "Pengoptimuman",
+            "Refaktor"
+          ]
+        },
+        {
+          "field_key": "template_meta.priority",
+          "label": "Keutamaan",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "Tinggi",
+            "Sederhana",
+            "Rendah"
+          ]
+        },
+        {
+          "field_key": "template_meta.proposing_department",
+          "label": "Jabatan pemohon",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Masukkan jabatan pemohon"
+        },
+        {
+          "field_key": "template_meta.requester",
+          "label": "Pemohon",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Masukkan pemohon"
+        },
+        {
+          "field_key": "template_meta.request_date",
+          "label": "Tarikh permintaan",
+          "component": "date",
+          "data_type": "date",
+          "required": false,
+          "placeholder": "YYYY-MM-DD"
+        },
+        {
+          "field_key": "template_meta.version",
+          "label": "Versi",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "V1.0"
+        }
+      ]
+    },
+    {
+      "section_key": "business_background",
+      "section_title": "Latar Belakang Perniagaan",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "business_background.summary",
+          "label": "Ringkasan latar belakang",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Huraikan latar belakang latihan, proses sedia ada, dan sebab pembinaan sistem"
+        },
+        {
+          "field_key": "business_background.pain_points",
+          "label": "Masalah semasa",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Huraikan latar belakang latihan, proses sedia ada, dan sebab pembinaan sistem"
+        }
+      ]
+    },
+    {
+      "section_key": "business_objectives",
+      "section_title": "Objektif Perniagaan",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "business_objectives.objectives",
+          "label": "Objektif perniagaan",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Huraikan objektif perniagaan yang perlu dicapai oleh sistem latihan"
+        },
+        {
+          "field_key": "business_objectives.metrics",
+          "label": "Metrik kuantitatif",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Contoh: Kurangkan masa pemprosesan pendaftaran kursus sebanyak 50%"
+        }
+      ]
+    },
+    {
+      "section_key": "business_scope",
+      "section_title": "Skop Perniagaan",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "business_scope.in_scope",
+          "label": "Dalam skop",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem latihan"
+        },
+        {
+          "field_key": "business_scope.out_scope",
+          "label": "Di luar skop",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem latihan"
+        }
+      ]
+    },
+    {
+      "section_key": "roles_and_scenarios",
+      "section_title": "Peranan dan Senario Teras",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "roles_and_scenarios.target_roles",
+          "label": "Peranan sasaran",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Contoh: pelajar, pengajar, pentadbir latihan, ketua jabatan"
+        },
+        {
+          "field_key": "roles_and_scenarios.core_scenarios",
+          "label": "Senario perniagaan teras",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Contoh: pelajar, pengajar, pentadbir latihan, ketua jabatan"
+        }
+      ]
+    },
+    {
+      "section_key": "functional_requirements",
+      "section_title": "Keperluan Fungsi",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "functional_requirements.overview",
+          "label": "Gambaran fungsi",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem latihan"
+        },
+        {
+          "field_key": "functional_requirements.features",
+          "label": "Butiran fungsi",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "feature": "Fungsi",
+            "description": "Penerangan",
+            "trigger": "Pencetus",
+            "logic": "Peraturan / logik perniagaan",
+            "inputs": "Input",
+            "outputs": "Output",
+            "exceptions": "Pengendalian pengecualian"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "page_and_process",
+      "section_title": "Halaman dan Proses",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "page_and_process.pages",
+          "label": "Halaman / laluan masuk",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "page": "Halaman / laluan masuk",
+            "entry": "Laluan masuk",
+            "elements": "Elemen utama",
+            "actions": "Tindakan utama",
+            "flow": "Aliran"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "business_rules_and_data",
+      "section_title": "Peraturan Perniagaan dan Data",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "business_rules_and_data.rules",
+          "label": "Peraturan / logik perniagaan",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem latihan"
+        },
+        {
+          "field_key": "business_rules_and_data.key_data",
+          "label": "Objek data utama",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Contoh: data induk kursus, data pelajar, bank soalan, rekod sijil"
+        }
+      ]
+    },
+    {
+      "section_key": "nonfunctional_requirements",
+      "section_title": "Keperluan Bukan Fungsi",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "nonfunctional_requirements.items",
+          "label": "Keperluan bukan fungsi",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem latihan"
+        }
+      ]
+    },
+    {
+      "section_key": "integration_dependencies",
+      "section_title": "Integrasi dan Kebergantungan",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "integration_dependencies.external_systems",
+          "label": "Kebergantungan luaran",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem latihan"
+        }
+      ]
+    },
+    {
+      "section_key": "risks_and_questions",
+      "section_title": "Risiko dan Soalan Terbuka",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "risks_and_questions.risks",
+          "label": "Risiko",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem latihan"
+        },
+        {
+          "field_key": "risks_and_questions.open_questions",
+          "label": "Soalan terbuka",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Masukkan soalan terbuka"
+        }
+      ]
+    },
+    {
+      "section_key": "milestone_acceptance",
+      "section_title": "Pencapaian dan Penerimaan",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "milestone_acceptance.milestones",
+          "label": "Pencapaian",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "milestone": "Pencapaian",
+            "target_date": "Tarikh sasaran",
+            "acceptance": "Kriteria penerimaan"
+          }
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "Projek naik taraf sistem latihan",
+      "requirement_name": "Pembinaan platform latihan perusahaan"
+    },
+    "template_meta": {
+      "template_name": "Templat Keperluan Perniagaan Sistem Latihan",
+      "requirement_type": "Binaan baharu",
+      "priority": "Tinggi",
+      "proposing_department": "Sumber Manusia / Pusat Pembelajaran dan Pembangunan",
+      "requester": "Pentadbir latihan",
+      "request_date": "2026-05-11",
+      "version": "V1.0"
+    },
+    "business_background": {
+      "summary": "Pelan latihan, pendaftaran kursus, rekod pembelajaran, keputusan peperiksaan, dan sijil kini tersebar di e-mel, hamparan, dan beberapa platform. Pentadbir latihan sukar menjejak pelaksanaan, pelajar tiada satu laluan masuk pembelajaran, dan pengurusan kekurangan data keberkesanan latihan yang boleh dianalisis.",
+      "pain_points": [
+        "Penerbitan pelan latihan dan pendaftaran bergantung pada notifikasi manual",
+        "Sumber kursus tersebar dan kemajuan pembelajaran sukar dijejak secara seragam",
+        "Keputusan peperiksaan, sijil, dan profil pembelajaran tidak diarkibkan secara automatik",
+        "Definisi data latihan tidak seragam dan laporan mengambil banyak kerja manual"
+      ]
+    },
+    "business_objectives": {
+      "objectives": [
+        "Wujudkan satu laluan masuk untuk pelan latihan, kursus, dan pembelajaran",
+        "Sokong pengurusan tertutup pendaftaran, pembelajaran, peperiksaan, dan sijil",
+        "Tingkatkan kecekapan pelaksanaan latihan dan ketepatan rekod pembelajaran",
+        "Bina data latihan yang boleh dianalisis untuk keputusan pembangunan bakat"
+      ],
+      "metrics": [
+        "Kurangkan masa pemprosesan pendaftaran kursus sebanyak 50%",
+        "Capai ketepatan statistik tamat pembelajaran sebanyak 98%",
+        "Jana dan arkibkan 90% sijil secara automatik",
+        "Kurangkan kerja penyediaan laporan latihan manual sebanyak 60%"
+      ]
+    },
+    "business_scope": {
+      "in_scope": [
+        "Pengurusan kursus dan kandungan",
+        "Penerbitan pelan latihan",
+        "Pendaftaran dan kelulusan pelajar",
+        "Pembelajaran dalam talian dan jejak kemajuan",
+        "Peperiksaan, penilaian, dan pengurusan markah",
+        "Sijil dan profil pembelajaran",
+        "Laporan dan analitik latihan"
+      ],
+      "out_scope": [
+        "Membangunkan enjin kelas langsung asas dari awal",
+        "Transaksi pasaran LMS yang kompleks",
+        "Perolehan kandungan mendalam daripada platform universiti luar",
+        "Cadangan laluan pembelajaran peribadi berasaskan AI"
+      ]
+    },
+    "roles_and_scenarios": {
+      "target_roles": [
+        "Pelajar: semak kursus, daftar latihan, belajar kandungan, ambil peperiksaan, dan lihat sijil",
+        "Pengajar: selenggara bahan pengajaran, lihat senarai pelajar, dan semak maklum balas",
+        "Pentadbir latihan: cipta pelan, urus pendaftaran, konfigurasi peperiksaan dan sijil",
+        "Ketua jabatan: luluskan pendaftaran pasukan dan lihat kemajuan pembelajaran pasukan",
+        "Pengurusan: lihat liputan, kadar tamat, kadar lulus, dan metrik keberkesanan latihan",
+        "Pentadbir sistem: selenggara kebenaran, kategori, kamus, dan konfigurasi asas"
+      ],
+      "core_scenarios": [
+        "Pentadbir latihan menerbitkan pelan latihan dan membuka pendaftaran kepada kumpulan sasaran.",
+        "Pelajar memilih kursus dalam portal latihan, menghantar pendaftaran, dan menerima notifikasi.",
+        "Ketua jabatan meluluskan pendaftaran ahli pasukan, dan sistem mengemas kini status pendaftaran.",
+        "Pelajar melengkapkan pembelajaran dalam talian dan mengambil penilaian.",
+        "Sistem menjana sijil berdasarkan peraturan tamat dan menyimpan profil pembelajaran.",
+        "Pengurusan menyemak kadar tamat, kadar lulus peperiksaan, dan maklum balas kursus."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "Keperluan ini merangkumi tujuh kumpulan keupayaan: sumber kursus, pelan latihan, kelulusan pendaftaran, kemajuan pembelajaran, peperiksaan dan penilaian, sijil dan profil pembelajaran, serta analitik.",
+      "features": [
+        {
+          "feature": "Pengurusan kursus dan kandungan",
+          "description": "Menyelenggara kategori kursus, maklumat kursus, bahan kandungan, pengajar, dan kumpulan sasaran.",
+          "trigger": "Pentadbir latihan mencipta atau mengemas kini kursus.",
+          "logic": [
+            "Sokong penerbitan, penarikan balik, kategori, tag, dan penyelenggaraan peranan sasaran",
+            "Sokong video, dokumen, tugasan, dan lampiran kandungan lain",
+            "Sokong versi kursus dan sejarah kemas kini"
+          ],
+          "inputs": "Nama kursus, kategori, pengajar, kandungan, kumpulan sasaran",
+          "outputs": "Butiran kursus, katalog, senarai kandungan",
+          "exceptions": "Kursus berulang, kandungan hilang, sekatan padam apabila dirujuk oleh pelan"
+        },
+        {
+          "feature": "Pelan latihan dan kelulusan pendaftaran",
+          "description": "Menerbitkan pelan latihan dan mengurus pendaftaran, kelulusan, kuota, dan notifikasi.",
+          "trigger": "Pelan dicipta atau pendaftaran dihantar.",
+          "logic": [
+            "Sokong pendaftaran mengikut organisasi, peranan, atau individu tertentu",
+            "Sokong kawalan kuota, senarai menunggu, pembatalan, dan aliran kelulusan",
+            "Sokong notifikasi pendaftaran, kelulusan, dan mula kelas"
+          ],
+          "inputs": "Nama pelan, kursus, jadual, kuota, kumpulan sasaran, pelulus",
+          "outputs": "Pelan latihan, senarai pendaftaran, keputusan kelulusan",
+          "exceptions": "Kuota penuh, tarikh tutup tamat, pendaftaran berulang, kelulusan lewat"
+        },
+        {
+          "feature": "Pembelajaran dalam talian dan jejak kemajuan",
+          "description": "Menyediakan satu laluan masuk pembelajaran dan merekod kemajuan.",
+          "trigger": "Pelajar memulakan pembelajaran kursus.",
+          "logic": [
+            "Sokong katalog kursus, kemajuan pembelajaran, tempoh, dan status tamat",
+            "Sokong sambung belajar, penanda wajib/opsyen, dan peringatan",
+            "Sokong peringatan pembelajaran tertunggak"
+          ],
+          "inputs": "Pelajar, kursus, kandungan, tempoh, status tamat",
+          "outputs": "Rekod pembelajaran, statistik kemajuan, bukti tamat",
+          "exceptions": "Kegagalan main kandungan, kegagalan laporan kemajuan, gabungan rekod berulang"
+        },
+        {
+          "feature": "Peperiksaan, penilaian, dan pengurusan markah",
+          "description": "Mengkonfigurasi bank soalan, kertas, sesi peperiksaan, pemarkahan, dan statistik markah.",
+          "trigger": "Pelan memerlukan peperiksaan atau pentadbir menerbitkannya.",
+          "logic": [
+            "Sokong tetapan bank soalan, kertas, masa peperiksaan, dan markah lulus",
+            "Sokong pemarkahan automatik, pemarkahan manual, dan peperiksaan ulangan",
+            "Sokong semakan markah, statistik kadar lulus, dan eksport"
+          ],
+          "inputs": "Soalan, kertas, tetapan peperiksaan, rekod jawapan",
+          "outputs": "Slip markah, status lulus, statistik peperiksaan",
+          "exceptions": "Masa tamat, penghantaran berulang, tanda penipuan, kelayakan ulangan tidak mencukupi"
+        },
+        {
+          "feature": "Sijil dan profil pembelajaran",
+          "description": "Menjana sijil berdasarkan keputusan tamat dan peperiksaan, serta membina profil pembelajaran pekerja.",
+          "trigger": "Pelajar memenuhi syarat pengeluaran sijil.",
+          "logic": [
+            "Sokong templat sijil, peraturan nombor, dan tempoh sah",
+            "Sokong penjanaan, muat turun, pembatalan, dan peringatan tamat tempoh sijil",
+            "Gabungkan rekod pembelajaran dan sijil mengikut pekerja"
+          ],
+          "inputs": "Rekod tamat, markah, templat sijil, data pekerja",
+          "outputs": "Sijil, profil pembelajaran, lejar sijil",
+          "exceptions": "Kegagalan jana sijil, tamat tempoh, jejak audit pembatalan"
+        },
+        {
+          "feature": "Laporan dan analitik latihan",
+          "description": "Menyediakan statistik pelaksanaan latihan, keberkesanan pembelajaran, dan penggunaan sumber.",
+          "trigger": "Pengurus atau pentadbir latihan melihat laporan.",
+          "logic": [
+            "Sokong statistik liputan dan tamat mengikut organisasi, kursus, masa, dan peranan",
+            "Sokong kadar lulus, penilaian kursus, dan ringkasan maklum balas",
+            "Sokong eksport laporan dan penghantaran berjadual"
+          ],
+          "inputs": "Rekod pendaftaran, rekod pembelajaran, markah, maklum balas",
+          "outputs": "Papan pemuka latihan, laporan statistik, fail eksport",
+          "exceptions": "Kelewatan data, kebenaran tidak mencukupi, peringatan apabila definisi statistik berubah"
+        }
+      ]
+    },
+    "page_and_process": {
+      "pages": [
+        {
+          "page": "Laman utama portal latihan",
+          "entry": "Laluan masuk pelajar",
+          "elements": "Kursus disyorkan, tugasan tertunda, sijil, notifikasi",
+          "actions": "Cari kursus, daftar, sambung belajar, lihat sijil",
+          "flow": "Pelajar log masuk, menyemak tugasan, dan memasuki kursus."
+        },
+        {
+          "page": "Pengurusan kursus",
+          "entry": "Konsol pentadbir latihan",
+          "elements": "Senarai kursus, butiran kursus, kandungan, pengajar, kumpulan sasaran",
+          "actions": "Cipta kursus, edit kandungan, terbit/tarik balik, salin kursus",
+          "flow": "Pentadbir menyelenggara kursus dan menerbitkannya kepada kumpulan yang boleh melihat."
+        },
+        {
+          "page": "Pengurusan pelan latihan",
+          "entry": "Konsol pentadbir latihan",
+          "elements": "Senarai pelan, senarai pendaftaran, status kelulusan, notifikasi",
+          "actions": "Terbit pelan, laras kuota, lihat pendaftaran, eksport senarai",
+          "flow": "Pentadbir mencipta pelan, sistem membuka pendaftaran mengikut sasaran dan menghantar notifikasi."
+        },
+        {
+          "page": "Pengurusan peperiksaan dan sijil",
+          "entry": "Konsol pentadbir latihan",
+          "elements": "Bank soalan, kertas, tetapan peperiksaan, markah, templat sijil",
+          "actions": "Konfigurasi peperiksaan, tanda markah, jana sijil, batal sijil",
+          "flow": "Selepas peperiksaan tamat, sistem merumuskan markah dan menjana sijil mengikut peraturan."
+        },
+        {
+          "page": "Papan pemuka analitik latihan",
+          "entry": "Laluan masuk pengurusan",
+          "elements": "Liputan, tamat, kadar lulus, penilaian kursus, trend",
+          "actions": "Tapis, telusuri, eksport, langgan",
+          "flow": "Pengurusan menyemak keberkesanan latihan mengikut organisasi dan masa."
+        }
+      ]
+    },
+    "business_rules_and_data": {
+      "rules": [
+        "Selepas tarikh tutup, pendaftaran ditutup secara lalai; pentadbir boleh menambah rekod dengan kebenaran.",
+        "Seorang pelajar hanya boleh mempunyai satu rekod pendaftaran aktif untuk pelan latihan yang sama.",
+        "Tamat kursus boleh bergantung pada kemajuan, tempoh, penghantaran tugasan, dan lulus peperiksaan.",
+        "Nombor sijil mesti unik secara global dan tidak boleh digunakan semula selepas pembatalan.",
+        "Perubahan pada markah dan sijil mesti menyimpan jejak audit."
+      ],
+      "key_data": [
+        "Kursus: kod, nama, kategori, pengajar, kandungan, kumpulan sasaran, status",
+        "Pelan latihan: kod, kursus, jadual, kuota, kumpulan sasaran, peraturan kelulusan",
+        "Rekod pendaftaran: pelajar, pelan, status, pelulus, masa kelulusan",
+        "Rekod pembelajaran: pelajar, kursus, kemajuan, tempoh, status tamat, masa tamat",
+        "Markah peperiksaan: peperiksaan, pelajar, markah, status lulus, status pemarkahan",
+        "Sijil: nombor, pelajar, kursus/pelan, masa pengeluaran, tempoh sah, status"
+      ]
+    },
+    "nonfunctional_requirements": {
+      "items": [
+        "Kawalan akses: keterlihatan dan operasi dikawal mengikut peranan, organisasi, dan skop data.",
+        "Prestasi: pertanyaan senarai lazim kembali dalam 3 saat; laporan boleh dijana secara tak segerak.",
+        "Kebolehgunaan: aliran pendaftaran dan pembelajaran utama memerlukan cuba semula dan mesej ralat yang jelas.",
+        "Audit: kelulusan pendaftaran, suntingan markah, dan penjanaan/pembatalan sijil mesti direkodkan.",
+        "Keselamatan: jawapan peperiksaan, markah, dan data sijil mesti diurus sebagai data sensitif."
+      ]
+    },
+    "integration_dependencies": {
+      "external_systems": [
+        "Data induk organisasi dan pekerja",
+        "Identiti bersatu / SSO",
+        "Perkhidmatan notifikasi mesej",
+        "Meterai elektronik atau perkhidmatan sijil",
+        "Gudang data perusahaan / BI"
+      ]
+    },
+    "risks_and_questions": {
+      "risks": [
+        "Definisi data latihan sejarah yang tidak seragam boleh menjejaskan kualiti migrasi.",
+        "Format kandungan dan keupayaan main balik yang berbeza boleh menjejaskan pengalaman belajar.",
+        "Keperluan anti-penipuan peperiksaan dan pematuhan sijil perlu disahkan awal.",
+        "Sempadan kebenaran berbilang organisasi yang tidak jelas boleh menjejaskan pengasingan data."
+      ],
+      "open_questions": [
+        "Adakah pelan latihan perlu menyokong pendaftaran rentas syarikat atau peserta luar?",
+        "Adakah peraturan tamat kursus perlu berbeza mengikut kursus, pelan, atau peranan?",
+        "Adakah sijil memerlukan meterai elektronik, pengesahan QR, atau tempoh sah?",
+        "Adakah peperiksaan memerlukan had masa, kertas rawak, anti-penipuan, dan peraturan ulangan?",
+        "Modul latihan manakah yang perlu menjadi halaman bebas dalam produk akhir?"
+      ]
+    },
+    "milestone_acceptance": {
+      "milestones": [
+        {
+          "milestone": "Pengesahan keperluan",
+          "target_date": "T+1 minggu",
+          "acceptance": "Sahkan skop, peranan, aliran teras, dan definisi laporan"
+        },
+        {
+          "milestone": "Semakan prototaip",
+          "target_date": "T+3 minggu",
+          "acceptance": "Lengkapkan prototaip halaman utama dan semakan proses"
+        },
+        {
+          "milestone": "Pembangunan dan integrasi",
+          "target_date": "T+8 minggu",
+          "acceptance": "Lengkapkan pembangunan fungsi teras dan integrasi luaran"
+        },
+        {
+          "milestone": "Pelancaran rintis",
+          "target_date": "T+10 minggu",
+          "acceptance": "Lancarkan organisasi rintis dan tutup isu rintis"
+        },
+        {
+          "milestone": "Pelancaran produksi",
+          "target_date": "T+12 minggu",
+          "acceptance": "Lengkapkan pelancaran penuh, latihan, dan penerimaan"
+        }
+      ]
+    },
+    "summary": "Pelan latihan, pendaftaran kursus, rekod pembelajaran, keputusan peperiksaan, dan sijil kini tersebar di e-mel, hamparan, dan beberapa platform. Pentadbir latihan sukar menjejak pelaksanaan, pelajar tiada satu laluan masuk pembelajaran, dan pengurusan kekurangan data keberkesanan latihan yang boleh dianalisis.",
+    "objective": "Wujudkan satu laluan masuk untuk pelan latihan, kursus, dan pembelajaran; Sokong pengurusan tertutup pendaftaran, pembelajaran, peperiksaan, dan sijil; Tingkatkan kecekapan pelaksanaan latihan dan ketepatan rekod pembelajaran; Bina data latihan yang boleh dianalisis untuk keputusan pembangunan bakat"
+  },
+  "prompt_hints": [
+    {
+      "hint_key": "training_hint_1",
+      "content": "Templat ini mengandungi objektif, skop, peranan, aliran, dan modul fungsi lazim untuk sistem latihan."
+    },
+    {
+      "hint_key": "training_hint_2",
+      "content": "Sahkan dahulu gelung tertutup antara kursus, pendaftaran, pembelajaran, peperiksaan, sijil, dan laporan."
+    },
+    {
+      "hint_key": "training_hint_3",
+      "content": "Tentukan kebenaran dan keperluan audit dengan jelas untuk markah, sijil, dan data sensitif."
+    }
+  ],
+  "prompt_questions": [
+    {
+      "question_key": "training_question_1",
+      "content": "Adakah pelan latihan perlu menyokong pendaftaran rentas syarikat atau peserta luar?"
+    },
+    {
+      "question_key": "training_question_2",
+      "content": "Adakah peraturan tamat kursus perlu berbeza mengikut kursus, pelan, atau peranan?"
+    },
+    {
+      "question_key": "training_question_3",
+      "content": "Adakah sijil memerlukan meterai elektronik, pengesahan QR, atau tempoh sah?"
+    },
+    {
+      "question_key": "training_question_4",
+      "content": "Adakah peperiksaan memerlukan had masa, kertas rawak, anti-penipuan, dan peraturan ulangan?"
+    },
+    {
+      "question_key": "training_question_5",
+      "content": "Modul latihan manakah yang perlu menjadi halaman bebas dalam produk akhir?"
+    }
+  ]
+}

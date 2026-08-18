@@ -1,0 +1,893 @@
+{
+  "template_id": "human_resource_management_business_requirement_template_de",
+  "template_key": "human_resource_management_business_requirement",
+  "template_name": "Vorlage fuer fachliche Anforderungen im Personalmanagement",
+  "template_category": "business_requirement",
+  "business_domain": "human_resource_management",
+  "language": "de",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "Allgemeine Vorlage fuer HR-Szenarien wie Mitarbeiterprofile, Recruiting und Onboarding, Anwesenheit und Schichtplanung, Payroll und Performance, Training und Entwicklung sowie Organisationsberechtigungen.",
+  "tags": [
+    "hr",
+    "employee",
+    "recruitment",
+    "attendance",
+    "payroll",
+    "performance"
+  ],
+  "applicable_scenarios": [
+    "Mitarbeiterprofilverwaltung",
+    "Recruiting und Onboarding",
+    "Anwesenheit und Schichtplanung",
+    "Payroll- und Performance-Management",
+    "Training und Entwicklung",
+    "Organisation und Berechtigungen"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/human-resource-management-business-requirement-template.de.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Basisinformationen",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.project_name",
+          "label": "Projekt",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Projektname eingeben"
+        },
+        {
+          "field_key": "document_info.requirement_name",
+          "label": "Anforderungsname",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Beispiel: Optimierung des Mitarbeiterlebenszyklus"
+        },
+        {
+          "field_key": "template_meta.requirement_type",
+          "label": "Anforderungstyp",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "Neuentwicklung",
+            "Optimierung",
+            "Refactoring"
+          ]
+        },
+        {
+          "field_key": "template_meta.priority",
+          "label": "Prioritaet",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "Hoch",
+            "Mittel",
+            "Niedrig"
+          ]
+        },
+        {
+          "field_key": "template_meta.proposing_department",
+          "label": "Anfordernde Abteilung",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Anfordernde Abteilung eingeben"
+        },
+        {
+          "field_key": "template_meta.requester",
+          "label": "Anforderer",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Anforderer eingeben"
+        },
+        {
+          "field_key": "template_meta.request_date",
+          "label": "Anforderungsdatum",
+          "component": "date",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "YYYY-MM-DD"
+        }
+      ]
+    },
+    {
+      "section_key": "background",
+      "section_title": "Fachlicher Hintergrund",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "background.summary",
+          "label": "Hintergrundbeschreibung",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "HR-Hintergrund, bestehende Prozesse und Aufbaugrund beschreiben"
+        },
+        {
+          "field_key": "template_meta.current_pain_points",
+          "label": "Aktuelle Schmerzpunkte",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "Je Zeile einen Schmerzpunkt eingeben"
+        },
+        {
+          "field_key": "background.objective",
+          "label": "Fachliche Ziele",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Fachliche HR-Ziele dieser Anforderung beschreiben"
+        },
+        {
+          "field_key": "template_meta.goal_metrics",
+          "label": "Messbare Kennzahlen",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "Beispiel: Onboarding-Dauer um 50% reduzieren"
+        }
+      ]
+    },
+    {
+      "section_key": "scope",
+      "section_title": "Fachlicher Umfang",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "scope.in_scope",
+          "label": "Im Umfang enthalten",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "Je Zeile einen Umfangspunkt eingeben"
+        },
+        {
+          "field_key": "scope.out_of_scope",
+          "label": "Nicht im Umfang enthalten",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "Je Zeile einen ausgeschlossenen Punkt eingeben"
+        }
+      ]
+    },
+    {
+      "section_key": "users_and_scenarios",
+      "section_title": "Rollen und Kernszenarien",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "users_and_scenarios.target_users",
+          "label": "Zielrollen",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "Beispiel: HR-Spezialisten, Fuehrungskraefte, Mitarbeitende, Management"
+        },
+        {
+          "field_key": "users_and_scenarios.core_scenarios",
+          "label": "Zentrale Geschaeftsszenarien",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "Je Zeile ein zentrales Szenario eingeben"
+        }
+      ]
+    },
+    {
+      "section_key": "functional_requirements",
+      "section_title": "Funktionale Anforderungen",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "functional_requirements.overview",
+          "label": "Funktionsuebersicht",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Kernfaehigkeiten fuer HR-Management zusammenfassen"
+        },
+        {
+          "field_key": "functional_requirements.feature_details",
+          "label": "Funktionsdetails",
+          "component": "object_array",
+          "data_type": "array<object>",
+          "required": true,
+          "item_schema": [
+            {
+              "field_key": "feature_name",
+              "label": "Funktionsname",
+              "component": "input",
+              "data_type": "string",
+              "required": true
+            },
+            {
+              "field_key": "description",
+              "label": "Beschreibung",
+              "component": "textarea",
+              "data_type": "string",
+              "required": true
+            },
+            {
+              "field_key": "trigger",
+              "label": "Ausloeser",
+              "component": "input",
+              "data_type": "string",
+              "required": false
+            },
+            {
+              "field_key": "processing_logic",
+              "label": "Verarbeitungslogik",
+              "component": "textarea",
+              "data_type": "string",
+              "required": true
+            },
+            {
+              "field_key": "inputs",
+              "label": "Eingaben",
+              "component": "string_array",
+              "data_type": "array<string>",
+              "required": false
+            },
+            {
+              "field_key": "outputs",
+              "label": "Ausgaben",
+              "component": "string_array",
+              "data_type": "array<string>",
+              "required": false
+            },
+            {
+              "field_key": "exception_cases",
+              "label": "Ausnahmefaelle",
+              "component": "string_array",
+              "data_type": "array<string>",
+              "required": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "section_key": "business_rules",
+      "section_title": "Geschaeftsregeln",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "business_rules",
+          "label": "Liste der Geschaeftsregeln",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "Je Zeile eine Geschaeftsregel eingeben"
+        }
+      ]
+    },
+    {
+      "section_key": "page_and_interaction",
+      "section_title": "Seiten und Interaktion",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "page_and_interaction.pages",
+          "label": "Seitenliste",
+          "component": "object_array",
+          "data_type": "array<object>",
+          "required": false,
+          "item_schema": [
+            {
+              "field_key": "page_name",
+              "label": "Seitenname",
+              "component": "input",
+              "data_type": "string",
+              "required": true
+            },
+            {
+              "field_key": "entry_point",
+              "label": "Einstiegspunkt",
+              "component": "input",
+              "data_type": "string",
+              "required": false
+            },
+            {
+              "field_key": "page_elements",
+              "label": "Seitenelemente",
+              "component": "string_array",
+              "data_type": "array<string>",
+              "required": false
+            },
+            {
+              "field_key": "button_actions",
+              "label": "Schaltflaechenaktionen",
+              "component": "string_array",
+              "data_type": "array<string>",
+              "required": false
+            }
+          ]
+        },
+        {
+          "field_key": "page_and_interaction.interaction_flow",
+          "label": "Interaktionsablauf",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "Je Zeile einen Prozessschritt eingeben"
+        }
+      ]
+    },
+    {
+      "section_key": "data_and_dependencies",
+      "section_title": "Daten und Abhaengigkeiten",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "data_and_dependencies",
+          "label": "Schluesseldaten und externe Abhaengigkeiten",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "Beispiel: Organisationsdaten, Mitarbeiterstammdaten, Zeiterfassung, Payroll-Schnittstelle"
+        }
+      ]
+    },
+    {
+      "section_key": "risks_and_notes",
+      "section_title": "Risiken und Hinweise",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "risks_and_notes",
+          "label": "Risiken und Hinweise",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "Je Zeile ein Risiko oder Hinweis eingeben"
+        },
+        {
+          "field_key": "open_questions",
+          "label": "Offene Fragen",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": false,
+          "placeholder": "Je Zeile eine offene Frage eingeben"
+        }
+      ]
+    },
+    {
+      "section_key": "acceptance_criteria",
+      "section_title": "Abnahmekriterien",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "acceptance_criteria",
+          "label": "Abnahmekriterien",
+          "component": "string_array",
+          "data_type": "array<string>",
+          "required": true,
+          "placeholder": "Je Zeile ein pruefbares Abnahmekriterium eingeben"
+        }
+      ]
+    }
+  ],
+  "default_structured_requirement_model": {
+    "document_info": {
+      "project_name": "",
+      "requirement_name": ""
+    },
+    "background": {
+      "summary": "",
+      "objective": ""
+    },
+    "scope": {
+      "in_scope": [],
+      "out_of_scope": []
+    },
+    "users_and_scenarios": {
+      "target_users": [],
+      "core_scenarios": []
+    },
+    "functional_requirements": {
+      "overview": "",
+      "feature_details": []
+    },
+    "business_rules": [],
+    "page_and_interaction": {
+      "pages": [],
+      "interaction_flow": []
+    },
+    "copywriting": [],
+    "data_and_dependencies": [],
+    "risks_and_notes": [],
+    "acceptance_criteria": [],
+    "open_questions": [],
+    "collection_status": {
+      "objective": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "scope": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "users": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "scenarios": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "features": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "pages": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "rules": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "integrations": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      },
+      "acceptance": {
+        "status": "missing",
+        "reason": "",
+        "pending_questions": []
+      }
+    }
+  },
+  "example_structured_requirement_model": {
+    "document_info": {
+      "project_name": "Human Resource Management Platform",
+      "requirement_name": "Human Resource Management Business Requirement Template"
+    },
+    "background": {
+      "summary": "Current HR processes are distributed across spreadsheets, email, offline approvals, and multiple systems, causing inconsistent employee data, low recruitment and onboarding efficiency, and poor linkage between attendance, payroll, and performance data.",
+      "objective": "Establish a unified HR business entry point, cover the employee lifecycle, and improve process efficiency, data accuracy, and management transparency."
+    },
+    "scope": {
+      "in_scope": [
+        "员工档案管理",
+        "招聘与入职",
+        "考勤与请假",
+        "薪酬绩效协同",
+        "培训发展记录",
+        "组织权限管理"
+      ],
+      "out_of_scope": [
+        "复杂薪资核算引擎",
+        "社保公积金申报",
+        "外部猎头平台深度集成",
+        "集团级人力成本预测"
+      ]
+    },
+    "users_and_scenarios": {
+      "target_users": [
+        "员工",
+        "HR 专员",
+        "招聘专员",
+        "部门负责人",
+        "薪酬绩效专员",
+        "管理层",
+        "系统管理员"
+      ],
+      "core_scenarios": [
+        "HR 创建和维护员工档案，员工可自助更新部分个人信息。",
+        "招聘录用后自动发起入职任务，相关角色按节点完成材料收集、账号开通和培训安排。",
+        "员工提交请假、加班或补卡申请，系统联动考勤规则进行校验。",
+        "部门负责人查看团队人员、考勤和绩效状态，并完成审批。",
+        "管理层查看组织人力统计、流动率、招聘进度和绩效分布。"
+      ]
+    },
+    "functional_requirements": {
+      "overview": "本需求围绕员工档案、招聘入职、考勤请假、薪酬绩效、培训发展和数据报表六类能力展开，目标是打通 HR 关键流程和人员主数据。",
+      "feature_details": [
+        {
+          "feature_name": "员工档案管理",
+          "description": "",
+          "trigger": "",
+          "processing_logic": "",
+          "inputs": [],
+          "outputs": [],
+          "exception_cases": []
+        },
+        {
+          "feature_name": "招聘与入职管理",
+          "description": "",
+          "trigger": "",
+          "processing_logic": "",
+          "inputs": [],
+          "outputs": [],
+          "exception_cases": []
+        },
+        {
+          "feature_name": "考勤与请假管理",
+          "description": "",
+          "trigger": "",
+          "processing_logic": "",
+          "inputs": [],
+          "outputs": [],
+          "exception_cases": []
+        },
+        {
+          "feature_name": "薪酬绩效协同",
+          "description": "",
+          "trigger": "",
+          "processing_logic": "",
+          "inputs": [],
+          "outputs": [],
+          "exception_cases": []
+        },
+        {
+          "feature_name": "培训与发展管理",
+          "description": "",
+          "trigger": "",
+          "processing_logic": "",
+          "inputs": [],
+          "outputs": [],
+          "exception_cases": []
+        },
+        {
+          "feature_name": "人力报表与分析",
+          "description": "",
+          "trigger": "",
+          "processing_logic": "",
+          "inputs": [],
+          "outputs": [],
+          "exception_cases": []
+        }
+      ]
+    },
+    "business_rules": [
+      "员工主数据必须有唯一员工编号并关联组织、岗位和在职状态。",
+      "入职流程未完成必填材料时不得标记为正式入职完成。",
+      "请假、加班、补卡申请必须按组织规则进入审批流程。",
+      "薪酬、绩效等敏感信息必须按角色授权访问。",
+      "离职流程完成后应自动回收系统权限并保留审计记录。"
+    ],
+    "page_and_interaction": {
+      "pages": [
+        {
+          "page_name": "员工档案列表",
+          "entry_point": "",
+          "page_elements": [],
+          "button_actions": []
+        },
+        {
+          "page_name": "员工档案详情",
+          "entry_point": "",
+          "page_elements": [],
+          "button_actions": []
+        },
+        {
+          "page_name": "招聘与入职看板",
+          "entry_point": "",
+          "page_elements": [],
+          "button_actions": []
+        },
+        {
+          "page_name": "考勤请假工作台",
+          "entry_point": "",
+          "page_elements": [],
+          "button_actions": []
+        },
+        {
+          "page_name": "绩效与培训记录页",
+          "entry_point": "",
+          "page_elements": [],
+          "button_actions": []
+        },
+        {
+          "page_name": "人力资源报表页",
+          "entry_point": "",
+          "page_elements": [],
+          "button_actions": []
+        }
+      ],
+      "interaction_flow": [
+        "HR 或员工发起人事业务申请。",
+        "系统校验基础信息、附件和规则条件。",
+        "相关负责人完成审批或处理任务。",
+        "流程完成后更新员工主数据、状态和记录。",
+        "数据同步到统计报表和外部依赖系统。"
+      ]
+    },
+    "copywriting": [],
+    "data_and_dependencies": [
+      "组织架构数据",
+      "员工主数据",
+      "岗位与职级数据",
+      "考勤规则和设备数据",
+      "薪酬绩效数据",
+      "OA / IAM / Payroll 等外部系统"
+    ],
+    "risks_and_notes": [
+      "历史员工数据不完整可能影响迁移和统计准确性。",
+      "权限边界不清会带来敏感人事数据泄露风险。",
+      "考勤、薪酬、绩效规则复杂，前期梳理不足会影响上线质量。"
+    ],
+    "acceptance_criteria": [
+      "员工档案、入职、考勤、审批和报表流程可端到端跑通。",
+      "员工主数据与组织岗位信息保持一致。",
+      "敏感字段权限隔离正确，越权访问被拦截。",
+      "考勤请假规则校验符合业务预期。",
+      "关键流程节点均有操作日志。"
+    ],
+    "open_questions": [
+      "是否需要对接现有 OA、IAM、Payroll 或考勤设备？",
+      "薪酬绩效数据是否只展示结果还是需要支持计算流程？",
+      "员工自助可编辑的信息范围如何定义？",
+      "历史员工档案是否需要一次性迁移？"
+    ],
+    "collection_status": {
+      "objective": {
+        "status": "confirmed",
+        "reason": "The template provides typical objectives for HR management requirements.",
+        "pending_questions": []
+      },
+      "scope": {
+        "status": "confirmed",
+        "reason": "The template provides typical HR in-scope and out-of-scope examples.",
+        "pending_questions": []
+      },
+      "users": {
+        "status": "confirmed",
+        "reason": "The template includes common HR roles and participants.",
+        "pending_questions": []
+      },
+      "scenarios": {
+        "status": "confirmed",
+        "reason": "The template describes common HR lifecycle scenarios.",
+        "pending_questions": []
+      },
+      "features": {
+        "status": "confirmed",
+        "reason": "The template provides HR feature categories and examples.",
+        "pending_questions": []
+      },
+      "pages": {
+        "status": "captured",
+        "reason": "The template provides suggested pages that should be adjusted for the actual product.",
+        "pending_questions": [
+          "Which HR modules need independent pages in the final product?"
+        ]
+      },
+      "rules": {
+        "status": "confirmed",
+        "reason": "The template covers common HR data, process, and permission rules.",
+        "pending_questions": []
+      },
+      "integrations": {
+        "status": "captured",
+        "reason": "The template lists typical external systems, but concrete interface boundaries still need confirmation.",
+        "pending_questions": [
+          "Do we need to integrate OA, IAM, Payroll, attendance devices, or notification systems?"
+        ]
+      },
+      "acceptance": {
+        "status": "confirmed",
+        "reason": "The template provides verifiable general acceptance criteria.",
+        "pending_questions": []
+      }
+    }
+  },
+  "template_meta": {
+    "requirement_type": "",
+    "priority": "",
+    "proposing_department": "",
+    "requester": "",
+    "request_date": "",
+    "current_pain_points": [],
+    "goal_metrics": []
+  },
+  "example_model": {
+    "document_info": {
+      "project_name": "Beispielprojekt: HR Lifecycle Management Platform",
+      "requirement_name": "Beispielanforderung: Employee lifecycle management optimization"
+    },
+    "background": {
+      "summary": "Dies ist ein integriertes Beispielgeschaeft fuer den schnellen Start mit einer vorbefuellten Vorlage. Employee profiles, recruitment, onboarding, attendance, payroll inputs, performance records, and training data are scattered across tools and spreadsheets.",
+      "objective": "Aus dem Beispiel sollen PRD und Design-Dokument erzeugt werden; spaetere Nutzeraenderungen haben Vorrang."
+    },
+    "scope": {
+      "in_scope": [
+        "Employee profile management",
+        "Recruitment and onboarding workflow",
+        "Attendance and scheduling records",
+        "Payroll input collection",
+        "Performance and training records",
+        "Organization permissions"
+      ],
+      "out_of_scope": [
+        "Payroll calculation engine",
+        "External recruitment marketplace",
+        "Legal contract signing service build"
+      ]
+    },
+    "users_and_scenarios": {
+      "target_users": [
+        "HR specialist",
+        "Hiring manager",
+        "Employee",
+        "Department manager",
+        "Payroll specialist",
+        "System administrator"
+      ],
+      "core_scenarios": [
+        "HR creates an employee profile during onboarding.",
+        "Manager reviews attendance exceptions.",
+        "Payroll specialist exports verified payroll inputs."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "This default example includes Employee master data, Onboarding workflow, Attendance and payroll input.",
+      "feature_details": [
+        {
+          "feature_name": "Employee master data",
+          "description": "Support employee master data for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        },
+        {
+          "feature_name": "Onboarding workflow",
+          "description": "Support onboarding workflow for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        },
+        {
+          "feature_name": "Attendance and payroll input",
+          "description": "Support attendance and payroll input for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        }
+      ]
+    },
+    "business_rules": [
+      "Only authorized roles can view scoped data and perform sensitive actions.",
+      "Core business actions must keep an audit trail.",
+      "Exported data must follow the same filters and permission scope as the page.",
+      "Data refresh status and calculation definitions must be visible to users."
+    ],
+    "page_and_interaction": {
+      "pages": [
+        {
+          "page_name": "Employee master data",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        },
+        {
+          "page_name": "Onboarding workflow",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        },
+        {
+          "page_name": "Attendance and payroll input",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        }
+      ],
+      "interaction_flow": [
+        "HR creates an employee profile during onboarding.",
+        "Manager reviews attendance exceptions.",
+        "Payroll specialist exports verified payroll inputs."
+      ]
+    },
+    "copywriting": [],
+    "data_and_dependencies": [
+      "User and organization master data",
+      "Business transaction data",
+      "Permission configuration",
+      "Reporting/export service"
+    ],
+    "risks_and_notes": [
+      "Metric ownership and data definitions must be confirmed.",
+      "Historical data quality may affect acceptance.",
+      "External system readiness may affect rollout scope."
+    ],
+    "acceptance_criteria": [
+      "The example scope can be generated into PRD and design documents.",
+      "Users can revise the seeded requirement through chat messages.",
+      "Main roles, flows, data, permissions, and acceptance criteria are represented."
+    ],
+    "open_questions": [
+      "Which roles need final approval authority?",
+      "Which fields and metrics are mandatory for MVP?",
+      "Which external systems must be integrated in the first release?"
+    ],
+    "template_meta": {
+      "example_note": "AI-generated default example business; replace with real business facts before final delivery."
+    }
+  }
+}

@@ -12,7 +12,11 @@ export default defineConfig(({ mode }) => {
       port: parseInt(env.VITE_PORT || '9530'),
       proxy: {
         '/api': {
-          target: env.VITE_API_BASE_URL || 'http://127.0.0.1:8000',
+          // VITE_DEV_PROXY_TARGET decouples the dev-proxy target from
+          // VITE_API_BASE_URL (which the browser also reads). Leaving
+          // VITE_API_BASE_URL empty lets the browser hit same-origin /api/*,
+          // while the proxy still knows where the backend lives.
+          target: env.VITE_DEV_PROXY_TARGET || env.VITE_API_BASE_URL || 'http://127.0.0.1:8002',
           changeOrigin: true,
         },
       },

@@ -1,0 +1,672 @@
+{
+  "template_id": "logistics_warehouse_business_requirement_template_ms",
+  "template_key": "logistics_warehouse_business_requirement",
+  "template_name": "Templat Keperluan Perniagaan Logistik dan Gudang",
+  "template_category": "business_requirement",
+  "business_domain": "logistics_warehouse",
+  "language": "ms",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "Templat keperluan perniagaan umum untuk pengurusan gudang, operasi masuk/keluar, kiraan inventori, semakan pemilihan, penghantaran, dan penjejakan logistik.",
+  "tags": [
+    "logistics",
+    "warehouse",
+    "inventory",
+    "inbound",
+    "outbound",
+    "shipment"
+  ],
+  "applicable_scenarios": [
+    "Janji temu inbound dan putaway",
+    "Operasi gudang dan inventori",
+    "Picking, semakan, dan outbound",
+    "Pengangkutan dan tracking",
+    "Pengecualian dan logistik songsang",
+    "Analitik gudang dan penghantaran"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/logistics-warehouse-business-requirement-template.ms.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Maklumat Asas",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.project_name",
+          "label": "Projek",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Masukkan nama projek"
+        },
+        {
+          "field_key": "document_info.requirement_name",
+          "label": "Nama keperluan",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Contoh: Pembinaan sistem logistik dan gudang bersepadu"
+        },
+        {
+          "field_key": "template_meta.requirement_type",
+          "label": "Jenis keperluan",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "Binaan baharu",
+            "Pengoptimuman",
+            "Refaktor"
+          ]
+        },
+        {
+          "field_key": "template_meta.priority",
+          "label": "Keutamaan",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "Tinggi",
+            "Sederhana",
+            "Rendah"
+          ]
+        },
+        {
+          "field_key": "template_meta.proposing_department",
+          "label": "Jabatan pemohon",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Masukkan jabatan pemohon"
+        },
+        {
+          "field_key": "template_meta.requester",
+          "label": "Pemohon",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Masukkan pemohon"
+        },
+        {
+          "field_key": "template_meta.request_date",
+          "label": "Tarikh permintaan",
+          "component": "date",
+          "data_type": "date",
+          "required": false,
+          "placeholder": "YYYY-MM-DD"
+        },
+        {
+          "field_key": "template_meta.version",
+          "label": "Versi",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "V1.0"
+        }
+      ]
+    },
+    {
+      "section_key": "business_background",
+      "section_title": "Latar Belakang Perniagaan",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "business_background.summary",
+          "label": "Ringkasan latar belakang",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Huraikan latar belakang logistik gudang, proses semasa, dan sebab pembinaan sistem"
+        },
+        {
+          "field_key": "business_background.pain_points",
+          "label": "Masalah semasa",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Huraikan latar belakang logistik gudang, proses semasa, dan sebab pembinaan sistem"
+        }
+      ]
+    },
+    {
+      "section_key": "business_objectives",
+      "section_title": "Objektif Perniagaan",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "business_objectives.objectives",
+          "label": "Objektif perniagaan",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Huraikan objektif perniagaan yang perlu dicapai oleh sistem logistik gudang"
+        },
+        {
+          "field_key": "business_objectives.metrics",
+          "label": "Metrik kuantitatif",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Contoh: Capai ketepatan outbound 99.5%"
+        }
+      ]
+    },
+    {
+      "section_key": "business_scope",
+      "section_title": "Skop Perniagaan",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "business_scope.in_scope",
+          "label": "Dalam skop",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem logistik gudang"
+        },
+        {
+          "field_key": "business_scope.out_scope",
+          "label": "Di luar skop",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem logistik gudang"
+        }
+      ]
+    },
+    {
+      "section_key": "roles_and_scenarios",
+      "section_title": "Peranan dan Senario Teras",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "roles_and_scenarios.target_roles",
+          "label": "Peranan sasaran",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Contoh: kerani gudang, picker, penyemak, dispatcher, pemandu, penyelia operasi"
+        },
+        {
+          "field_key": "roles_and_scenarios.core_scenarios",
+          "label": "Senario perniagaan teras",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Contoh: kerani gudang, picker, penyemak, dispatcher, pemandu, penyelia operasi"
+        }
+      ]
+    },
+    {
+      "section_key": "functional_requirements",
+      "section_title": "Keperluan Fungsi",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "functional_requirements.overview",
+          "label": "Gambaran fungsi",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem logistik gudang"
+        },
+        {
+          "field_key": "functional_requirements.features",
+          "label": "Butiran fungsi",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "feature": "Fungsi",
+            "description": "Penerangan",
+            "trigger": "Pencetus",
+            "logic": "Peraturan / logik perniagaan",
+            "inputs": "Input",
+            "outputs": "Output",
+            "exceptions": "Pengendalian pengecualian"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "page_and_process",
+      "section_title": "Halaman dan Proses",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "page_and_process.pages",
+          "label": "Halaman / laluan masuk",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "page": "Halaman / laluan masuk",
+            "entry": "Laluan masuk",
+            "elements": "Elemen utama",
+            "actions": "Tindakan utama",
+            "flow": "Aliran"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "business_rules_and_data",
+      "section_title": "Peraturan Perniagaan dan Data",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "business_rules_and_data.rules",
+          "label": "Peraturan / logik perniagaan",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem logistik gudang"
+        },
+        {
+          "field_key": "business_rules_and_data.key_data",
+          "label": "Objek data utama",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Contoh: gudang, lokasi, inventori, pesanan inbound, pesanan outbound, waybill"
+        }
+      ]
+    },
+    {
+      "section_key": "nonfunctional_requirements",
+      "section_title": "Keperluan Bukan Fungsi",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "nonfunctional_requirements.items",
+          "label": "Keperluan bukan fungsi",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem logistik gudang"
+        }
+      ]
+    },
+    {
+      "section_key": "integration_dependencies",
+      "section_title": "Integrasi dan Kebergantungan",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "integration_dependencies.external_systems",
+          "label": "Kebergantungan luaran",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem logistik gudang"
+        }
+      ]
+    },
+    {
+      "section_key": "risks_and_questions",
+      "section_title": "Risiko dan Soalan Terbuka",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "risks_and_questions.risks",
+          "label": "Risiko",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem logistik gudang"
+        },
+        {
+          "field_key": "risks_and_questions.open_questions",
+          "label": "Soalan terbuka",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Masukkan soalan terbuka"
+        }
+      ]
+    },
+    {
+      "section_key": "milestone_acceptance",
+      "section_title": "Pencapaian dan Penerimaan",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "milestone_acceptance.milestones",
+          "label": "Pencapaian",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "milestone": "Pencapaian",
+            "target_date": "Tarikh sasaran",
+            "acceptance": "Kriteria penerimaan"
+          }
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "Projek platform kerjasama gudang-penghantaran",
+      "requirement_name": "Pembinaan sistem logistik dan gudang bersepadu"
+    },
+    "template_meta": {
+      "template_name": "Templat Keperluan Perniagaan Logistik dan Gudang",
+      "requirement_type": "Binaan baharu",
+      "priority": "Tinggi",
+      "proposing_department": "Rantaian Bekalan / Logistik Gudang",
+      "requester": "Pengurus produk logistik",
+      "request_date": "2026-05-14",
+      "version": "V1.0"
+    },
+    "business_background": {
+      "summary": "Inbound, putaway, inventori, picking, semakan, penghantaran, dan delivery kini bergantung pada beberapa sistem dan hamparan manual. Ketepatan inventori, kecekapan operasi, dan keterlihatan logistik tidak mencukupi. Sistem logistik gudang bersatu diperlukan untuk menyokong operasi gudang, kerjasama gudang-penghantaran, pengendalian pengecualian, dan analitik.",
+      "pain_points": [
+        "Janji temu inbound, penerimaan, dan putaway tiada panduan kerja bersatu",
+        "Perbezaan inventori sukar dikesan dan dijejak tepat pada masa",
+        "Picking, semakan, pembungkusan, dan penghantaran bergantung pada komunikasi manual",
+        "Tracking penghantaran, pengecualian, dan bukti terima tidak boleh dijejak secara seragam"
+      ]
+    },
+    "business_objectives": {
+      "objectives": [
+        "Bina pengurusan bersatu untuk gudang, zon, lokasi, inventori, dan batch",
+        "Tingkatkan kecekapan dan ketepatan operasi inbound, gudang, outbound, dan penghantaran",
+        "Sambungkan aliran maklumat antara pesanan, gudang, carrier, dan pelanggan",
+        "Kumpul data pusingan inventori, kecekapan operasi, ketepatan masa penghantaran, dan pengecualian"
+      ],
+      "metrics": [
+        "Capai ketepatan inventori 99%",
+        "Capai ketepatan outbound 99.5%",
+        "Tingkatkan kecekapan picking purata sebanyak 30%",
+        "Kurangkan masa pengendalian pengecualian penghantaran sebanyak 40%"
+      ]
+    },
+    "business_scope": {
+      "in_scope": [
+        "Janji temu inbound, penerimaan, pemeriksaan kualiti, dan putaway",
+        "Zon gudang, lokasi, inventori, batch, beku, dan kiraan",
+        "Wave, picking, semakan, pembungkusan, dan serahan outbound",
+        "Carrier, waybill, tracking penghantaran, dan bukti terima",
+        "Pulangan inbound, pengecualian, rosak/hilang, dan tuntutan",
+        "Papan pemuka logistik gudang dan laporan operasi"
+      ],
+      "out_scope": [
+        "Membangunkan sendiri sistem kawalan peralatan gudang automatik",
+        "Pembelian terminal perkakasan tracking kenderaan",
+        "Kastam rentas sempadan dan pengangkutan antarabangsa",
+        "Pembinaan semula sistem penyelesaian kewangan yang kompleks"
+      ]
+    },
+    "roles_and_scenarios": {
+      "target_roles": [
+        "Kerani gudang: penerimaan, putaway, pindah lokasi, kiraan, dan pelarasan inventori",
+        "Picker: lengkapkan tugasan picking mengikut wave atau pesanan",
+        "Penyemak: semak produk, kuantiti, batch, dan kendali perbezaan",
+        "Packer: bungkus, timbang, cetak label, dan serah outbound",
+        "Dispatcher: tetapkan carrier, jejak pengangkutan, dan kendali pengecualian",
+        "Pemandu/carrier: terima waybill, ambil barang, hantar, dan pulangkan bukti terima",
+        "Penyelia operasi: lihat inventori, kecekapan, ketepatan masa, dan data pengecualian"
+      ],
+      "core_scenarios": [
+        "Pembekal atau sistem huluan mencipta janji temu inbound, dan gudang menerima mengikut janji temu.",
+        "Kerani gudang melengkapkan pemeriksaan, mencipta tugasan putaway, dan meletakkan barang ke lokasi sasaran.",
+        "Sistem mencipta wave dan tugasan picking daripada pesanan; picker memilih mengikut laluan.",
+        "Penyemak menyemak barang dan kuantiti; perbezaan masuk ke aliran pengecualian.",
+        "Packer menimbang, mencetak label, menyerahkan kepada carrier, dan sistem menyegerakkan waybill/tracking.",
+        "Penyelia melihat ketepatan inventori, kecekapan outbound, ketepatan masa penghantaran, dan pengecualian."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "Keperluan ini merangkumi tujuh kumpulan keupayaan: inbound, inventori gudang, picking dan semakan, penghantaran outbound, pengangkutan, pengecualian songsang, dan analitik.",
+      "features": [
+        {
+          "feature": "Janji temu inbound dan putaway",
+          "description": "Mengurus janji temu, ketibaan, penerimaan, pemeriksaan kualiti, dan tugasan putaway.",
+          "trigger": "Sistem huluan mencipta pesanan inbound atau pembekal menjadualkan ketibaan.",
+          "logic": [
+            "Sokong masa janji temu, pembekal, jumlah kotak, SKU, dan batch",
+            "Sokong perbezaan penerimaan, keputusan pemeriksaan, dan pendaftaran pengecualian",
+            "Jana tugasan putaway mengikut strategi lokasi"
+          ],
+          "inputs": "Pesanan inbound, pembekal, SKU, batch, kuantiti, keputusan pemeriksaan",
+          "outputs": "Rekod penerimaan, tugasan putaway, rekod tambah inventori",
+          "exceptions": "Ketibaan melebihi janji temu, kurang/lebih barang, pemeriksaan gagal, lokasi tidak cukup"
+        },
+        {
+          "feature": "Inventori dan operasi gudang",
+          "description": "Menyelenggara gudang, zon, lokasi, inventori, batch, beku, dan kiraan.",
+          "trigger": "Pergerakan inventori, pelan kiraan, atau pindah lokasi.",
+          "logic": [
+            "Sokong inventori tersedia, beku, dalam transit, dan mengikut batch",
+            "Sokong pindah lokasi, replenishment, pelarasan, beku/nyahbeku, dan lejar inventori",
+            "Sokong kiraan penuh, kiraan bergerak, kiraan kitaran, dan rawatan perbezaan"
+          ],
+          "inputs": "Gudang, lokasi, SKU, batch, status inventori, dokumen kiraan",
+          "outputs": "Lejar inventori, aliran inventori, perbezaan kiraan",
+          "exceptions": "Akaun tidak sepadan fizikal, inventori beku, batch luput, kapasiti lokasi tidak cukup"
+        },
+        {
+          "feature": "Wave picking dan semakan",
+          "description": "Menjana wave, tugasan picking, tugasan semakan, dan pengendalian perbezaan berdasarkan pesanan.",
+          "trigger": "Pesanan masuk status perlu keluar atau operator mencipta wave.",
+          "logic": [
+            "Sokong wave mengikut gudang, carrier, SLA, dan atribut produk",
+            "Sokong laluan picking, kotak penuh/pecahan, kekurangan stok, dan penggantian",
+            "Sokong semakan imbasan, pendaftaran perbezaan, dan semakan kedua"
+          ],
+          "inputs": "Pesanan, SKU, lokasi, peraturan wave, tugasan picking",
+          "outputs": "Senarai picking, keputusan semakan, rekod perbezaan",
+          "exceptions": "Kekurangan stok, salah pilih, batch tidak sepadan, semakan gagal"
+        },
+        {
+          "feature": "Pembungkusan outbound dan serahan",
+          "description": "Melengkapkan pembungkusan, timbang, label, pengesahan outbound, dan serahan carrier.",
+          "trigger": "Selepas semakan lulus, masuk proses pembungkusan outbound.",
+          "logic": [
+            "Sokong pecah/gabung bungkusan, timbang, rekod bahan, dan cetak label",
+            "Sokong serahan outbound, pengesahan ambil, dan potongan inventori",
+            "Sokong catatan pesanan, pembungkusan khas, dan petunjuk barang berbahaya"
+          ],
+          "inputs": "Keputusan semakan, bungkusan, berat, label, carrier",
+          "outputs": "Pesanan outbound, nombor bungkusan, nombor waybill, rekod serahan",
+          "exceptions": "Cetak label gagal, berat abnormal, carrier menolak, outbound dibatalkan"
+        },
+        {
+          "feature": "Pengangkutan dan tracking",
+          "description": "Mengurus carrier, waybill, nod tracking, bukti terima, dan pengecualian penghantaran.",
+          "trigger": "Selepas outbound, waybill dicipta dan diserahkan kepada carrier.",
+          "logic": [
+            "Sokong laluan carrier, templat caj penghantaran, dan peraturan masa",
+            "Sokong langganan tracking, callback nod, gambar bukti terima, dan resit elektronik",
+            "Sokong kelewatan, ditolak, hilang, rosak, dan pengecualian lain"
+          ],
+          "inputs": "Waybill, carrier, bungkusan, nod tracking, maklumat bukti terima",
+          "outputs": "Tracking logistik, keputusan terima, rekod pengecualian",
+          "exceptions": "Tracking lewat, terima gagal, hilang, rosak, alamat tidak dapat dicapai"
+        },
+        {
+          "feature": "Logistik songsang dan pengecualian",
+          "description": "Mengendalikan pulangan, penolakan, pertukaran, item pengecualian, tuntutan, dan tulis balik inventori.",
+          "trigger": "Pelanggan memulangkan barang, carrier menolak, atau gudang menemui pengecualian.",
+          "logic": [
+            "Sokong janji temu pulangan, penerimaan, pemeriksaan, putaway semula, atau lupus",
+            "Sokong pendaftaran pengecualian, atribusi tanggungjawab, tuntutan, dan had masa",
+            "Sokong kaitan selepas jualan, waybill, inventori, dan status kewangan"
+          ],
+          "inputs": "Pesanan pulangan, sebab pengecualian, keputusan pemeriksaan, pihak bertanggungjawab, hasil",
+          "outputs": "Pulangan inbound, lejar pengecualian, rekod tuntutan",
+          "exceptions": "Pulangan tanpa pesanan asal, barang rosak, tanggungjawab tidak jelas, lewat diproses"
+        }
+      ]
+    },
+    "page_and_process": {
+      "pages": [
+        {
+          "page": "Meja kerja gudang",
+          "entry": "Laluan masuk operasi gudang",
+          "elements": "Menunggu terima, putaway, picking, semakan, amaran pengecualian",
+          "actions": "Ambil tugasan, imbas, hantar keputusan, lihat pengecualian",
+          "flow": "Staf operasi masuk meja kerja untuk mengambil dan menyelesaikan tugasan gudang."
+        },
+        {
+          "page": "Pengurusan inbound",
+          "entry": "Backend gudang",
+          "elements": "Janji temu, pesanan inbound, rekod penerimaan, keputusan pemeriksaan, tugasan putaway",
+          "actions": "Cipta janji temu, terima, semak, jana putaway, tutup inbound",
+          "flow": "Kerani gudang menerima mengikut janji temu dan melakukan putaway."
+        },
+        {
+          "page": "Pengurusan inventori",
+          "entry": "Backend gudang",
+          "elements": "Lejar inventori, lokasi, batch, beku, dokumen kiraan",
+          "actions": "Cari, pindah lokasi, beku, kira, laras",
+          "flow": "Penyelia melihat inventori dan mengendalikan perbezaan."
+        },
+        {
+          "page": "Operasi outbound",
+          "entry": "Laluan masuk operasi gudang",
+          "elements": "Wave, senarai picking, tugasan semakan, bungkusan, label",
+          "actions": "Jana wave, picking, semak, bungkus, serah",
+          "flow": "Sistem menjana tugasan mengikut pesanan dan menyelesaikan serahan outbound."
+        },
+        {
+          "page": "Tracking pengangkutan",
+          "entry": "Backend logistik",
+          "elements": "Waybill, tracking, bukti terima, pengecualian, carrier",
+          "actions": "Tetapkan carrier, semak tracking, kendali pengecualian, eksport laporan",
+          "flow": "Dispatcher menjejak penghantaran dan mengendalikan pengecualian."
+        },
+        {
+          "page": "Papan pemuka gudang-penghantaran",
+          "entry": "Laluan masuk pengurusan",
+          "elements": "Ketepatan inventori, kecekapan outbound, masa penghantaran, kadar pengecualian",
+          "actions": "Tapis, telusuri, eksport, langgan",
+          "flow": "Pengurusan melihat kualiti operasi gudang dan penghantaran."
+        }
+      ]
+    },
+    "business_rules_and_data": {
+      "rules": [
+        "Setiap pergerakan inventori mesti menjana rekod lejar inventori dan dikaitkan dengan dokumen sumber.",
+        "Inventori tersedia hanya boleh ditolak dan bungkusan dijana selepas semakan outbound lulus.",
+        "Batch yang sama perlu dipilih mengikut FIFO atau peraturan batch tertentu.",
+        "Pengecualian mesti merekod pihak bertanggungjawab, kesimpulan, dan tarikh akhir pengendalian.",
+        "Tracking waybill dan bukti terima perlu menyokong cuba semula dan pengisian manual apabila callback gagal."
+      ],
+      "key_data": [
+        "Gudang: kod, nama, zon, lokasi, kapasiti, status",
+        "Inventori: SKU, batch, lokasi, tersedia, beku, dalam transit, dikhaskan",
+        "Pesanan inbound: pembekal, SKU, kuantiti, masa janji temu, keputusan pemeriksaan",
+        "Pesanan outbound: pesanan, wave, picking, semakan, bungkusan, waybill",
+        "Waybill: carrier, bungkusan, tracking, bukti terima, status pengecualian",
+        "Kes pengecualian: jenis, sebab, pihak bertanggungjawab, pengendali, keputusan"
+      ]
+    },
+    "nonfunctional_requirements": {
+      "items": [
+        "Prestasi: operasi imbasan dan pertanyaan inventori perlu respons pantas; tindakan lazim selesai dalam 2 saat.",
+        "Ketepatan: status inventori, inbound, outbound, dan waybill perlu boleh dijejak dan konsisten akhirnya.",
+        "Operasi mudah alih: halaman handheld perlu menyokong imbasan, rangkaian lemah, dan hantar semula luar talian.",
+        "Audit: pelarasan inventori, pengendalian pengecualian, dan pengisian waybill manual mesti direkodkan.",
+        "Keselamatan: data gudang, pemilik barang, dan carrier mesti diasingkan mengikut kebenaran."
+      ]
+    },
+    "integration_dependencies": {
+      "external_systems": [
+        "Sistem pesanan / ERP",
+        "Pusat beli-belah atau saluran jualan",
+        "API carrier",
+        "Perkhidmatan cetakan kod bar / label",
+        "Terminal handheld / PDA",
+        "Gudang data perusahaan / BI"
+      ]
+    },
+    "risks_and_questions": {
+      "risks": [
+        "Perbezaan inventori menjejaskan janji jualan dan pemenuhan.",
+        "Callback tracking carrier yang tidak stabil menjejaskan pengalaman pertanyaan pelanggan.",
+        "Aliran kerja gudang terlalu kompleks mengurangkan kecekapan barisan hadapan.",
+        "Peraturan batch, tarikh luput, dan beku yang tidak jelas boleh menyebabkan salah hantar atau risiko luput."
+      ],
+      "open_questions": [
+        "Adakah perlu menyokong berbilang gudang, berbilang pemilik barang, dan zon suhu?",
+        "Adakah potongan inventori berlaku semasa pesanan, bayaran, atau outbound?",
+        "Adakah strategi picking mengutamakan wave, pesanan, zon, atau batch?",
+        "Adakah tracking carrier melalui langganan API atau import manual?",
+        "Adakah imbasan PDA, operasi luar talian, dan bukti terima elektronik diperlukan?"
+      ]
+    },
+    "milestone_acceptance": {
+      "milestones": [
+        {
+          "milestone": "Pengesahan keperluan",
+          "target_date": "T+1 minggu",
+          "acceptance": "Sahkan skop gudang-penghantaran, peraturan inventori, aliran kerja, dan API carrier"
+        },
+        {
+          "milestone": "Semakan prototaip",
+          "target_date": "T+3 minggu",
+          "acceptance": "Lengkapkan prototaip inbound, inventori, outbound, pengangkutan, dan papan pemuka"
+        },
+        {
+          "milestone": "Pembangunan dan integrasi",
+          "target_date": "T+8 minggu",
+          "acceptance": "Lengkapkan integrasi pesanan, gudang, carrier, dan cetakan"
+        },
+        {
+          "milestone": "Pelancaran rintis",
+          "target_date": "T+10 minggu",
+          "acceptance": "Rintiskan satu gudang atau barisan perniagaan"
+        },
+        {
+          "milestone": "Pelancaran produksi",
+          "target_date": "T+12 minggu",
+          "acceptance": "Lengkapkan rollout berbilang gudang, latihan, dan penerimaan"
+        }
+      ]
+    },
+    "summary": "Inbound, putaway, inventori, picking, semakan, penghantaran, dan delivery kini bergantung pada beberapa sistem dan hamparan manual. Ketepatan inventori, kecekapan operasi, dan keterlihatan logistik tidak mencukupi. Sistem logistik gudang bersatu diperlukan untuk menyokong operasi gudang, kerjasama gudang-penghantaran, pengendalian pengecualian, dan analitik.",
+    "objective": "Bina pengurusan bersatu untuk gudang, zon, lokasi, inventori, dan batch; Tingkatkan kecekapan dan ketepatan operasi inbound, gudang, outbound, dan penghantaran; Sambungkan aliran maklumat antara pesanan, gudang, carrier, dan pelanggan; Kumpul data pusingan inventori, kecekapan operasi, ketepatan masa penghantaran, dan pengecualian"
+  },
+  "prompt_hints": [
+    {
+      "hint_key": "logistics_hint_1",
+      "content": "Templat ini mengandungi keupayaan lazim logistik gudang untuk inbound, inventori, outbound, penghantaran, dan pengecualian."
+    },
+    {
+      "hint_key": "logistics_hint_2",
+      "content": "Sahkan dahulu potongan inventori, strategi batch, peraturan semakan, dan mekanisme callback tracking carrier."
+    },
+    {
+      "hint_key": "logistics_hint_3",
+      "content": "Halaman barisan hadapan perlu fokus pada kecekapan imbasan, rangkaian lemah, dan pengisian pengecualian."
+    }
+  ],
+  "prompt_questions": [
+    {
+      "question_key": "logistics_question_1",
+      "content": "Adakah perlu menyokong berbilang gudang, berbilang pemilik barang, dan zon suhu?"
+    },
+    {
+      "question_key": "logistics_question_2",
+      "content": "Adakah potongan inventori berlaku semasa pesanan, bayaran, atau outbound?"
+    },
+    {
+      "question_key": "logistics_question_3",
+      "content": "Adakah strategi picking mengutamakan wave, pesanan, zon, atau batch?"
+    },
+    {
+      "question_key": "logistics_question_4",
+      "content": "Adakah tracking carrier melalui langganan API atau import manual?"
+    },
+    {
+      "question_key": "logistics_question_5",
+      "content": "Adakah imbasan PDA, operasi luar talian, dan bukti terima elektronik diperlukan?"
+    }
+  ]
+}

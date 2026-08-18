@@ -1,0 +1,665 @@
+{
+  "template_id": "shopping_mall_business_requirement_template_ms",
+  "template_key": "shopping_mall_business_requirement",
+  "template_name": "Templat Keperluan Perniagaan Pusat Beli-belah Dalam Talian",
+  "template_category": "business_requirement",
+  "business_domain": "shopping_mall",
+  "language": "ms",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "Templat keperluan perniagaan umum untuk pusat beli-belah B2C, kedai jenama, kedai keahlian, dan sistem transaksi e-dagang berbilang saluran.",
+  "tags": [
+    "ecommerce",
+    "product",
+    "order",
+    "cart",
+    "promotion",
+    "customer"
+  ],
+  "applicable_scenarios": [
+    "Pengurusan produk dan kategori",
+    "Troli dan checkout",
+    "Pesanan dan bayaran",
+    "Promosi dan kupon",
+    "Keahlian dan operasi pelanggan",
+    "Selepas jualan dan analitik perdagangan"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/shopping-mall-business-requirement-template.ms.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Maklumat Asas",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.project_name",
+          "label": "Projek",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Masukkan nama projek"
+        },
+        {
+          "field_key": "document_info.requirement_name",
+          "label": "Nama keperluan",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Contoh: Pembinaan pusat beli-belah jenama"
+        },
+        {
+          "field_key": "template_meta.requirement_type",
+          "label": "Jenis keperluan",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "Binaan baharu",
+            "Pengoptimuman",
+            "Refaktor"
+          ]
+        },
+        {
+          "field_key": "template_meta.priority",
+          "label": "Keutamaan",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "Tinggi",
+            "Sederhana",
+            "Rendah"
+          ]
+        },
+        {
+          "field_key": "template_meta.proposing_department",
+          "label": "Jabatan pemohon",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Masukkan jabatan pemohon"
+        },
+        {
+          "field_key": "template_meta.requester",
+          "label": "Pemohon",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Masukkan pemohon"
+        },
+        {
+          "field_key": "template_meta.request_date",
+          "label": "Tarikh permintaan",
+          "component": "date",
+          "data_type": "date",
+          "required": false,
+          "placeholder": "YYYY-MM-DD"
+        },
+        {
+          "field_key": "template_meta.version",
+          "label": "Versi",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "V1.0"
+        }
+      ]
+    },
+    {
+      "section_key": "business_background",
+      "section_title": "Latar Belakang Perniagaan",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "business_background.summary",
+          "label": "Ringkasan latar belakang",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Huraikan latar belakang perdagangan, saluran jualan, dan sebab pembinaan pusat beli-belah"
+        },
+        {
+          "field_key": "business_background.pain_points",
+          "label": "Masalah semasa",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Huraikan latar belakang perdagangan, saluran jualan, dan sebab pembinaan pusat beli-belah"
+        }
+      ]
+    },
+    {
+      "section_key": "business_objectives",
+      "section_title": "Objektif Perniagaan",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "business_objectives.objectives",
+          "label": "Objektif perniagaan",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Huraikan objektif perniagaan yang perlu dicapai oleh pusat beli-belah"
+        },
+        {
+          "field_key": "business_objectives.metrics",
+          "label": "Metrik kuantitatif",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Contoh: Tingkatkan penukaran checkout sebanyak 15%"
+        }
+      ]
+    },
+    {
+      "section_key": "business_scope",
+      "section_title": "Skop Perniagaan",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "business_scope.in_scope",
+          "label": "Dalam skop",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem pusat beli-belah"
+        },
+        {
+          "field_key": "business_scope.out_scope",
+          "label": "Di luar skop",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem pusat beli-belah"
+        }
+      ]
+    },
+    {
+      "section_key": "roles_and_scenarios",
+      "section_title": "Peranan dan Senario Teras",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "roles_and_scenarios.target_roles",
+          "label": "Peranan sasaran",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Contoh: pelawat, ahli, operator, khidmat pelanggan, gudang, kewangan"
+        },
+        {
+          "field_key": "roles_and_scenarios.core_scenarios",
+          "label": "Senario perniagaan teras",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Contoh: pelawat, ahli, operator, khidmat pelanggan, gudang, kewangan"
+        }
+      ]
+    },
+    {
+      "section_key": "functional_requirements",
+      "section_title": "Keperluan Fungsi",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "functional_requirements.overview",
+          "label": "Gambaran fungsi",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem pusat beli-belah"
+        },
+        {
+          "field_key": "functional_requirements.features",
+          "label": "Butiran fungsi",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "feature": "Fungsi",
+            "description": "Penerangan",
+            "trigger": "Pencetus",
+            "logic": "Peraturan / logik perniagaan",
+            "inputs": "Input",
+            "outputs": "Output",
+            "exceptions": "Pengendalian pengecualian"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "page_and_process",
+      "section_title": "Halaman dan Proses",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "page_and_process.pages",
+          "label": "Halaman / laluan masuk",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "page": "Halaman / laluan masuk",
+            "entry": "Laluan masuk",
+            "elements": "Elemen utama",
+            "actions": "Tindakan utama",
+            "flow": "Aliran"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "business_rules_and_data",
+      "section_title": "Peraturan Perniagaan dan Data",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "business_rules_and_data.rules",
+          "label": "Peraturan / logik perniagaan",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem pusat beli-belah"
+        },
+        {
+          "field_key": "business_rules_and_data.key_data",
+          "label": "Objek data utama",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Contoh: produk, SKU, troli, pesanan, bayaran, kes selepas jualan"
+        }
+      ]
+    },
+    {
+      "section_key": "nonfunctional_requirements",
+      "section_title": "Keperluan Bukan Fungsi",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "nonfunctional_requirements.items",
+          "label": "Keperluan bukan fungsi",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem pusat beli-belah"
+        }
+      ]
+    },
+    {
+      "section_key": "integration_dependencies",
+      "section_title": "Integrasi dan Kebergantungan",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "integration_dependencies.external_systems",
+          "label": "Kebergantungan luaran",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem pusat beli-belah"
+        }
+      ]
+    },
+    {
+      "section_key": "risks_and_questions",
+      "section_title": "Risiko dan Soalan Terbuka",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "risks_and_questions.risks",
+          "label": "Risiko",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Ringkaskan keupayaan teras yang perlu dibina untuk sistem pusat beli-belah"
+        },
+        {
+          "field_key": "risks_and_questions.open_questions",
+          "label": "Soalan terbuka",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Masukkan soalan terbuka"
+        }
+      ]
+    },
+    {
+      "section_key": "milestone_acceptance",
+      "section_title": "Pencapaian dan Penerimaan",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "milestone_acceptance.milestones",
+          "label": "Pencapaian",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "milestone": "Pencapaian",
+            "target_date": "Tarikh sasaran",
+            "acceptance": "Kriteria penerimaan"
+          }
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "Projek platform e-dagang",
+      "requirement_name": "Pembinaan pusat beli-belah jenama"
+    },
+    "template_meta": {
+      "template_name": "Templat Keperluan Perniagaan Pusat Beli-belah Dalam Talian",
+      "requirement_type": "Binaan baharu",
+      "priority": "Tinggi",
+      "proposing_department": "Operasi E-dagang / Produk",
+      "requester": "Pengurus produk pusat beli-belah",
+      "request_date": "2026-05-14",
+      "version": "V1.0"
+    },
+    "business_background": {
+      "summary": "Jualan produk kini bergantung pada kedai fizikal, komuniti, dan pesanan manual. Maklumat produk, inventori, diskaun, pesanan, dan selepas jualan diurus berasingan. Pusat beli-belah bersatu diperlukan untuk paparan produk, pembelian ahli, bayaran dalam talian, pemenuhan pesanan, khidmat selepas jualan, dan analitik operasi.",
+      "pain_points": [
+        "Maklumat produk dan harga tersebar serta tidak konsisten antara frontend dan backend",
+        "Pesanan, kutipan bayaran, potongan inventori, dan penghantaran tiada gelung tertutup",
+        "Promosi bergantung pada konfigurasi dan kiraan manual serta mudah salah",
+        "Bayaran balik, khidmat pelanggan, dan data operasi tiada penjejakan bersatu"
+      ]
+    },
+    "business_objectives": {
+      "objectives": [
+        "Bina sistem paparan produk, SKU, harga, dan inventori yang bersatu",
+        "Sambungkan troli, pesanan, bayaran, penghantaran, dan selepas jualan dalam satu gelung transaksi",
+        "Sokong kupon, potongan penuh, jualan kilat, harga ahli, dan mekanik kempen",
+        "Kumpul data pelanggan, pesanan, penukaran, dan pembelian semula untuk keputusan operasi"
+      ],
+      "metrics": [
+        "Tingkatkan penukaran checkout sebanyak 15%",
+        "Capai kadar bayaran berjaya 98%",
+        "Kurangkan purata masa selepas jualan sebanyak 40%",
+        "Kurangkan masa konfigurasi promosi sebanyak 60%"
+      ]
+    },
+    "business_scope": {
+      "in_scope": [
+        "Kategori produk, SPU/SKU, harga, dan pengurusan listing",
+        "Carian, penapis, butiran produk, troli, dan checkout",
+        "Penciptaan pesanan, bayaran, batal, penghantaran, dan pengesahan terima",
+        "Kupon, potongan penuh, jualan kilat, harga ahli, dan halaman kempen",
+        "Profil ahli, alamat, simpanan, pelayaran, dan operasi pelanggan",
+        "Bayaran balik/pulangan, kerjasama khidmat pelanggan, dan papan pemuka perdagangan"
+      ],
+      "out_scope": [
+        "Kastam rentas sempadan dan pengiraan cukai antarabangsa",
+        "Onboarding dan penyelesaian pedagang marketplace yang kompleks",
+        "Pembinaan semula POS luar talian",
+        "Membangunkan enjin live commerce dari awal"
+      ]
+    },
+    "roles_and_scenarios": {
+      "target_roles": [
+        "Pelawat: semak produk, cari, lihat kempen, dan log masuk/daftar",
+        "Ahli: tambah ke troli, pesan, bayar, lihat pesanan, dan mohon selepas jualan",
+        "Operator: selenggara produk, kempen, cadangan, dan halaman kandungan",
+        "Khidmat pelanggan: kendali pertanyaan, pengecualian pesanan, pulangan, dan aduan",
+        "Staf gudang: terima pesanan, pilih, hantar, dan segerakkan nombor tracking",
+        "Kewangan: lihat bayaran, bayaran balik, rekonsiliasi, dan invois",
+        "Pentadbir sistem: selenggara kebenaran, kamus, bayaran, dan parameter pusat beli-belah"
+      ],
+      "core_scenarios": [
+        "Operator menyenaraikan produk dan mengkonfigurasi inventori, harga, dan tag kempen.",
+        "Pengguna mencari produk, masuk halaman butiran, tambah ke troli, dan menghantar pesanan.",
+        "Sistem mengira diskaun, caj penghantaran, dan jumlah perlu bayar; pengguna menyelesaikan bayaran dalam talian.",
+        "Gudang menerima pesanan untuk dihantar, memilih barang, menghantar, dan memulangkan nombor tracking.",
+        "Pengguna memohon bayaran balik/pulangan, khidmat pelanggan menyemak dan mencetuskan bayaran balik.",
+        "Operator melihat data penukaran, nilai pesanan purata, pembelian semula, inventori, dan prestasi kempen."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "Keperluan ini merangkumi tujuh kumpulan keupayaan: produk, troli, pesanan dan bayaran, promosi, ahli dan pelanggan, selepas jualan, serta analitik.",
+      "features": [
+        {
+          "feature": "Pengurusan produk dan SKU",
+          "description": "Menyelenggara kategori, jenama, SPU/SKU, imej, spesifikasi, harga, inventori, dan status listing.",
+          "trigger": "Operator mencipta atau mengemas kini produk.",
+          "logic": [
+            "Sokong hierarki kategori, jenama, atribut spesifikasi, dan gabungan SKU",
+            "Sokong draf, pratonton, listing/nyahlisting, susunan, dan tag cadangan",
+            "Sokong harga, inventori, had pembelian, dan kawasan jualan"
+          ],
+          "inputs": "Data produk, SKU, harga, inventori, imej, tag",
+          "outputs": "Butiran produk, senarai SKU, status listing",
+          "exceptions": "Konflik SKU, inventori tidak cukup, harga abnormal, produk dirujuk oleh pesanan"
+        },
+        {
+          "feature": "Troli dan checkout",
+          "description": "Menyokong tambah ke troli, pilih item, ubah kuantiti, kira diskaun, dan hantar pesanan.",
+          "trigger": "Pengguna klik tambah ke troli atau checkout.",
+          "logic": [
+            "Sokong kuantiti troli, status dipilih, dan petunjuk item tidak sah",
+            "Sokong kupon, potongan penuh, harga ahli, potongan mata, dan kiraan penghantaran",
+            "Sokong alamat, invois, catatan, dan pilihan penghantaran"
+          ],
+          "inputs": "Pengguna, SKU, kuantiti, diskaun, alamat, cara penghantaran",
+          "outputs": "Troli, helaian checkout, jumlah perlu bayar",
+          "exceptions": "Inventori tidak cukup, harga berubah, diskaun tidak tersedia, alamat tidak boleh dihantar"
+        },
+        {
+          "feature": "Pesanan dan bayaran",
+          "description": "Mengurus penciptaan pesanan, bayaran, batal, tutup tamat masa, penghantaran, dan pengesahan terima.",
+          "trigger": "Pengguna menghantar pesanan atau callback bayaran diterima.",
+          "logic": [
+            "Sokong mesin status pesanan, rekod bayaran, rekod bayaran balik, dan log operasi",
+            "Sokong pelbagai kaedah bayaran, pengesahan callback, dan tutup tamat masa",
+            "Sokong pecah pesanan, penghantaran separa, dan catatan pesanan"
+          ],
+          "inputs": "Pesanan, rekod bayaran, pengguna, produk, jumlah, status",
+          "outputs": "Butiran pesanan, keputusan bayaran, tugasan penghantaran",
+          "exceptions": "Bayaran berulang, bayaran gagal, pesanan tamat masa, jumlah tidak sepadan"
+        },
+        {
+          "feature": "Promosi dan operasi ahli",
+          "description": "Mengkonfigurasi kupon, potongan penuh, jualan kilat, harga ahli, slot cadangan, dan halaman kempen.",
+          "trigger": "Operator mencipta kempen atau pengguna mengambil bahagian.",
+          "logic": [
+            "Sokong masa kempen, skop produk, skop pengguna, dan peraturan tindanan",
+            "Sokong pengambilan kupon, penebusan, tamat tempoh, dan ambang penggunaan",
+            "Sokong statistik prestasi kempen dan tag audiens"
+          ],
+          "inputs": "Kempen, kupon, tahap ahli, audiens, skop produk",
+          "outputs": "Keputusan diskaun, halaman kempen, laporan pemasaran",
+          "exceptions": "Konflik kempen, tindanan salah, inventori ditempah"
+        },
+        {
+          "feature": "Selepas jualan dan khidmat pelanggan",
+          "description": "Mengendalikan bayaran balik, pulangan, pertukaran, aduan, dan pengecualian pesanan.",
+          "trigger": "Pengguna menghantar permohonan selepas jualan atau khidmat pelanggan mencipta tiket.",
+          "logic": [
+            "Sokong sebab, bukti, semakan, penghantaran balik, dan bayaran balik",
+            "Sokong catatan khidmat pelanggan, rekod rundingan, dan peringatan tamat masa",
+            "Sokong aliran status selepas jualan dan atribusi tanggungjawab"
+          ],
+          "inputs": "Kes selepas jualan, pesanan, bayaran, bukti, rekod khidmat",
+          "outputs": "Keputusan semakan, keputusan bayaran balik, kemajuan selepas jualan",
+          "exceptions": "Melebihi tempoh selepas jualan, item tidak boleh dipulangkan, bayaran balik gagal, penghantaran hilang"
+        },
+        {
+          "feature": "Analitik perdagangan",
+          "description": "Menyediakan papan pemuka untuk jualan, penukaran, inventori, pelanggan, dan kempen.",
+          "trigger": "Operator atau pengurus melihat data.",
+          "logic": [
+            "Sokong statistik jumlah pesanan, nilai pesanan purata, penukaran, dan pembelian semula",
+            "Sokong jualan produk, pusingan inventori, ROI kempen, dan analisis saluran",
+            "Sokong eksport laporan dan definisi metrik"
+          ],
+          "inputs": "Pesanan, bayaran, produk, tingkah laku pengguna, data kempen",
+          "outputs": "Papan pemuka operasi, laporan produk, analisis pelanggan",
+          "exceptions": "Kelewatan data, kebenaran tidak cukup, definisi metrik berubah"
+        }
+      ]
+    },
+    "page_and_process": {
+      "pages": [
+        {
+          "page": "Laman utama pusat beli-belah",
+          "entry": "Laluan masuk pelanggan",
+          "elements": "Carian, banner, kategori, produk disyorkan, kempen",
+          "actions": "Cari, semak, buka produk, log masuk/daftar",
+          "flow": "Pengguna masuk ke produk melalui kategori, carian, atau kempen."
+        },
+        {
+          "page": "Butiran produk",
+          "entry": "Senarai produk / hasil carian",
+          "elements": "Imej, harga, spesifikasi, inventori, ulasan, cadangan",
+          "actions": "Pilih spesifikasi, tambah troli, beli sekarang, simpan",
+          "flow": "Pengguna mengesahkan produk dan menambah ke troli atau membeli terus."
+        },
+        {
+          "page": "Troli dan checkout",
+          "entry": "Laluan masuk troli",
+          "elements": "Item, diskaun, alamat, penghantaran, invois, butiran jumlah",
+          "actions": "Ubah kuantiti, pilih diskaun, hantar pesanan",
+          "flow": "Sistem mengesahkan inventori dan harga sebelum mencipta pesanan belum bayar."
+        },
+        {
+          "page": "Pusat pesanan",
+          "entry": "Pusat ahli",
+          "elements": "Senarai pesanan, status, tracking, bayaran, selepas jualan",
+          "actions": "Bayar, batal, sahkan terima, mohon selepas jualan",
+          "flow": "Pengguna melihat kemajuan pesanan dan mengendalikan bayaran atau selepas jualan."
+        },
+        {
+          "page": "Backend operasi pusat beli-belah",
+          "entry": "Laluan masuk pentadbir",
+          "elements": "Produk, kempen, pesanan, selepas jualan, pelanggan, laporan",
+          "actions": "Senarai produk, konfigurasi kempen, kendali pengecualian, eksport laporan",
+          "flow": "Operator menyelenggara operasi perdagangan dan menjejak hasil."
+        }
+      ]
+    },
+    "business_rules_and_data": {
+      "rules": [
+        "Penghantaran pesanan mesti mengunci snapshot harga, diskaun, dan inventori.",
+        "Hanya pesanan dibayar boleh masuk status menunggu penghantaran; pesanan tamat masa ditutup dan inventori dilepaskan.",
+        "Promosi mesti mengesahkan skop produk, skop pengguna, masa, dan peraturan tindanan.",
+        "Jumlah bayaran balik tidak boleh melebihi jumlah dibayar dan mesti menyimpan transaksi saluran bayaran.",
+        "Perubahan harga, inventori, pesanan, dan selepas jualan mesti menyimpan log operasi."
+      ],
+      "key_data": [
+        "Produk/SPU: id, nama, kategori, jenama, status, imej utama",
+        "SKU: spesifikasi, harga, inventori, had pembelian, kawasan jualan",
+        "Troli: pengguna, SKU, kuantiti, status dipilih, status tidak sah",
+        "Pesanan: nombor pesanan, pengguna, butiran item, jumlah, status, alamat penghantaran",
+        "Bayaran: nombor bayaran, saluran, jumlah, status, transaksi callback",
+        "Kes selepas jualan: pesanan, sebab, bukti, status semakan, status bayaran balik"
+      ]
+    },
+    "nonfunctional_requirements": {
+      "items": [
+        "Prestasi: pertanyaan lazim halaman utama dan butiran produk kembali dalam 3 saat.",
+        "Konsistensi: status pesanan, bayaran, inventori, dan bayaran balik perlu konsisten akhirnya dan boleh dijejak.",
+        "Keselamatan: callback bayaran, alamat pengguna, dan jumlah pesanan memerlukan tandatangan dan semakan kebenaran.",
+        "Kebolehgunaan: aliran pesanan, bayaran, dan bayaran balik memerlukan cuba semula dan petunjuk jelas.",
+        "Audit: perubahan harga, inventori, pesanan, dan selepas jualan mesti merekod operator dan masa."
+      ]
+    },
+    "integration_dependencies": {
+      "external_systems": [
+        "Gerbang bayaran",
+        "Perkhidmatan tracking logistik",
+        "Sistem inventori / gudang",
+        "SMS atau notifikasi mesej",
+        "Perkhidmatan invois / cukai",
+        "Gudang data perusahaan / BI"
+      ]
+    },
+    "risks_and_questions": {
+      "risks": [
+        "Tindanan promosi kompleks boleh menyebabkan ralat harga.",
+        "Ketidakselarasan bayaran dan inventori boleh menjejaskan pemenuhan dan khidmat pelanggan.",
+        "Kempen puncak boleh menyebabkan tekanan tempahan inventori dan prestasi pesanan.",
+        "Polisi selepas jualan tidak jelas boleh menyebabkan pertikaian khidmat pelanggan."
+      ],
+      "open_questions": [
+        "Adakah inventori berbilang gudang dan penghantaran pecah perlu disokong?",
+        "Bolehkah kupon, potongan penuh, dan harga ahli ditindankan?",
+        "Bagaimana masa tutup pesanan tamat masa dan pelepasan inventori dikonfigurasi?",
+        "Adakah bayaran balik memerlukan laluan asal dan semakan manual?",
+        "Adakah invois, mata, tahap ahli, dan ulasan diperlukan?"
+      ]
+    },
+    "milestone_acceptance": {
+      "milestones": [
+        {
+          "milestone": "Pengesahan keperluan",
+          "target_date": "T+1 minggu",
+          "acceptance": "Sahkan gelung transaksi, peraturan promosi, inventori, dan polisi selepas jualan"
+        },
+        {
+          "milestone": "Semakan prototaip",
+          "target_date": "T+3 minggu",
+          "acceptance": "Lengkapkan prototaip halaman utama, butiran, checkout, pesanan, dan backend"
+        },
+        {
+          "milestone": "Pembangunan dan integrasi",
+          "target_date": "T+8 minggu",
+          "acceptance": "Lengkapkan integrasi bayaran, inventori, logistik, dan notifikasi"
+        },
+        {
+          "milestone": "Pelancaran rintis",
+          "target_date": "T+10 minggu",
+          "acceptance": "Lancarkan produk dan pengguna terpilih secara gray"
+        },
+        {
+          "milestone": "Pelancaran produksi",
+          "target_date": "T+12 minggu",
+          "acceptance": "Lengkapkan pelancaran penuh, konfigurasi operasi, dan penerimaan"
+        }
+      ]
+    },
+    "summary": "Jualan produk kini bergantung pada kedai fizikal, komuniti, dan pesanan manual. Maklumat produk, inventori, diskaun, pesanan, dan selepas jualan diurus berasingan. Pusat beli-belah bersatu diperlukan untuk paparan produk, pembelian ahli, bayaran dalam talian, pemenuhan pesanan, khidmat selepas jualan, dan analitik operasi.",
+    "objective": "Bina sistem paparan produk, SKU, harga, dan inventori yang bersatu; Sambungkan troli, pesanan, bayaran, penghantaran, dan selepas jualan dalam satu gelung transaksi; Sokong kupon, potongan penuh, jualan kilat, harga ahli, dan mekanik kempen; Kumpul data pelanggan, pesanan, penukaran, dan pembelian semula untuk keputusan operasi"
+  },
+  "prompt_hints": [
+    {
+      "hint_key": "shopping_hint_1",
+      "content": "Templat ini mengandungi keupayaan perdagangan lazim untuk produk, pesanan, bayaran, promosi, dan selepas jualan."
+    },
+    {
+      "hint_key": "shopping_hint_2",
+      "content": "Sahkan dahulu peraturan konsistensi antara harga, inventori, promosi, dan bayaran."
+    },
+    {
+      "hint_key": "shopping_hint_3",
+      "content": "Senario kempen puncak memerlukan had, kunci inventori, dan pelan pampasan pengecualian."
+    }
+  ],
+  "prompt_questions": [
+    {
+      "question_key": "shopping_question_1",
+      "content": "Adakah inventori berbilang gudang dan penghantaran pecah perlu disokong?"
+    },
+    {
+      "question_key": "shopping_question_2",
+      "content": "Bolehkah kupon, potongan penuh, dan harga ahli ditindankan?"
+    },
+    {
+      "question_key": "shopping_question_3",
+      "content": "Bagaimana masa tutup pesanan tamat masa dan pelepasan inventori dikonfigurasi?"
+    },
+    {
+      "question_key": "shopping_question_4",
+      "content": "Adakah bayaran balik memerlukan laluan asal dan semakan manual?"
+    },
+    {
+      "question_key": "shopping_question_5",
+      "content": "Adakah invois, mata, tahap ahli, dan ulasan diperlukan?"
+    }
+  ]
+}

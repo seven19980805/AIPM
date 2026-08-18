@@ -1,0 +1,40 @@
+{
+  "template_id": "ai_pm_production_flow_en",
+  "template_key": "ai_pm_production_flow",
+  "template_name": "Production Flow Baseline",
+  "template_category": "ai_pm_baseline",
+  "business_domain": "Production",
+  "business_route": "production",
+  "product_scope": "ai_pm_v2",
+  "language": "en",
+  "version": "2.0.0",
+  "status": "enabled",
+  "description": "A compact baseline for production planning, WIP, lot flow, output, and yield decisions. Every baseline item must still be confirmed.",
+  "tags": ["production", "lot-flow", "wip", "yield"],
+  "applicable_scenarios": ["Production action dashboard", "Lot or WIP exception workflow"],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/ai-pm-production-flow.en.md"
+  },
+  "storage_model": "structured_requirement_template.v2",
+  "sections": [
+    {"section_key": "outcome", "section_title": "Outcome", "sort_order": 1, "fields": [{"field_key": "outcome.decision"}]},
+    {"section_key": "users", "section_title": "User and Owner", "sort_order": 2, "fields": [{"field_key": "users.primary"}]},
+    {"section_key": "scope", "section_title": "First-release Scope", "sort_order": 3, "fields": [{"field_key": "scope.boundary"}]},
+    {"section_key": "workflow", "section_title": "Workflow", "sort_order": 4, "fields": [{"field_key": "workflow.primary"}]},
+    {"section_key": "rules", "section_title": "Rules", "sort_order": 5, "fields": [{"field_key": "rules.confirmed"}]},
+    {"section_key": "data", "section_title": "Data Boundary", "sort_order": 6, "fields": [{"field_key": "data.source"}]},
+    {"section_key": "acceptance", "section_title": "Acceptance", "sort_order": 7, "fields": [{"field_key": "acceptance.evidence"}]}
+  ],
+  "prompt_hints": [
+    {"key": "baseline", "text": "Treat this as an unconfirmed baseline, not as user facts."},
+    {"key": "data", "text": "Data can come from SQL Server, SAP, or manual Excel/CSV upload only."}
+  ],
+  "prompt_questions": [
+    {"key": "scenario", "question": "Which production action must improve first?"},
+    {"key": "user", "question": "Who makes that decision today?"},
+    {"key": "scope", "question": "What is the smallest useful first release?"},
+    {"key": "data", "question": "Which approved data path is the source of truth?"},
+    {"key": "acceptance", "question": "What observable evidence proves the workflow works?"}
+  ]
+}

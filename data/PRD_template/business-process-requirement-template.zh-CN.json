@@ -1,0 +1,559 @@
+{
+  "template_id": "business_process_requirement_template_zh_cn",
+  "template_key": "business_process_requirement",
+  "template_name": "业务流程需求模板",
+  "template_category": "business_requirement",
+  "business_domain": "business_process",
+  "language": "zh-CN",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "适用于流程发起、评审审批、待办处理、权限控制、审计历史、系统集成和 UAT 验收的业务流程需求模板。",
+  "tags": [
+    "business-process",
+    "workflow",
+    "approval",
+    "permissions",
+    "audit",
+    "uat"
+  ],
+  "applicable_scenarios": [
+    "工作流或审批流程需求",
+    "待办列表和流程历史页面",
+    "基于角色的权限与审计控制",
+    "数据驱动的流程校验",
+    "业务流程 UAT 和签署",
+    "配置驱动的流程管理"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/business-process-requirement-template.zh-CN.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "基础文档信息",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.document_name",
+          "label": "文档名称",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "例如：D.CHQ.QDM 业务流程需求"
+        },
+        {
+          "field_key": "document_info.process_name",
+          "label": "业务流程名称",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "请输入业务流程名称"
+        },
+        {
+          "field_key": "document_info.owner",
+          "label": "业务负责人",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "请输入业务负责人"
+        },
+        {
+          "field_key": "document_info.status",
+          "label": "文档状态",
+          "component": "select",
+          "data_type": "string",
+          "required": false,
+          "options": [
+            "草稿",
+            "评审中",
+            "已批准"
+          ]
+        }
+      ]
+    },
+    {
+      "section_key": "background_objectives",
+      "section_title": "背景与目标",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "background_objectives.background",
+          "label": "背景说明",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "描述当前流程背景、痛点和系统化支持原因"
+        },
+        {
+          "field_key": "background_objectives.objectives",
+          "label": "目标",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "定义期望达成的业务结果"
+        }
+      ]
+    },
+    {
+      "section_key": "scope",
+      "section_title": "范围",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "scope.in_scope",
+          "label": "本次范围",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "列出流程、数据、页面、报表和配置范围"
+        },
+        {
+          "field_key": "scope.out_of_scope",
+          "label": "非本次范围",
+          "component": "list",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "列出本次明确不包含的内容"
+        }
+      ]
+    },
+    {
+      "section_key": "stakeholders",
+      "section_title": "责任方与干系人",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "stakeholders.roles",
+          "label": "干系人角色",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "业务发起人、业务负责人、操作人、IT、数据、QA、安全"
+        }
+      ]
+    },
+    {
+      "section_key": "data_description",
+      "section_title": "数据说明",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "data_description.sources",
+          "label": "数据来源",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "来源名称、类型、负责人、刷新频率、用途、备注"
+        },
+        {
+          "field_key": "data_description.fields",
+          "label": "关键字段与数据字典",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "字段名、业务定义、类型、是否必填、校验、示例"
+        },
+        {
+          "field_key": "data_description.quality_rules",
+          "label": "数据逻辑与质量规则",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "必填校验、状态流转校验、错误提示"
+        }
+      ]
+    },
+    {
+      "section_key": "process_description",
+      "section_title": "流程说明",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "process_description.flowchart",
+          "label": "流程图",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "描述或插入已确认的流程图"
+        },
+        {
+          "field_key": "process_description.step_matrix",
+          "label": "流程步骤矩阵",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "步骤、角色、输入、活动、输出、下一状态"
+        }
+      ]
+    },
+    {
+      "section_key": "business_rules",
+      "section_title": "业务规则",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "business_rules.rules",
+          "label": "业务规则",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "规则 ID、规则、负责人、优先级、备注"
+        }
+      ]
+    },
+    {
+      "section_key": "pages_functions",
+      "section_title": "页面 / 功能呈现",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "pages_functions.page_list",
+          "label": "页面与功能清单",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "流程发起页、待办列表、详情历史、配置、权限管理"
+        },
+        {
+          "field_key": "pages_functions.ui_behavior",
+          "label": "UI 行为与布局要求",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "响应式、表单校验、查询筛选、审计可见性、空态错误态"
+        }
+      ]
+    },
+    {
+      "section_key": "permissions_controls",
+      "section_title": "权限与控制",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "permissions_controls.matrix",
+          "label": "权限矩阵",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "发起人、评审人、审批人、管理员、安全角色的权限"
+        }
+      ]
+    },
+    {
+      "section_key": "audit_compliance",
+      "section_title": "审计与合规要求",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "audit_compliance.requirements",
+          "label": "审计与合规要求",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "审计轨迹、敏感数据访问、保留周期、导出控制"
+        }
+      ]
+    },
+    {
+      "section_key": "development_requirements",
+      "section_title": "开发要求",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "development_requirements.technical_specs",
+          "label": "技术规格",
+          "component": "textarea",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "HTML、Bootstrap、JavaScript、jQuery，或已确认项目技术栈"
+        },
+        {
+          "field_key": "development_requirements.color_system",
+          "label": "色彩系统",
+          "component": "table",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "色彩 token、取值和用途"
+        }
+      ]
+    },
+    {
+      "section_key": "integrations",
+      "section_title": "集成与接口要求",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "integrations.interfaces",
+          "label": "接口",
+          "component": "table",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "接口、方向、载荷、频率、失败处理、负责人"
+        }
+      ]
+    },
+    {
+      "section_key": "non_functional",
+      "section_title": "非功能需求",
+      "sort_order": 13,
+      "fields": [
+        {
+          "field_key": "non_functional.requirements",
+          "label": "非功能需求",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "性能、可用性、安全、易用性、可维护性"
+        }
+      ]
+    },
+    {
+      "section_key": "acceptance_testing",
+      "section_title": "验收标准与测试",
+      "sort_order": 14,
+      "fields": [
+        {
+          "field_key": "acceptance_testing.criteria",
+          "label": "验收标准",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "AC ID、验收标准、测试方法、负责人、状态"
+        },
+        {
+          "field_key": "acceptance_testing.uat_signoff",
+          "label": "UAT 签署",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "业务、IT、安全签署结论"
+        }
+      ]
+    },
+    {
+      "section_key": "risks_open_questions",
+      "section_title": "风险、依赖与待确认问题",
+      "sort_order": 15,
+      "fields": [
+        {
+          "field_key": "risks_open_questions.risks",
+          "label": "风险与依赖",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "风险/依赖 ID、影响、缓解措施、负责人"
+        },
+        {
+          "field_key": "risks_open_questions.questions",
+          "label": "待确认问题",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "问题、负责人、目标日期、结论"
+        }
+      ]
+    },
+    {
+      "section_key": "completion_checklist",
+      "section_title": "建议完成检查清单",
+      "sort_order": 16,
+      "fields": [
+        {
+          "field_key": "completion_checklist.items",
+          "label": "完成检查清单",
+          "component": "table",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "文档、范围、数据、流程、页面、开发、测试"
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "采购审批流程数字化",
+      "requirement_name": "采购申请审批流程优化"
+    },
+    "background": {
+      "summary": "采购申请目前依赖邮件、表格和线下签核。申请人难以查看审批状态，审批人缺少统一待办入口，财务审计时也难以追溯完整审批依据。",
+      "objective": "建立标准化的线上采购申请审批流程，提升审批透明度，缩短流转周期，并保留完整审计记录。"
+    },
+    "scope": {
+      "in_scope": [
+        "采购申请提交",
+        "预算与金额校验",
+        "多级审批流转",
+        "审批通知与催办",
+        "流程历史与审计导出"
+      ],
+      "out_of_scope": [
+        "不替代 ERP 的采购订单创建",
+        "不覆盖供应商准入流程"
+      ]
+    },
+    "users_and_scenarios": {
+      "target_users": [
+        "申请人",
+        "直属主管",
+        "采购负责人",
+        "财务审核人",
+        "系统管理员"
+      ],
+      "core_scenarios": [
+        "申请人提交采购申请并补充附件。",
+        "审批人通过统一待办处理同意、退回或拒绝。",
+        "财务导出审批历史用于月度审计。"
+      ]
+    },
+    "functional_requirements": {
+      "overview": "该默认示例覆盖：流程发起与校验、审批待办、流程历史与审计导出。",
+      "feature_details": [
+        {
+          "feature_name": "流程发起与校验",
+          "description": "支持流程发起与校验，用于满足示例业务场景的核心诉求。",
+          "trigger": "用户进入相关页面、执行查询或提交业务动作时触发。",
+          "processing_logic": "校验必填字段，应用权限规则，读取或保存业务数据，并更新相关状态、指标或明细结果。",
+          "inputs": [
+            "业务主数据",
+            "用户筛选条件或业务单据数据"
+          ],
+          "outputs": [
+            "更新后的业务记录",
+            "可查看的状态、图表或明细结果"
+          ],
+          "exception_cases": [
+            "必填数据缺失",
+            "权限不足",
+            "数据刷新延迟"
+          ]
+        },
+        {
+          "feature_name": "审批待办",
+          "description": "支持审批待办，用于满足示例业务场景的核心诉求。",
+          "trigger": "用户进入相关页面、执行查询或提交业务动作时触发。",
+          "processing_logic": "校验必填字段，应用权限规则，读取或保存业务数据，并更新相关状态、指标或明细结果。",
+          "inputs": [
+            "业务主数据",
+            "用户筛选条件或业务单据数据"
+          ],
+          "outputs": [
+            "更新后的业务记录",
+            "可查看的状态、图表或明细结果"
+          ],
+          "exception_cases": [
+            "必填数据缺失",
+            "权限不足",
+            "数据刷新延迟"
+          ]
+        },
+        {
+          "feature_name": "流程历史与审计导出",
+          "description": "支持流程历史与审计导出，用于满足示例业务场景的核心诉求。",
+          "trigger": "用户进入相关页面、执行查询或提交业务动作时触发。",
+          "processing_logic": "校验必填字段，应用权限规则，读取或保存业务数据，并更新相关状态、指标或明细结果。",
+          "inputs": [
+            "业务主数据",
+            "用户筛选条件或业务单据数据"
+          ],
+          "outputs": [
+            "更新后的业务记录",
+            "可查看的状态、图表或明细结果"
+          ],
+          "exception_cases": [
+            "必填数据缺失",
+            "权限不足",
+            "数据刷新延迟"
+          ]
+        }
+      ]
+    },
+    "business_rules": [
+      "只有授权角色可以查看权限范围内的数据并执行敏感操作。",
+      "核心业务操作必须保留操作人、操作时间、输入条件和结果状态，便于审计追溯。",
+      "导出数据必须遵循页面筛选条件、字段权限和数据权限范围。",
+      "页面必须展示数据刷新时间、指标口径说明和异常状态提示。"
+    ],
+    "page_and_interaction": {
+      "pages": [
+        {
+          "page_name": "流程发起与校验",
+          "entry_point": "业务工作台",
+          "page_elements": [
+            "筛选区",
+            "主内容区",
+            "明细区"
+          ],
+          "button_actions": [
+            "查询",
+            "重置",
+            "导出",
+            "查看详情"
+          ]
+        },
+        {
+          "page_name": "审批待办",
+          "entry_point": "业务工作台",
+          "page_elements": [
+            "筛选区",
+            "主内容区",
+            "明细区"
+          ],
+          "button_actions": [
+            "查询",
+            "重置",
+            "导出",
+            "查看详情"
+          ]
+        },
+        {
+          "page_name": "流程历史与审计导出",
+          "entry_point": "业务工作台",
+          "page_elements": [
+            "筛选区",
+            "主内容区",
+            "明细区"
+          ],
+          "button_actions": [
+            "查询",
+            "重置",
+            "导出",
+            "查看详情"
+          ]
+        }
+      ],
+      "interaction_flow": [
+        "申请人提交采购申请并补充附件。",
+        "审批人通过统一待办处理同意、退回或拒绝。",
+        "财务导出审批历史用于月度审计。"
+      ]
+    },
+    "copywriting": [],
+    "data_and_dependencies": [
+      "员工与组织主数据",
+      "预算科目与成本中心",
+      "审批矩阵配置",
+      "ERP 采购与财务系统",
+      "消息通知服务"
+    ],
+    "risks_and_notes": [
+      "指标口径和业务归属需要在项目启动时确认。",
+      "历史数据质量可能影响看板或流程上线后的验收结果。",
+      "外部系统接口准备情况可能影响首版范围。"
+    ],
+    "acceptance_criteria": [
+      "可以基于该示例直接生成完整的需求文档和设计文档。",
+      "用户可以通过后续对话修改示例业务内容，并覆盖对应需求事实。",
+      "主要角色、流程、数据、权限、业务规则和验收标准均有明确描述。"
+    ],
+    "open_questions": [
+      "是否存在必须优先支持的组织、工厂、客户或业务范围？",
+      "首版是否需要限制在 MVP 范围内上线？"
+    ],
+    "template_meta": {
+      "is_default_example": true,
+      "example_notice": "这是系统内置的默认示例业务，仅用于填充式开始，可被用户后续修改意见覆盖。"
+    }
+  }
+}

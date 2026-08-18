@@ -1,0 +1,530 @@
+{
+  "template_id": "abf_yield_analysis_template_zh_cn",
+  "template_key": "abf_yield_analysis",
+  "template_name": "ABF良率分析模板",
+  "template_category": "business_requirement",
+  "business_domain": "data_visualization",
+  "language": "zh-CN",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "适用于 ABF 载板/基板制造场景的良率分析需求模板，覆盖良率口径、制程站点、批次/Panel/料号维度、缺陷 Pareto、根因下钻、告警闭环、数据契约和验收标准。",
+  "tags": [
+    "chart",
+    "dashboard",
+    "visualization",
+    "data-contract",
+    "uat"
+  ],
+  "applicable_scenarios": [
+    "ABF 制造良率看板",
+    "批次、Panel、料号、站点维度的良率追踪",
+    "缺陷 Pareto 与良率损失分析",
+    "异常站点根因下钻和改善闭环",
+    "制造质量数据口径确认和 UAT 验证"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/abf-yield-analysis-template.zh-CN.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "基础文档信息",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.analysis_name",
+          "label": "分析主题 / 页面名称",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "例如：ABF 良率分析看板"
+        },
+        {
+          "field_key": "document_info.business_owner",
+          "label": "业务负责人",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "负责良率口径和业务验收的团队或人员"
+        }
+      ]
+    },
+    {
+      "section_key": "background_objectives",
+      "section_title": "背景与目标",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "background_objectives.background",
+          "label": "业务背景",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "描述 ABF 产品良率管理现状、痛点、使用人群和决策场景"
+        },
+        {
+          "field_key": "background_objectives.objectives",
+          "label": "分析目标",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "良率趋势、损失来源、异常识别、改善闭环、数据口径标准化"
+        }
+      ]
+    },
+    {
+      "section_key": "scope",
+      "section_title": "分析范围",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "scope.items",
+          "label": "范围定义",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "产品范围、制程范围、数据范围、图表范围、非本次范围"
+        }
+      ]
+    },
+    {
+      "section_key": "stakeholders",
+      "section_title": "责任方与干系人",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "stakeholders.roles",
+          "label": "干系人角色",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "制造、质量、工艺、设备、数据、产品、开发、QA、管理层"
+        }
+      ]
+    },
+    {
+      "section_key": "yield_definition",
+      "section_title": "良率口径与业务规则",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "yield_definition.formulas",
+          "label": "良率公式",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "总良率、站点良率、一次通过率、报废率、返工率、损失率"
+        },
+        {
+          "field_key": "yield_definition.rules",
+          "label": "口径规则",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "分子分母、剔除项、重测/返工处理、时间归属、单位换算、舍入规则"
+        }
+      ]
+    },
+    {
+      "section_key": "data_contract",
+      "section_title": "数据说明与数据契约",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "data_contract.sources",
+          "label": "数据来源",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "MES、QMS、测试系统、设备日志、缺陷检测、工单/批次主数据"
+        },
+        {
+          "field_key": "data_contract.fields",
+          "label": "关键字段",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "lot_id、panel_id、product_code、process_step、defect_code、pass_qty、fail_qty"
+        },
+        {
+          "field_key": "data_contract.quality_rules",
+          "label": "数据质量规则",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "唯一键、缺失值、迟到数据、重复记录、跨系统对账、刷新 SLA"
+        }
+      ]
+    },
+    {
+      "section_key": "dimensions_filters",
+      "section_title": "分析维度与筛选条件",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "dimensions_filters.dimensions",
+          "label": "分析维度",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "日期、厂区、线别、产品、料号、批次、Panel、站点、设备、缺陷类别"
+        },
+        {
+          "field_key": "dimensions_filters.filters",
+          "label": "筛选器",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "默认值、是否必填、权限范围、联动关系、最大查询跨度"
+        }
+      ]
+    },
+    {
+      "section_key": "metrics",
+      "section_title": "指标体系",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "metrics.kpis",
+          "label": "核心指标",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "投入数、产出良品数、不良数、良率、目标良率、损失贡献、异常批次数"
+        },
+        {
+          "field_key": "metrics.thresholds",
+          "label": "目标与阈值",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "目标值、预警线、红黄绿规则、同比/环比判断、责任人"
+        }
+      ]
+    },
+    {
+      "section_key": "page_presentation",
+      "section_title": "页面与图表呈现",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "page_presentation.layout",
+          "label": "页面布局",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "顶部筛选区、KPI 区、趋势区、Pareto 区、站点矩阵、明细区"
+        },
+        {
+          "field_key": "page_presentation.charts",
+          "label": "图表清单",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "良率趋势、目标达成、站点损失、缺陷 Pareto、批次明细、热力图"
+        }
+      ]
+    },
+    {
+      "section_key": "drilldown_root_cause",
+      "section_title": "下钻与根因分析",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "drilldown_root_cause.paths",
+          "label": "下钻路径",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "产品 -> 批次 -> Panel -> 站点 -> 缺陷 -> 设备/参数"
+        },
+        {
+          "field_key": "drilldown_root_cause.rules",
+          "label": "根因辅助规则",
+          "component": "list",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "异常贡献排序、同站点对比、设备批次关联、工艺参数偏移、备注留痕"
+        }
+      ]
+    },
+    {
+      "section_key": "alerts_workflow",
+      "section_title": "异常告警与改善闭环",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "alerts_workflow.alerts",
+          "label": "告警规则",
+          "component": "table",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "触发条件、严重等级、通知对象、响应时限、升级规则"
+        },
+        {
+          "field_key": "alerts_workflow.actions",
+          "label": "改善动作",
+          "component": "table",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "责任部门、原因分类、临时措施、长期措施、关闭条件"
+        }
+      ]
+    },
+    {
+      "section_key": "interactions_permissions",
+      "section_title": "交互、权限与导出",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "interactions_permissions.requirements",
+          "label": "交互与权限要求",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "联动筛选、悬浮提示、明细下钻、导出范围、数据脱敏、角色权限"
+        }
+      ]
+    },
+    {
+      "section_key": "technical_specs",
+      "section_title": "技术规格与非功能需求",
+      "sort_order": 13,
+      "fields": [
+        {
+          "field_key": "technical_specs.requirements",
+          "label": "技术规格",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "API、聚合层、缓存、性能、刷新策略、错误处理、浏览器支持"
+        },
+        {
+          "field_key": "technical_specs.non_functional",
+          "label": "非功能需求",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "准确性、实时性、可靠性、可访问性、安全、审计、可维护性"
+        }
+      ]
+    },
+    {
+      "section_key": "acceptance",
+      "section_title": "验收标准",
+      "sort_order": 14,
+      "fields": [
+        {
+          "field_key": "acceptance.criteria",
+          "label": "验收标准",
+          "component": "table",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "良率口径、图表渲染、筛选联动、明细一致性、权限导出、性能、异常状态"
+        }
+      ]
+    },
+    {
+      "section_key": "open_questions",
+      "section_title": "待确认问题与变更记录",
+      "sort_order": 15,
+      "fields": [
+        {
+          "field_key": "open_questions.questions",
+          "label": "待确认问题",
+          "component": "table",
+          "data_type": "array",
+          "required": false,
+          "placeholder": "良率口径、目标值、来源表、刷新频率、权限范围、告警责任人"
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "ABF 良率分析看板",
+      "requirement_name": "ABF 制造良率损失分析"
+    },
+    "background": {
+      "summary": "ABF 良率数据分散在 MES、QMS、检测系统和设备日志中。质量与工艺团队需要统一视图，按批次、Panel、产品、工序、设备和缺陷原因定位良率损失。",
+      "objective": "建立统一的良率分析工作台，标准化良率口径，识别主要损失来源，支持异常下钻和改善闭环。"
+    },
+    "scope": {
+      "in_scope": [
+        "良率 KPI 与趋势分析",
+        "按产品、工序、设备、缺陷代码筛选",
+        "缺陷 Pareto 与异常批次下钻",
+        "改善措施跟踪",
+        "明细导出与数据对账"
+      ],
+      "out_of_scope": [
+        "不在首版自动调整工艺参数",
+        "不替代 MES 或 QMS 的主数据维护"
+      ]
+    },
+    "users_and_scenarios": {
+      "target_users": [
+        "质量工程师",
+        "工艺工程师",
+        "生产主管",
+        "QDM 管理者",
+        "IT 开发人员"
+      ],
+      "core_scenarios": [
+        "质量工程师查看本周 ABF 良率趋势并定位主要损失工序。",
+        "工艺工程师按设备和缺陷代码下钻异常批次。",
+        "主管导出明细用于改善会议和责任部门确认。"
+      ]
+    },
+    "functional_requirements": {
+      "overview": "该默认示例覆盖：良率 KPI 与趋势分析、缺陷 Pareto 下钻、异常闭环跟踪。",
+      "feature_details": [
+        {
+          "feature_name": "良率 KPI 与趋势分析",
+          "description": "支持良率 KPI 与趋势分析，用于满足示例业务场景的核心诉求。",
+          "trigger": "用户进入相关页面、执行查询或提交业务动作时触发。",
+          "processing_logic": "校验必填字段，应用权限规则，读取或保存业务数据，并更新相关状态、指标或明细结果。",
+          "inputs": [
+            "业务主数据",
+            "用户筛选条件或业务单据数据"
+          ],
+          "outputs": [
+            "更新后的业务记录",
+            "可查看的状态、图表或明细结果"
+          ],
+          "exception_cases": [
+            "必填数据缺失",
+            "权限不足",
+            "数据刷新延迟"
+          ]
+        },
+        {
+          "feature_name": "缺陷 Pareto 下钻",
+          "description": "支持缺陷 Pareto 下钻，用于满足示例业务场景的核心诉求。",
+          "trigger": "用户进入相关页面、执行查询或提交业务动作时触发。",
+          "processing_logic": "校验必填字段，应用权限规则，读取或保存业务数据，并更新相关状态、指标或明细结果。",
+          "inputs": [
+            "业务主数据",
+            "用户筛选条件或业务单据数据"
+          ],
+          "outputs": [
+            "更新后的业务记录",
+            "可查看的状态、图表或明细结果"
+          ],
+          "exception_cases": [
+            "必填数据缺失",
+            "权限不足",
+            "数据刷新延迟"
+          ]
+        },
+        {
+          "feature_name": "异常闭环跟踪",
+          "description": "支持异常闭环跟踪，用于满足示例业务场景的核心诉求。",
+          "trigger": "用户进入相关页面、执行查询或提交业务动作时触发。",
+          "processing_logic": "校验必填字段，应用权限规则，读取或保存业务数据，并更新相关状态、指标或明细结果。",
+          "inputs": [
+            "业务主数据",
+            "用户筛选条件或业务单据数据"
+          ],
+          "outputs": [
+            "更新后的业务记录",
+            "可查看的状态、图表或明细结果"
+          ],
+          "exception_cases": [
+            "必填数据缺失",
+            "权限不足",
+            "数据刷新延迟"
+          ]
+        }
+      ]
+    },
+    "business_rules": [
+      "只有授权角色可以查看权限范围内的数据并执行敏感操作。",
+      "核心业务操作必须保留操作人、操作时间、输入条件和结果状态，便于审计追溯。",
+      "导出数据必须遵循页面筛选条件、字段权限和数据权限范围。",
+      "页面必须展示数据刷新时间、指标口径说明和异常状态提示。"
+    ],
+    "page_and_interaction": {
+      "pages": [
+        {
+          "page_name": "良率 KPI 与趋势分析",
+          "entry_point": "业务工作台",
+          "page_elements": [
+            "筛选区",
+            "主内容区",
+            "明细区"
+          ],
+          "button_actions": [
+            "查询",
+            "重置",
+            "导出",
+            "查看详情"
+          ]
+        },
+        {
+          "page_name": "缺陷 Pareto 下钻",
+          "entry_point": "业务工作台",
+          "page_elements": [
+            "筛选区",
+            "主内容区",
+            "明细区"
+          ],
+          "button_actions": [
+            "查询",
+            "重置",
+            "导出",
+            "查看详情"
+          ]
+        },
+        {
+          "page_name": "异常闭环跟踪",
+          "entry_point": "业务工作台",
+          "page_elements": [
+            "筛选区",
+            "主内容区",
+            "明细区"
+          ],
+          "button_actions": [
+            "查询",
+            "重置",
+            "导出",
+            "查看详情"
+          ]
+        }
+      ],
+      "interaction_flow": [
+        "质量工程师查看本周 ABF 良率趋势并定位主要损失工序。",
+        "工艺工程师按设备和缺陷代码下钻异常批次。",
+        "主管导出明细用于改善会议和责任部门确认。"
+      ]
+    },
+    "copywriting": [],
+    "data_and_dependencies": [
+      "MES 批次与工序数据",
+      "QMS 缺陷与判定数据",
+      "检测系统量测结果",
+      "设备与产线主数据",
+      "用户权限配置"
+    ],
+    "risks_and_notes": [
+      "指标口径和业务归属需要在项目启动时确认。",
+      "历史数据质量可能影响看板或流程上线后的验收结果。",
+      "外部系统接口准备情况可能影响首版范围。"
+    ],
+    "acceptance_criteria": [
+      "可以基于该示例直接生成完整的需求文档和设计文档。",
+      "用户可以通过后续对话修改示例业务内容，并覆盖对应需求事实。",
+      "主要角色、流程、数据、权限、业务规则和验收标准均有明确描述。"
+    ],
+    "open_questions": [
+      "是否存在必须优先支持的组织、工厂、客户或业务范围？",
+      "首版是否需要限制在 MVP 范围内上线？"
+    ],
+    "template_meta": {
+      "is_default_example": true,
+      "example_notice": "这是系统内置的默认示例业务，仅用于填充式开始，可被用户后续修改意见覆盖。"
+    }
+  }
+}

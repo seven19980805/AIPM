@@ -1,0 +1,210 @@
+{
+  "version": "2026-06-23",
+  "domain": "IC Substrate",
+  "active_departments": ["production", "quality", "tdi", "general"],
+  "visible_starter_departments": ["Production", "Quality", "TDI"],
+  "departments": {
+    "production": {
+      "label": "Production",
+      "business_objects": ["lot", "panel", "unit", "route", "station", "wip", "finished lot"],
+      "evidence_keys": [
+        "production_route_time_boundary",
+        "production_kpi_formula_grain",
+        "production_dispatch_exception_control"
+      ],
+      "question_ladder": [
+        "Confirm product family, plant or line, route or station boundary, and lot/panel/unit grain.",
+        "Confirm KPI formula, numerator/denominator, excluded lots, and time window.",
+        "Confirm dispatch, hold/release, bottleneck, aging, rework, and owner action."
+      ]
+    },
+    "quality": {
+      "label": "Quality",
+      "business_objects": ["lot", "panel", "unit", "defect", "inspection", "disposition", "capa"],
+      "evidence_keys": [
+        "quality_defect_disposition",
+        "quality_inspection_coverage",
+        "quality_capa_traceability"
+      ],
+      "question_ladder": [
+        "Confirm defect taxonomy, severity, disposition, and release decision.",
+        "Confirm inspection coverage, sampling/full inspection, false call, and missed-defect correction.",
+        "Confirm CAPA owner, root cause, closure evidence, reopen condition, and traceability."
+      ]
+    },
+    "tdi": {
+      "label": "TDI",
+      "business_objects": ["request", "case", "ticket", "product", "revision", "spec", "recipe", "parameter"],
+      "evidence_keys": [
+        "tdi_request_triage_sla",
+        "tdi_engineering_data_mapping",
+        "tdi_request_writeback_approval"
+      ],
+      "question_ladder": [
+        "Confirm what TDI means in this project before expanding the acronym.",
+        "Confirm request intake, triage, priority, owner, SLA definition, and closure criteria.",
+        "Confirm product/revision/spec/route/parameter mapping, approval, writeback, versioning, and audit trail."
+      ]
+    },
+    "general": {
+      "label": "General",
+      "business_objects": ["request", "business object", "status", "report", "dashboard", "workflow"],
+      "evidence_keys": [],
+      "question_ladder": [
+        "Confirm the requesting department, business owner, primary user, and acceptance owner.",
+        "Confirm the first-version software shape and business action.",
+        "Confirm source of truth, data owner, workflow state, and acceptance evidence."
+      ]
+    }
+  },
+  "product_shapes": {
+    "dashboard": {
+      "label": "Dashboard",
+      "required_dimensions": ["decision scenario", "core KPI", "default dimension", "refresh cadence", "drilldown path"]
+    },
+    "workflow_tracker": {
+      "label": "Workflow tracker",
+      "required_dimensions": ["trigger", "state flow", "owner by state", "SLA definition", "closure evidence"]
+    },
+    "planning_simulation": {
+      "label": "Planning simulation",
+      "required_dimensions": ["planning horizon", "capacity bucket", "forecast-to-schedule gap", "commit-risk rule", "writeback boundary"]
+    },
+    "production_delivery_commit_risk_dashboard": {
+      "label": "Production delivery commit risk dashboard",
+      "required_dimensions": ["OTD definition", "customer commit date source", "planned ship date source", "WIP readiness rule", "risk reason taxonomy", "delivery promise/writeback boundary"]
+    },
+    "production_equipment_downtime_oee_dashboard": {
+      "label": "Production equipment downtime OEE dashboard",
+      "required_dimensions": ["equipment downtime record grain", "equipment scope", "OEE/availability formula", "downtime reason taxonomy", "equipment-to-station mapping", "lot impact rule", "equipment-state/maintenance writeback boundary", "equipment-state/maintenance/MES writeback boundary"]
+    },
+    "production_material_shortage_readiness_dashboard": {
+      "label": "Production material shortage readiness dashboard",
+      "required_dimensions": ["material grain", "BOM/material source", "kit readiness rule", "shortage reason taxonomy", "inventory coverage calculation", "affected lot/order linkage", "inventory/procurement/production writeback boundary"]
+    },
+    "production_cost_simulation": {
+      "label": "Production cost simulation",
+      "required_dimensions": ["cost formula owner", "Activity Rate/MOH source", "Processing Time source", "Yield denominator", "Panel Utilization rule", "SAP/Finance writeback boundary"]
+    },
+    "report_export": {
+      "label": "Report/export",
+      "required_dimensions": ["recipient", "cadence", "format", "frozen definition", "dashboard reconciliation"]
+    },
+    "data_query": {
+      "label": "Data query",
+      "required_dimensions": ["query object", "business key", "filter", "grain", "lineage"]
+    },
+    "alerting": {
+      "label": "Alerting",
+      "required_dimensions": ["trigger threshold", "judgment window", "notification target", "escalation", "closure evidence"]
+    },
+    "quality_spc_process_capability_dashboard": {
+      "label": "Quality SPC process capability dashboard",
+      "required_dimensions": ["SPC control chart record grain", "parameter definition", "subgroup/sample rule", "UCL/LCL calculation", "USL/LSL source", "Cpk formula", "control-limit/spec-limit writeback boundary", "control-limit/spec-limit/writeback boundary"]
+    },
+    "quality_iqc_supplier_lot_issue_tracker": {
+      "label": "Quality IQC supplier lot issue tracker",
+      "required_dimensions": ["supplier lot grain", "IQC pass/fail rule", "incoming pass rate formula", "defect taxonomy", "production lot linkage", "supplier-claim/material-hold writeback boundary", "supplier-claim/material-hold/writeback boundary"]
+    },
+    "quality_mrb_disposition_tracker": {
+      "label": "Quality MRB disposition tracker",
+      "required_dimensions": ["MRB trigger rule", "nonconforming material grain", "quarantine status taxonomy", "disposition path taxonomy", "release evidence checklist", "disposition/release writeback boundary"]
+    },
+    "quality_capa_8d_closure_tracker": {
+      "label": "Quality CAPA/8D closure tracker board",
+      "required_dimensions": ["capa 8d closure tracker", "CAPA/8D case taxonomy", "D0-D8 stage definition", "root-cause method", "customer response due-date rule", "verification evidence checklist", "closure evidence", "reopen rule", "writeback boundary"]
+    },
+    "tdi_trial_lot_issue_tracker": {
+      "label": "TDI trial lot issue tracker",
+      "required_dimensions": ["trial lot/engineering run grain", "issue taxonomy", "blocking decision rule", "owner action matrix", "closure evidence checklist", "recipe/spec/release writeback boundary"]
+    },
+    "tdi_npi_handoff_readiness_tracker": {
+      "label": "TDI NPI handoff readiness tracker",
+      "required_dimensions": ["product-transfer grain", "recipe/spec package checklist", "qualification evidence checklist", "Production/Quality sign-off owner", "open issue closure rule", "master-data/release writeback boundary"]
+    },
+    "engineering_change_approval_tracker": {
+      "label": "TDI engineering change approval tracker",
+      "required_dimensions": ["engineering change approval tracker", "change request grain", "recipe/spec fields affected", "approval stage names", "validation evidence checklist", "effective-date/effective-lot rule", "downstream handoff owner", "writeback boundary"]
+    },
+    "admin_tool": {
+      "label": "Admin tool",
+      "required_dimensions": ["config object", "role permission", "approval boundary", "audit trail", "rollback rule"]
+    }
+  },
+  "core_evidence_keys": [
+    "entry_owner",
+    "business_action",
+    "object_grain",
+    "workflow_state_owner",
+    "data_reconciliation",
+    "acceptance_evidence",
+    "uncertainty_handling"
+  ],
+  "glossary_seed_terms": [
+    "lot",
+    "panel",
+    "unit",
+    "route",
+    "station",
+    "equipment",
+    "OEE",
+    "downtime reason",
+    "material availability",
+    "kit readiness",
+    "shortage reason",
+    "defect",
+    "inspection",
+    "disposition",
+    "SPC",
+    "Cpk",
+    "UCL/LCL",
+    "IQC",
+    "supplier lot",
+    "incoming pass rate",
+    "MRB",
+    "nonconforming material",
+    "quarantine status",
+    "trial lot",
+    "engineering run",
+    "blocking decision",
+    "NPI handoff",
+    "recipe/spec package",
+    "Production/Quality sign-off",
+    "CAPA",
+    "rework",
+    "scrap",
+    "hold",
+    "release",
+    "standard cost",
+    "Activity Rate",
+    "Processing Time",
+    "MOH",
+    "Panel Utilization",
+    "OTD",
+    "customer commit date",
+    "delivery promise",
+    "source of truth",
+    "refresh cadence",
+    "reconciliation",
+    "writeback",
+    "approval",
+    "audit trail"
+  ],
+  "guardrails": {
+    "forbidden_assumptions": [
+      "Do not invent formulas, numerator/denominator rules, station names, process steps, system names, table names, status names, SLA values, owner roles, approval levels, or spec limits.",
+      "Do not expand TDI until the user confirms what TDI means in this project.",
+      "Do not introduce FVI, AOI, E-test, AVI, SAP, EAP, SPC, MES, QMS, ERP, or similar local terms unless the user or source material provided them."
+    ],
+    "source_of_truth_contract": [
+      "source system or file",
+      "business key",
+      "join key",
+      "refresh cadence",
+      "latency tolerance",
+      "reconciliation owner",
+      "missing-data behavior",
+      "writeback or approval target"
+    ]
+  }
+}

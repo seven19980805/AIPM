@@ -1,0 +1,385 @@
+{
+  "template_id": "individual_chart_requirement_template_ms",
+  "template_key": "individual_chart_requirement",
+  "template_name": "Templat Keperluan Carta Individu",
+  "template_category": "business_requirement",
+  "business_domain": "data_visualization",
+  "language": "ms",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "Templat untuk satu carta atau komponen dashboard, meliputi tujuan perniagaan, kontrak data, spesifikasi carta, penapis, jadual butiran, interaksi, kebenaran, keperluan pembangunan dan UAT.",
+  "tags": [
+    "chart",
+    "dashboard",
+    "visualization",
+    "data-contract",
+    "uat"
+  ],
+  "applicable_scenarios": [
+    "Satu carta atau komponen dashboard",
+    "Visualisasi metrik dengan penapis",
+    "Pengesahan kontrak data carta",
+    "Drill-down carta dan jadual butiran",
+    "Eksport carta dan peraturan kebenaran"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/individual-chart-requirement-template.ms.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Maklumat Dokumen Asas",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.chart_name",
+          "label": "Nama carta / halaman",
+          "component": "input",
+          "data_type": "string",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "background_objectives",
+      "section_title": "Latar Belakang dan Objektif",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "background_objectives.summary",
+          "label": "Latar belakang dan objektif",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "scope",
+      "section_title": "Skop",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "scope.items",
+          "label": "Skop",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "stakeholders",
+      "section_title": "Pihak Bertanggungjawab dan Berkepentingan",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "stakeholders.roles",
+          "label": "Stakeholder",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "data_description",
+      "section_title": "Penerangan Data",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "data_description.items",
+          "label": "Sumber dan medan data",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "chart_presentation",
+      "section_title": "Persembahan Halaman dan Carta",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "chart_presentation.spec",
+          "label": "Spesifikasi carta",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "filters_detail",
+      "section_title": "Penapis dan Jadual Butiran",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "filters_detail.items",
+          "label": "Penapis dan butiran",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "interactions_permissions",
+      "section_title": "Interaksi, Kebenaran dan Eksport",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "interactions_permissions.requirements",
+          "label": "Interaksi dan kebenaran",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "development",
+      "section_title": "Keperluan Pembangunan",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "development.requirements",
+          "label": "Pembangunan",
+          "component": "list",
+          "data_type": "array",
+          "required": false
+        }
+      ]
+    },
+    {
+      "section_key": "color_system",
+      "section_title": "Sistem Warna",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "color_system.tokens",
+          "label": "Token warna",
+          "component": "table",
+          "data_type": "array",
+          "required": false
+        }
+      ]
+    },
+    {
+      "section_key": "acceptance",
+      "section_title": "Kriteria Penerimaan dan Senarai Semak UAT",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "acceptance.criteria",
+          "label": "Kriteria penerimaan",
+          "component": "table",
+          "data_type": "array",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_key": "open_questions",
+      "section_title": "Soalan Terbuka dan Log Perubahan",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "open_questions.questions",
+          "label": "Soalan terbuka",
+          "component": "table",
+          "data_type": "array",
+          "required": false
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "Projek contoh: Monthly Defect Rate Chart",
+      "requirement_name": "Keperluan contoh: Single chart for monthly defect-rate monitoring"
+    },
+    "background": {
+      "summary": "Ini ialah contoh perniagaan terbina dalam untuk memulakan templat berisi dengan pantas. Quality managers need one trusted chart to monitor monthly defect rate by plant, product family, and defect category. Current reports are manually prepared and definitions are inconsistent.",
+      "objective": "Jana dokumen PRD dan reka bentuk berdasarkan contoh; perubahan pengguna kemudian mengatasi contoh."
+    },
+    "scope": {
+      "in_scope": [
+        "One defect-rate trend chart",
+        "Plant/product/date filters",
+        "Detail table and export",
+        "Tooltip and drill-down interaction",
+        "Data refresh and permission rules"
+      ],
+      "out_of_scope": [
+        "Full dashboard suite",
+        "Predictive defect modeling",
+        "Data warehouse redesign"
+      ]
+    },
+    "users_and_scenarios": {
+      "target_users": [
+        "Quality manager",
+        "Process engineer",
+        "Data owner",
+        "Dashboard developer",
+        "QA tester"
+      ],
+      "core_scenarios": [
+        "User filters by plant and month.",
+        "User hovers over a point to see numerator and denominator.",
+        "User clicks a month to inspect detail records."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "This default example includes Chart rendering, Filter and detail table, Export and permission control.",
+      "feature_details": [
+        {
+          "feature_name": "Chart rendering",
+          "description": "Support chart rendering for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        },
+        {
+          "feature_name": "Filter and detail table",
+          "description": "Support filter and detail table for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        },
+        {
+          "feature_name": "Export and permission control",
+          "description": "Support export and permission control for the example business scenario.",
+          "trigger": "User opens the related workspace or submits the related business action.",
+          "processing_logic": "Validate required fields, apply permission rules, persist records, and update related status or metrics.",
+          "inputs": [
+            "Business master data",
+            "User filter or request data"
+          ],
+          "outputs": [
+            "Updated records",
+            "Visible status or chart result"
+          ],
+          "exception_cases": [
+            "Missing required data",
+            "Insufficient permission",
+            "Data refresh delay"
+          ]
+        }
+      ]
+    },
+    "business_rules": [
+      "Only authorized roles can view scoped data and perform sensitive actions.",
+      "Core business actions must keep an audit trail.",
+      "Exported data must follow the same filters and permission scope as the page.",
+      "Data refresh status and calculation definitions must be visible to users."
+    ],
+    "page_and_interaction": {
+      "pages": [
+        {
+          "page_name": "Chart rendering",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        },
+        {
+          "page_name": "Filter and detail table",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        },
+        {
+          "page_name": "Export and permission control",
+          "entry_point": "Main workspace",
+          "page_elements": [
+            "Filter area",
+            "Main content area",
+            "Detail area"
+          ],
+          "button_actions": [
+            "Search",
+            "Reset",
+            "Export",
+            "Open detail"
+          ]
+        }
+      ],
+      "interaction_flow": [
+        "User filters by plant and month.",
+        "User hovers over a point to see numerator and denominator.",
+        "User clicks a month to inspect detail records."
+      ]
+    },
+    "copywriting": [],
+    "data_and_dependencies": [
+      "User and organization master data",
+      "Business transaction data",
+      "Permission configuration",
+      "Reporting/export service"
+    ],
+    "risks_and_notes": [
+      "Metric ownership and data definitions must be confirmed.",
+      "Historical data quality may affect acceptance.",
+      "External system readiness may affect rollout scope."
+    ],
+    "acceptance_criteria": [
+      "The example scope can be generated into PRD and design documents.",
+      "Users can revise the seeded requirement through chat messages.",
+      "Main roles, flows, data, permissions, and acceptance criteria are represented."
+    ],
+    "open_questions": [
+      "Which roles need final approval authority?",
+      "Which fields and metrics are mandatory for MVP?",
+      "Which external systems must be integrated in the first release?"
+    ],
+    "template_meta": {
+      "example_note": "AI-generated default example business; replace with real business facts before final delivery."
+    }
+  }
+}

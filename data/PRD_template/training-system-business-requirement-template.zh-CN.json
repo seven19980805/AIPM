@@ -1,0 +1,664 @@
+{
+  "template_id": "training_system_business_requirement_template_zh_cn",
+  "template_key": "training_system_business_requirement",
+  "template_name": "培训系统业务需求模板",
+  "template_category": "business_requirement",
+  "business_domain": "training_system",
+  "language": "zh-CN",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "适用于课程管理、培训报名、在线学习、考试测评、证书管理、学习档案与培训数据分析等培训系统场景的通用业务需求模板。",
+  "tags": [
+    "training",
+    "course",
+    "learning",
+    "exam",
+    "certificate",
+    "enrollment"
+  ],
+  "applicable_scenarios": [
+    "课程与课件管理",
+    "培训计划与报名",
+    "在线学习与进度跟踪",
+    "考试测评与成绩管理",
+    "证书与培训档案",
+    "学习数据分析"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/training-system-business-requirement-template.zh-CN.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "基础信息",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.project_name",
+          "label": "项目",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "请输入项目名称"
+        },
+        {
+          "field_key": "document_info.requirement_name",
+          "label": "需求名称",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "示例：企业培训平台建设"
+        },
+        {
+          "field_key": "template_meta.requirement_type",
+          "label": "需求类型",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "新建",
+            "优化",
+            "重构"
+          ]
+        },
+        {
+          "field_key": "template_meta.priority",
+          "label": "优先级",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "高",
+            "中",
+            "低"
+          ]
+        },
+        {
+          "field_key": "template_meta.proposing_department",
+          "label": "提出部门",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "请输入提出部门"
+        },
+        {
+          "field_key": "template_meta.requester",
+          "label": "提出人",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "请输入提出人"
+        },
+        {
+          "field_key": "template_meta.request_date",
+          "label": "提出日期",
+          "component": "date",
+          "data_type": "date",
+          "required": false,
+          "placeholder": "YYYY-MM-DD"
+        },
+        {
+          "field_key": "template_meta.version",
+          "label": "版本",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "V1.0"
+        }
+      ]
+    },
+    {
+      "section_key": "business_background",
+      "section_title": "业务背景",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "business_background.summary",
+          "label": "背景概述",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "描述培训业务背景、现有流程和建设原因"
+        },
+        {
+          "field_key": "business_background.pain_points",
+          "label": "现状痛点",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "描述培训业务背景、现有流程和建设原因"
+        }
+      ]
+    },
+    {
+      "section_key": "business_objectives",
+      "section_title": "业务目标",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "business_objectives.objectives",
+          "label": "业务目标",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "描述培训系统需要达成的业务目标"
+        },
+        {
+          "field_key": "business_objectives.metrics",
+          "label": "量化指标",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "示例：课程报名处理时长降低 50%"
+        }
+      ]
+    },
+    {
+      "section_key": "business_scope",
+      "section_title": "业务范围",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "business_scope.in_scope",
+          "label": "需求范围内",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "概述本次培训系统需要建设的核心能力"
+        },
+        {
+          "field_key": "business_scope.out_scope",
+          "label": "需求范围外",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "概述本次培训系统需要建设的核心能力"
+        }
+      ]
+    },
+    {
+      "section_key": "roles_and_scenarios",
+      "section_title": "角色与核心场景",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "roles_and_scenarios.target_roles",
+          "label": "目标角色",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "示例：学员、讲师、培训管理员、部门负责人"
+        },
+        {
+          "field_key": "roles_and_scenarios.core_scenarios",
+          "label": "核心业务场景",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "示例：学员、讲师、培训管理员、部门负责人"
+        }
+      ]
+    },
+    {
+      "section_key": "functional_requirements",
+      "section_title": "功能需求",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "functional_requirements.overview",
+          "label": "功能概述",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "概述本次培训系统需要建设的核心能力"
+        },
+        {
+          "field_key": "functional_requirements.features",
+          "label": "功能明细",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "feature": "功能",
+            "description": "说明",
+            "trigger": "触发条件",
+            "logic": "业务规则/处理逻辑",
+            "inputs": "输入",
+            "outputs": "输出",
+            "exceptions": "异常处理"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "page_and_process",
+      "section_title": "页面与流程",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "page_and_process.pages",
+          "label": "页面/入口",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "page": "页面/入口",
+            "entry": "访问入口",
+            "elements": "关键元素",
+            "actions": "主要操作",
+            "flow": "流程说明"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "business_rules_and_data",
+      "section_title": "业务规则与数据",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "business_rules_and_data.rules",
+          "label": "业务规则/处理逻辑",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "概述本次培训系统需要建设的核心能力"
+        },
+        {
+          "field_key": "business_rules_and_data.key_data",
+          "label": "关键数据对象",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "示例：课程主数据、学员数据、题库、证书记录"
+        }
+      ]
+    },
+    {
+      "section_key": "nonfunctional_requirements",
+      "section_title": "非功能要求",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "nonfunctional_requirements.items",
+          "label": "非功能要求",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "概述本次培训系统需要建设的核心能力"
+        }
+      ]
+    },
+    {
+      "section_key": "integration_dependencies",
+      "section_title": "集成与依赖",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "integration_dependencies.external_systems",
+          "label": "外部依赖",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "概述本次培训系统需要建设的核心能力"
+        }
+      ]
+    },
+    {
+      "section_key": "risks_and_questions",
+      "section_title": "风险与待确认问题",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "risks_and_questions.risks",
+          "label": "风险项",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "概述本次培训系统需要建设的核心能力"
+        },
+        {
+          "field_key": "risks_and_questions.open_questions",
+          "label": "待确认问题",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "请输入待确认问题"
+        }
+      ]
+    },
+    {
+      "section_key": "milestone_acceptance",
+      "section_title": "里程碑与验收",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "milestone_acceptance.milestones",
+          "label": "里程碑",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "milestone": "里程碑",
+            "target_date": "计划日期",
+            "acceptance": "验收标准"
+          }
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "培训系统升级项目",
+      "requirement_name": "企业培训平台建设"
+    },
+    "template_meta": {
+      "template_name": "培训系统业务需求模板",
+      "requirement_type": "新建",
+      "priority": "高",
+      "proposing_department": "人力资源部 / 培训发展中心",
+      "requester": "培训管理员",
+      "request_date": "2026-05-11",
+      "version": "V1.0"
+    },
+    "business_background": {
+      "summary": "培训计划、课程报名、学习记录、考试成绩和证书目前分散在邮件、表格和多个平台中。培训管理员难以追踪执行进度，学员缺少统一学习入口，管理层缺少可分析的培训效果数据。",
+      "pain_points": [
+        "培训计划发布和报名依赖人工通知",
+        "课程资源分散，学习进度难以统一跟踪",
+        "考试结果、证书和培训档案无法自动沉淀",
+        "培训数据口径不统一，报表统计耗时"
+      ]
+    },
+    "business_objectives": {
+      "objectives": [
+        "建立统一的培训计划、课程和学习入口",
+        "支持报名、学习、考试、证书的闭环管理",
+        "提升培训执行效率和学习记录准确性",
+        "沉淀可分析的培训数据，支撑人才发展决策"
+      ],
+      "metrics": [
+        "课程报名处理时长降低 50%",
+        "学习完成统计准确率达到 98%",
+        "90% 的证书自动生成并归档",
+        "培训报表人工整理工作量降低 60%"
+      ]
+    },
+    "business_scope": {
+      "in_scope": [
+        "课程与课件管理",
+        "培训计划发布",
+        "学员报名与审批",
+        "在线学习与进度跟踪",
+        "考试测评与成绩管理",
+        "证书与培训档案",
+        "培训报表分析"
+      ],
+      "out_scope": [
+        "直播课堂底层能力自研",
+        "复杂 LMS 商城化交易",
+        "外部大学平台深度内容采购",
+        "AI 个性化学习路径推荐"
+      ]
+    },
+    "roles_and_scenarios": {
+      "target_roles": [
+        "学员：查看课程、报名培训、学习课程、参加考试并查看证书",
+        "讲师：维护授课资料、查看学员名单和培训反馈",
+        "培训管理员：创建培训计划、管理报名、配置考试和证书",
+        "部门负责人：审批团队报名并查看团队学习进度",
+        "管理层：查看培训覆盖率、完成率和效果统计",
+        "系统管理员：维护权限、分类、字典和基础配置"
+      ],
+      "core_scenarios": [
+        "培训管理员发布培训计划并开放报名范围。",
+        "学员在培训门户选择课程、提交报名并接收通知。",
+        "部门负责人审批团队成员报名，系统更新报名状态。",
+        "学员完成线上学习并参加考试测评。",
+        "系统根据完成条件生成证书并沉淀培训档案。",
+        "管理层查看培训完成率、考试通过率和课程反馈。"
+      ]
+    },
+    "functional_requirements": {
+      "overview": "本需求围绕课程资源、培训计划、报名审批、学习进度、考试测评、证书档案和数据报表七类能力展开，目标是形成培训业务闭环。",
+      "features": [
+        {
+          "feature": "课程与课件管理",
+          "description": "维护课程分类、课程信息、课件资料、讲师信息和适用对象。",
+          "trigger": "培训管理员创建或更新课程。",
+          "logic": [
+            "支持课程上下架、分类、标签和适用岗位维护",
+            "支持课件、视频、文档、作业等资源关联",
+            "支持课程版本和更新记录"
+          ],
+          "inputs": "课程名称、分类、讲师、课件、适用对象",
+          "outputs": "课程详情、课程目录、课件列表",
+          "exceptions": "课程重复、课件缺失、课程已被计划引用时限制删除"
+        },
+        {
+          "feature": "培训计划与报名审批",
+          "description": "发布培训计划并管理报名、审批、名额和通知。",
+          "trigger": "培训计划创建或报名提交。",
+          "logic": [
+            "支持按组织、岗位、人员范围开放报名",
+            "支持名额控制、候补、取消报名和审批流",
+            "支持报名通知、审批通知和开课提醒"
+          ],
+          "inputs": "计划名称、课程、时间、名额、报名范围、审批人",
+          "outputs": "培训计划、报名名单、审批结果",
+          "exceptions": "名额不足、报名截止、重复报名、审批超时"
+        },
+        {
+          "feature": "在线学习与进度跟踪",
+          "description": "为学员提供统一学习入口并记录学习进度。",
+          "trigger": "学员进入课程学习。",
+          "logic": [
+            "支持课程目录、学习进度、学习时长和完成状态记录",
+            "支持断点续学、必修课和选修课标识",
+            "支持学习提醒和未完成催办"
+          ],
+          "inputs": "学员、课程、课件、学习时长、完成状态",
+          "outputs": "学习记录、进度统计、完成证明",
+          "exceptions": "课件无法播放、进度上报失败、重复学习记录合并"
+        },
+        {
+          "feature": "考试测评与成绩管理",
+          "description": "配置题库、试卷、考试安排、阅卷和成绩统计。",
+          "trigger": "培训计划要求考试或管理员发布考试。",
+          "logic": [
+            "支持题库、试卷、考试时间、通过分数配置",
+            "支持自动阅卷、人工阅卷和补考",
+            "支持成绩查询、通过率统计和成绩导出"
+          ],
+          "inputs": "题目、试卷、考试安排、答题记录",
+          "outputs": "成绩单、通过状态、考试统计",
+          "exceptions": "考试超时、重复提交、作弊标记、补考资格不足"
+        },
+        {
+          "feature": "证书与培训档案",
+          "description": "根据学习完成和考试结果生成证书，并形成员工培训档案。",
+          "trigger": "学员满足证书发放条件。",
+          "logic": [
+            "支持证书模板、编号规则和有效期配置",
+            "支持证书生成、下载、撤销和过期提醒",
+            "支持按员工聚合培训记录和证书记录"
+          ],
+          "inputs": "完成记录、成绩、证书模板、员工信息",
+          "outputs": "证书、培训档案、证书台账",
+          "exceptions": "证书生成失败、证书过期、撤销记录留痕"
+        },
+        {
+          "feature": "培训报表与分析",
+          "description": "提供培训执行、学习效果和资源使用情况统计。",
+          "trigger": "管理者或培训管理员查看报表。",
+          "logic": [
+            "支持按组织、课程、时间、岗位统计覆盖率和完成率",
+            "支持考试通过率、课程评分、反馈汇总",
+            "支持报表导出和定时推送"
+          ],
+          "inputs": "报名记录、学习记录、考试成绩、反馈数据",
+          "outputs": "培训看板、统计报表、导出文件",
+          "exceptions": "数据延迟、权限不足、统计口径变更需提示"
+        }
+      ]
+    },
+    "page_and_process": {
+      "pages": [
+        {
+          "page": "培训门户首页",
+          "entry": "学员端入口",
+          "elements": "推荐课程、待学习任务、证书、通知",
+          "actions": "搜索课程、报名、继续学习、查看证书",
+          "flow": "学员登录后进入门户，查看待办并进入课程。"
+        },
+        {
+          "page": "课程管理",
+          "entry": "培训管理员后台",
+          "elements": "课程列表、课程详情、课件、讲师、适用对象",
+          "actions": "新增课程、编辑课件、上下架、复制课程",
+          "flow": "管理员维护课程后发布到可见范围。"
+        },
+        {
+          "page": "培训计划管理",
+          "entry": "培训管理员后台",
+          "elements": "计划列表、报名名单、审批状态、通知记录",
+          "actions": "发布计划、调整名额、查看报名、导出名单",
+          "flow": "管理员创建计划，系统按范围开放报名并触发通知。"
+        },
+        {
+          "page": "考试与证书管理",
+          "entry": "培训管理员后台",
+          "elements": "题库、试卷、考试安排、成绩、证书模板",
+          "actions": "配置考试、阅卷、生成证书、撤销证书",
+          "flow": "考试结束后系统汇总成绩并按规则生成证书。"
+        },
+        {
+          "page": "培训数据看板",
+          "entry": "管理端入口",
+          "elements": "覆盖率、完成率、通过率、课程评分、趋势图",
+          "actions": "筛选、钻取、导出、订阅",
+          "flow": "管理者按组织和时间查看培训效果。"
+        }
+      ]
+    },
+    "business_rules_and_data": {
+      "rules": [
+        "报名截止后默认不允许新增报名，管理员可按权限补录。",
+        "同一学员同一培训计划只能存在一条有效报名记录。",
+        "课程完成条件可由学习进度、学习时长、作业提交和考试通过共同决定。",
+        "证书编号需全局唯一，撤销后不可复用。",
+        "涉及成绩和证书的数据修改必须保留审计日志。"
+      ],
+      "key_data": [
+        "课程：课程编号、名称、分类、讲师、课件、适用对象、状态",
+        "培训计划：计划编号、课程、时间、名额、报名范围、审批规则",
+        "报名记录：学员、计划、报名状态、审批人、审批时间",
+        "学习记录：学员、课程、进度、时长、完成状态、完成时间",
+        "考试成绩：考试、学员、分数、通过状态、阅卷状态",
+        "证书：证书编号、学员、课程/计划、发放时间、有效期、状态"
+      ]
+    },
+    "nonfunctional_requirements": {
+      "items": [
+        "权限控制：按角色、组织和数据范围控制可见性与操作权限。",
+        "性能要求：常用列表查询 3 秒内返回，报表可异步生成。",
+        "可用性：关键报名和学习链路需支持失败重试和明确提示。",
+        "审计要求：报名审批、成绩修改、证书生成/撤销需记录操作日志。",
+        "安全要求：考试答案、成绩和证书数据需按敏感数据管理。"
+      ]
+    },
+    "integration_dependencies": {
+      "external_systems": [
+        "组织与人员主数据",
+        "统一身份认证/单点登录",
+        "消息通知系统",
+        "电子签章或证书服务",
+        "企业数据仓库/BI"
+      ]
+    },
+    "risks_and_questions": {
+      "risks": [
+        "历史培训数据口径不一致可能影响迁移质量。",
+        "课件格式和播放能力差异可能影响学习体验。",
+        "考试防作弊和证书合规要求需提前确认。",
+        "多组织权限边界不清会影响数据隔离。"
+      ],
+      "open_questions": [
+        "培训计划是否需要支持跨公司或外部人员报名？",
+        "课程完成条件是否按课程、计划或岗位差异化配置？",
+        "证书是否需要电子签章、二维码核验或有效期管理？",
+        "考试是否需要限时、随机组卷、防作弊和补考规则？",
+        "哪些培训模块需要在最终产品中独立成页？"
+      ]
+    },
+    "milestone_acceptance": {
+      "milestones": [
+        {
+          "milestone": "需求确认",
+          "target_date": "T+1 周",
+          "acceptance": "确认范围、角色、核心流程和报表口径"
+        },
+        {
+          "milestone": "原型评审",
+          "target_date": "T+3 周",
+          "acceptance": "完成主要页面原型和流程评审"
+        },
+        {
+          "milestone": "开发联调",
+          "target_date": "T+8 周",
+          "acceptance": "完成核心功能开发和外部系统联调"
+        },
+        {
+          "milestone": "试点上线",
+          "target_date": "T+10 周",
+          "acceptance": "完成试点组织上线和问题闭环"
+        },
+        {
+          "milestone": "正式上线",
+          "target_date": "T+12 周",
+          "acceptance": "完成全员发布、培训和验收"
+        }
+      ]
+    },
+    "summary": "培训计划、课程报名、学习记录、考试成绩和证书目前分散在邮件、表格和多个平台中。培训管理员难以追踪执行进度，学员缺少统一学习入口，管理层缺少可分析的培训效果数据。",
+    "objective": "建立统一的培训计划、课程和学习入口; 支持报名、学习、考试、证书的闭环管理; 提升培训执行效率和学习记录准确性; 沉淀可分析的培训数据，支撑人才发展决策"
+  },
+  "prompt_hints": [
+    {
+      "hint_key": "training_hint_1",
+      "content": "模板已内置培训系统常见目标、范围、角色、流程和功能模块。"
+    },
+    {
+      "hint_key": "training_hint_2",
+      "content": "请优先确认课程、报名、学习、考试、证书和报表之间的闭环关系。"
+    },
+    {
+      "hint_key": "training_hint_3",
+      "content": "涉及成绩、证书和审计的数据需明确权限和留痕要求。"
+    }
+  ],
+  "prompt_questions": [
+    {
+      "question_key": "training_question_1",
+      "content": "培训计划是否需要支持跨公司或外部人员报名？"
+    },
+    {
+      "question_key": "training_question_2",
+      "content": "课程完成条件是否按课程、计划或岗位差异化配置？"
+    },
+    {
+      "question_key": "training_question_3",
+      "content": "证书是否需要电子签章、二维码核验或有效期管理？"
+    },
+    {
+      "question_key": "training_question_4",
+      "content": "考试是否需要限时、随机组卷、防作弊和补考规则？"
+    },
+    {
+      "question_key": "training_question_5",
+      "content": "哪些培训模块需要在最终产品中独立成页？"
+    }
+  ]
+}

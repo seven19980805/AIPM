@@ -1,0 +1,664 @@
+{
+  "template_id": "training_system_business_requirement_template_en",
+  "template_key": "training_system_business_requirement",
+  "template_name": "Training System Business Requirement Template",
+  "template_category": "business_requirement",
+  "business_domain": "training_system",
+  "language": "en",
+  "version": "1.0.0",
+  "status": "enabled",
+  "description": "A general business requirement template for course management, training enrollment, online learning, exams and assessments, certificate management, learning profiles, and training analytics.",
+  "tags": [
+    "training",
+    "course",
+    "learning",
+    "exam",
+    "certificate",
+    "enrollment"
+  ],
+  "applicable_scenarios": [
+    "Course and content management",
+    "Training plans and enrollment",
+    "Online learning and progress tracking",
+    "Exams and assessments",
+    "Certificate management",
+    "Learning data analytics"
+  ],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/training-system-business-requirement-template.en.md"
+  },
+  "storage_model": "structured_requirement_template.v1",
+  "sections": [
+    {
+      "section_key": "document_info",
+      "section_title": "Basic Information",
+      "sort_order": 1,
+      "fields": [
+        {
+          "field_key": "document_info.project_name",
+          "label": "Project",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Enter the project name"
+        },
+        {
+          "field_key": "document_info.requirement_name",
+          "label": "Requirement name",
+          "component": "input",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Example: Enterprise training platform build"
+        },
+        {
+          "field_key": "template_meta.requirement_type",
+          "label": "Requirement type",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "New build",
+            "Optimization",
+            "Refactor"
+          ]
+        },
+        {
+          "field_key": "template_meta.priority",
+          "label": "Priority",
+          "component": "select",
+          "data_type": "string",
+          "required": true,
+          "options": [
+            "High",
+            "Medium",
+            "Low"
+          ]
+        },
+        {
+          "field_key": "template_meta.proposing_department",
+          "label": "Proposing department",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Enter the proposing department"
+        },
+        {
+          "field_key": "template_meta.requester",
+          "label": "Requester",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "Enter the requester"
+        },
+        {
+          "field_key": "template_meta.request_date",
+          "label": "Request date",
+          "component": "date",
+          "data_type": "date",
+          "required": false,
+          "placeholder": "YYYY-MM-DD"
+        },
+        {
+          "field_key": "template_meta.version",
+          "label": "Version",
+          "component": "input",
+          "data_type": "string",
+          "required": false,
+          "placeholder": "V1.0"
+        }
+      ]
+    },
+    {
+      "section_key": "business_background",
+      "section_title": "Business Background",
+      "sort_order": 2,
+      "fields": [
+        {
+          "field_key": "business_background.summary",
+          "label": "Background summary",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Describe the training business background, existing process, and reason for building the system"
+        },
+        {
+          "field_key": "business_background.pain_points",
+          "label": "Current pain points",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Describe the training business background, existing process, and reason for building the system"
+        }
+      ]
+    },
+    {
+      "section_key": "business_objectives",
+      "section_title": "Business Objectives",
+      "sort_order": 3,
+      "fields": [
+        {
+          "field_key": "business_objectives.objectives",
+          "label": "Business objectives",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Describe the business goals this training system should achieve"
+        },
+        {
+          "field_key": "business_objectives.metrics",
+          "label": "Quantified metrics",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Example: Reduce course enrollment processing time by 50%"
+        }
+      ]
+    },
+    {
+      "section_key": "business_scope",
+      "section_title": "Business Scope",
+      "sort_order": 4,
+      "fields": [
+        {
+          "field_key": "business_scope.in_scope",
+          "label": "In scope",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the training system"
+        },
+        {
+          "field_key": "business_scope.out_scope",
+          "label": "Out of scope",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the training system"
+        }
+      ]
+    },
+    {
+      "section_key": "roles_and_scenarios",
+      "section_title": "Roles and Core Scenarios",
+      "sort_order": 5,
+      "fields": [
+        {
+          "field_key": "roles_and_scenarios.target_roles",
+          "label": "Target roles",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Example: learners, instructors, training admins, department owners"
+        },
+        {
+          "field_key": "roles_and_scenarios.core_scenarios",
+          "label": "Core business scenarios",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Example: learners, instructors, training admins, department owners"
+        }
+      ]
+    },
+    {
+      "section_key": "functional_requirements",
+      "section_title": "Functional Requirements",
+      "sort_order": 6,
+      "fields": [
+        {
+          "field_key": "functional_requirements.overview",
+          "label": "Feature overview",
+          "component": "textarea",
+          "data_type": "string",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the training system"
+        },
+        {
+          "field_key": "functional_requirements.features",
+          "label": "Feature details",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "feature": "Feature",
+            "description": "Description",
+            "trigger": "Trigger",
+            "logic": "Business rules / logic",
+            "inputs": "Inputs",
+            "outputs": "Outputs",
+            "exceptions": "Exceptions"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "page_and_process",
+      "section_title": "Pages and Processes",
+      "sort_order": 7,
+      "fields": [
+        {
+          "field_key": "page_and_process.pages",
+          "label": "Page / entry",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "page": "Page / entry",
+            "entry": "Entry",
+            "elements": "Key elements",
+            "actions": "Main actions",
+            "flow": "Flow"
+          }
+        }
+      ]
+    },
+    {
+      "section_key": "business_rules_and_data",
+      "section_title": "Business Rules and Data",
+      "sort_order": 8,
+      "fields": [
+        {
+          "field_key": "business_rules_and_data.rules",
+          "label": "Business rules / logic",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the training system"
+        },
+        {
+          "field_key": "business_rules_and_data.key_data",
+          "label": "Key data objects",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Example: course master data, learner data, question bank, certificate records"
+        }
+      ]
+    },
+    {
+      "section_key": "nonfunctional_requirements",
+      "section_title": "Non-functional Requirements",
+      "sort_order": 9,
+      "fields": [
+        {
+          "field_key": "nonfunctional_requirements.items",
+          "label": "Non-functional requirements",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the training system"
+        }
+      ]
+    },
+    {
+      "section_key": "integration_dependencies",
+      "section_title": "Integrations and Dependencies",
+      "sort_order": 10,
+      "fields": [
+        {
+          "field_key": "integration_dependencies.external_systems",
+          "label": "External dependencies",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the training system"
+        }
+      ]
+    },
+    {
+      "section_key": "risks_and_questions",
+      "section_title": "Risks and Open Questions",
+      "sort_order": 11,
+      "fields": [
+        {
+          "field_key": "risks_and_questions.risks",
+          "label": "Risks",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Summarize the core capabilities to be built for the training system"
+        },
+        {
+          "field_key": "risks_and_questions.open_questions",
+          "label": "Open questions",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "placeholder": "Enter an open question"
+        }
+      ]
+    },
+    {
+      "section_key": "milestone_acceptance",
+      "section_title": "Milestones and Acceptance",
+      "sort_order": 12,
+      "fields": [
+        {
+          "field_key": "milestone_acceptance.milestones",
+          "label": "Milestone",
+          "component": "list",
+          "data_type": "array",
+          "required": true,
+          "item_schema": {
+            "milestone": "Milestone",
+            "target_date": "Target date",
+            "acceptance": "Acceptance criteria"
+          }
+        }
+      ]
+    }
+  ],
+  "example_model": {
+    "document_info": {
+      "project_name": "Training system upgrade project",
+      "requirement_name": "Enterprise training platform build"
+    },
+    "template_meta": {
+      "template_name": "Training System Business Requirement Template",
+      "requirement_type": "New build",
+      "priority": "High",
+      "proposing_department": "Human Resources / Learning and Development Center",
+      "requester": "Training administrator",
+      "request_date": "2026-05-11",
+      "version": "V1.0"
+    },
+    "business_background": {
+      "summary": "Training plans, course enrollment, learning records, exam results, and certificates are currently scattered across email, spreadsheets, and several platforms. Training admins struggle to track execution, learners lack one learning entry point, and management lacks analyzable training effectiveness data.",
+      "pain_points": [
+        "Training plan publishing and enrollment rely on manual notifications",
+        "Course resources are scattered and learning progress is hard to track consistently",
+        "Exam results, certificates, and learning profiles are not archived automatically",
+        "Training data definitions are inconsistent and reporting takes too much manual work"
+      ]
+    },
+    "business_objectives": {
+      "objectives": [
+        "Create one entry point for training plans, courses, and learning",
+        "Support closed-loop management of enrollment, learning, exams, and certificates",
+        "Improve training execution efficiency and learning record accuracy",
+        "Build analyzable training data for talent development decisions"
+      ],
+      "metrics": [
+        "Reduce course enrollment processing time by 50%",
+        "Reach 98% accuracy for completion statistics",
+        "Automatically generate and archive 90% of certificates",
+        "Reduce manual training report preparation by 60%"
+      ]
+    },
+    "business_scope": {
+      "in_scope": [
+        "Course and content management",
+        "Training plan publishing",
+        "Learner enrollment and approval",
+        "Online learning and progress tracking",
+        "Exams, assessments, and score management",
+        "Certificates and learning profiles",
+        "Training reports and analytics"
+      ],
+      "out_scope": [
+        "Building the underlying live classroom engine from scratch",
+        "Complex LMS marketplace transactions",
+        "Deep content procurement from external university platforms",
+        "AI personalized learning path recommendation"
+      ]
+    },
+    "roles_and_scenarios": {
+      "target_roles": [
+        "Learner: browse courses, enroll in training, study content, take exams, and view certificates",
+        "Instructor: maintain teaching materials, view learner lists, and review feedback",
+        "Training administrator: create plans, manage enrollment, configure exams and certificates",
+        "Department owner: approve team enrollment and view team learning progress",
+        "Management: view coverage, completion, pass rate, and training effectiveness metrics",
+        "System administrator: maintain permissions, categories, dictionaries, and base configuration"
+      ],
+      "core_scenarios": [
+        "A training administrator publishes a training plan and opens enrollment to the target audience.",
+        "A learner selects a course in the training portal, submits enrollment, and receives notifications.",
+        "A department owner approves team member enrollment, and the system updates enrollment status.",
+        "A learner completes online learning and takes an assessment.",
+        "The system generates a certificate based on completion rules and stores the learning profile.",
+        "Management reviews completion rate, exam pass rate, and course feedback."
+      ]
+    },
+    "functional_requirements": {
+      "overview": "This requirement covers seven capability groups: course resources, training plans, enrollment approval, learning progress, exams and assessments, certificates and learning profiles, and analytics.",
+      "features": [
+        {
+          "feature": "Course and content management",
+          "description": "Maintain course categories, course information, content materials, instructors, and target audiences.",
+          "trigger": "A training administrator creates or updates a course.",
+          "logic": [
+            "Support course publishing, unpublishing, categories, tags, and target role maintenance",
+            "Support videos, documents, assignments, and other content attachments",
+            "Support course versions and update history"
+          ],
+          "inputs": "Course name, category, instructor, content, target audience",
+          "outputs": "Course detail, catalog, content list",
+          "exceptions": "Duplicate courses, missing content, deletion blocked when referenced by a plan"
+        },
+        {
+          "feature": "Training plans and enrollment approval",
+          "description": "Publish training plans and manage enrollment, approval, quotas, and notifications.",
+          "trigger": "A plan is created or an enrollment is submitted.",
+          "logic": [
+            "Support enrollment by organization, role, or named people",
+            "Support quota control, waitlists, cancellation, and approval flows",
+            "Support enrollment, approval, and class-start notifications"
+          ],
+          "inputs": "Plan name, course, schedule, quota, audience, approver",
+          "outputs": "Training plan, enrollment list, approval result",
+          "exceptions": "Quota full, deadline passed, duplicate enrollment, approval timeout"
+        },
+        {
+          "feature": "Online learning and progress tracking",
+          "description": "Provide one learning entry point and record learning progress.",
+          "trigger": "A learner starts course learning.",
+          "logic": [
+            "Support course catalog, learning progress, duration, and completion status",
+            "Support resume learning, mandatory/elective markers, and reminders",
+            "Support overdue learning reminders"
+          ],
+          "inputs": "Learner, course, content, duration, completion status",
+          "outputs": "Learning record, progress statistics, completion proof",
+          "exceptions": "Content playback failure, progress reporting failure, duplicate record merge"
+        },
+        {
+          "feature": "Exams, assessments, and score management",
+          "description": "Configure question banks, papers, exam sessions, grading, and score statistics.",
+          "trigger": "A plan requires an exam or an admin publishes one.",
+          "logic": [
+            "Support question bank, paper, exam time, and pass score settings",
+            "Support automatic grading, manual grading, and retakes",
+            "Support score lookup, pass-rate statistics, and export"
+          ],
+          "inputs": "Questions, paper, exam setup, answer records",
+          "outputs": "Score sheet, pass status, exam statistics",
+          "exceptions": "Exam timeout, duplicate submission, cheating flag, insufficient retake eligibility"
+        },
+        {
+          "feature": "Certificates and learning profiles",
+          "description": "Generate certificates based on completion and exam results, and build employee learning profiles.",
+          "trigger": "A learner meets certificate issuance conditions.",
+          "logic": [
+            "Support certificate templates, number rules, and validity periods",
+            "Support certificate generation, download, revocation, and expiry reminders",
+            "Aggregate learning and certificate records by employee"
+          ],
+          "inputs": "Completion record, score, certificate template, employee data",
+          "outputs": "Certificate, learning profile, certificate ledger",
+          "exceptions": "Certificate generation failure, expiry, revocation audit trail"
+        },
+        {
+          "feature": "Training reports and analytics",
+          "description": "Provide statistics on training execution, learning effectiveness, and resource usage.",
+          "trigger": "A manager or training admin views reports.",
+          "logic": [
+            "Support coverage and completion statistics by organization, course, time, and role",
+            "Support pass rate, course rating, and feedback summary",
+            "Support report export and scheduled delivery"
+          ],
+          "inputs": "Enrollment records, learning records, scores, feedback",
+          "outputs": "Training dashboard, statistical report, export file",
+          "exceptions": "Data delay, insufficient permission, definition change reminder"
+        }
+      ]
+    },
+    "page_and_process": {
+      "pages": [
+        {
+          "page": "Training portal home",
+          "entry": "Learner entry",
+          "elements": "Recommended courses, pending tasks, certificates, notifications",
+          "actions": "Search courses, enroll, continue learning, view certificates",
+          "flow": "A learner logs in, reviews tasks, and enters a course."
+        },
+        {
+          "page": "Course management",
+          "entry": "Training admin console",
+          "elements": "Course list, course detail, content, instructors, target audience",
+          "actions": "Create course, edit content, publish/unpublish, copy course",
+          "flow": "An admin maintains a course and publishes it to the visible audience."
+        },
+        {
+          "page": "Training plan management",
+          "entry": "Training admin console",
+          "elements": "Plan list, enrollment list, approval status, notifications",
+          "actions": "Publish plan, adjust quota, view enrollment, export list",
+          "flow": "An admin creates a plan, and the system opens enrollment by audience and sends notices."
+        },
+        {
+          "page": "Exam and certificate management",
+          "entry": "Training admin console",
+          "elements": "Question bank, paper, exam setup, scores, certificate templates",
+          "actions": "Configure exam, grade, generate certificate, revoke certificate",
+          "flow": "After an exam ends, the system summarizes scores and generates certificates by rule."
+        },
+        {
+          "page": "Training analytics dashboard",
+          "entry": "Management entry",
+          "elements": "Coverage, completion, pass rate, course rating, trends",
+          "actions": "Filter, drill down, export, subscribe",
+          "flow": "Management reviews training effectiveness by organization and time."
+        }
+      ]
+    },
+    "business_rules_and_data": {
+      "rules": [
+        "Enrollment is closed after the deadline by default; admins may add records with permission.",
+        "One learner can have only one active enrollment record for the same training plan.",
+        "Course completion can depend on progress, duration, assignment submission, and exam pass status.",
+        "Certificate numbers must be globally unique and cannot be reused after revocation.",
+        "Changes to scores and certificates must keep an audit trail."
+      ],
+      "key_data": [
+        "Course: code, name, category, instructor, content, target audience, status",
+        "Training plan: code, course, schedule, quota, audience, approval rules",
+        "Enrollment record: learner, plan, status, approver, approval time",
+        "Learning record: learner, course, progress, duration, completion status, completion time",
+        "Exam score: exam, learner, score, pass status, grading status",
+        "Certificate: number, learner, course/plan, issue time, validity period, status"
+      ]
+    },
+    "nonfunctional_requirements": {
+      "items": [
+        "Access control: visibility and operations controlled by role, organization, and data scope.",
+        "Performance: common list queries return within 3 seconds; reports may be generated asynchronously.",
+        "Usability: key enrollment and learning flows need retry handling and clear error messages.",
+        "Audit: enrollment approval, score edits, and certificate generation/revocation must be logged.",
+        "Security: exam answers, scores, and certificate data must be managed as sensitive data."
+      ]
+    },
+    "integration_dependencies": {
+      "external_systems": [
+        "Organization and employee master data",
+        "Unified identity / SSO",
+        "Message notification service",
+        "Electronic seal or certificate service",
+        "Enterprise data warehouse / BI"
+      ]
+    },
+    "risks_and_questions": {
+      "risks": [
+        "Inconsistent historical training data definitions may affect migration quality.",
+        "Different content formats and playback capabilities may affect learning experience.",
+        "Exam anti-cheating and certificate compliance requirements need early confirmation.",
+        "Unclear multi-organization permission boundaries may affect data isolation."
+      ],
+      "open_questions": [
+        "Should training plans support cross-company or external learner enrollment?",
+        "Should course completion rules vary by course, plan, or role?",
+        "Do certificates require electronic seals, QR verification, or validity periods?",
+        "Do exams require time limits, random papers, anti-cheating, and retake rules?",
+        "Which training modules need independent pages in the final product?"
+      ]
+    },
+    "milestone_acceptance": {
+      "milestones": [
+        {
+          "milestone": "Requirement confirmation",
+          "target_date": "T+1 week",
+          "acceptance": "Confirm scope, roles, core flows, and reporting definitions"
+        },
+        {
+          "milestone": "Prototype review",
+          "target_date": "T+3 weeks",
+          "acceptance": "Complete main page prototypes and process review"
+        },
+        {
+          "milestone": "Development and integration",
+          "target_date": "T+8 weeks",
+          "acceptance": "Complete core feature development and external integrations"
+        },
+        {
+          "milestone": "Pilot launch",
+          "target_date": "T+10 weeks",
+          "acceptance": "Launch pilot organization and close pilot issues"
+        },
+        {
+          "milestone": "Production launch",
+          "target_date": "T+12 weeks",
+          "acceptance": "Complete full release, training, and acceptance"
+        }
+      ]
+    },
+    "summary": "Training plans, course enrollment, learning records, exam results, and certificates are currently scattered across email, spreadsheets, and several platforms. Training admins struggle to track execution, learners lack one learning entry point, and management lacks analyzable training effectiveness data.",
+    "objective": "Create one entry point for training plans, courses, and learning; Support closed-loop management of enrollment, learning, exams, and certificates; Improve training execution efficiency and learning record accuracy; Build analyzable training data for talent development decisions"
+  },
+  "prompt_hints": [
+    {
+      "hint_key": "training_hint_1",
+      "content": "The template includes common training system goals, scope, roles, flows, and feature modules."
+    },
+    {
+      "hint_key": "training_hint_2",
+      "content": "Confirm the closed loop among courses, enrollment, learning, exams, certificates, and reports first."
+    },
+    {
+      "hint_key": "training_hint_3",
+      "content": "Define permissions and audit requirements clearly for scores, certificates, and related sensitive data."
+    }
+  ],
+  "prompt_questions": [
+    {
+      "question_key": "training_question_1",
+      "content": "Should training plans support cross-company or external learner enrollment?"
+    },
+    {
+      "question_key": "training_question_2",
+      "content": "Should course completion rules vary by course, plan, or role?"
+    },
+    {
+      "question_key": "training_question_3",
+      "content": "Do certificates require electronic seals, QR verification, or validity periods?"
+    },
+    {
+      "question_key": "training_question_4",
+      "content": "Do exams require time limits, random papers, anti-cheating, and retake rules?"
+    },
+    {
+      "question_key": "training_question_5",
+      "content": "Which training modules need independent pages in the final product?"
+    }
+  ]
+}
