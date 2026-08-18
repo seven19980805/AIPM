@@ -1,3 +1,4 @@
+import atexit
 import logging
 import os
 from pathlib import Path
@@ -24,13 +25,17 @@ def _load_dotenv() -> None:
         os.environ.setdefault(key, value)
 
 
+def _register_session_store_shutdown(session_store) -> None:
+    atexit.register(session_store.close)
+
+
 def create_app():
     from flask import Flask, request
 
     from .services.asr_client import ASRConfig, DoubaoASRClient
     from .services.llm_client import LLMConfig, MiniMaxChatClient
     from .services.requirement_collector import RequirementCollectorService
-    from .services.session_store import SQLiteSessionStore
+    from .services.session_store import PostgreSQLSessionStore
 
     _load_dotenv()
     logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
@@ -50,9 +55,10 @@ def create_app():
         if origin.strip()
     ]
     app.config["CORS_ALLOW_METHODS"] = "GET, POST, DELETE, OPTIONS"
-    app.config["SQLITE_DB_PATH"] = os.getenv(
-        "SQLITE_DB_PATH",
-        str(Path(__file__).resolve().parent.parent / "data" / "rqmd.sqlite3"),
+    app.config["DATABASE_URL"] = os.getenv("DATABASE_URL", "")
+    app.config["DOCUMENT_STORAGE_PATH"] = os.getenv(
+        "DOCUMENT_STORAGE_PATH",
+        str(Path(__file__).resolve().parent.parent / "data"),
     )
 
     # LLM configuration
@@ -77,7 +83,11 @@ def create_app():
     app.config["ASR_SECRET_KEY"] = os.getenv("ASR_SECRET_KEY", "")
     app.config["ASR_BASE_URL"] = os.getenv("ASR_BASE_URL", "")
 
-    session_store = SQLiteSessionStore(app.config["SQLITE_DB_PATH"])
+    session_store = PostgreSQLSessionStore(
+        app.config["DATABASE_URL"],
+        storage_dir=app.config["DOCUMENT_STORAGE_PATH"],
+    )
+    _register_session_store_shutdown(session_store)
 
     llm_config = LLMConfig(
         provider=app.config["LLM_PROVIDER"],

@@ -121,6 +121,7 @@ export const structuredRequirementPanelCopy = {
       rules: 'Business Rules',
       integrations: 'Integration Systems',
       acceptance: 'Acceptance Criteria',
+      ownership: 'Business / Acceptance Owners',
     },
     scopeLabels: {
       in: 'In',
@@ -292,6 +293,7 @@ export const structuredRequirementPanelCopy = {
       rules: 'Geschaeftsregeln',
       integrations: 'Integrationssysteme',
       acceptance: 'Abnahmekriterien',
+      ownership: 'Business- / Abnahmeverantwortung',
     },
     scopeLabels: {
       in: 'Im Umfang',
@@ -463,6 +465,7 @@ export const structuredRequirementPanelCopy = {
       rules: '\u4e1a\u52a1\u89c4\u5219',
       integrations: '\u96c6\u6210\u7cfb\u7edf',
       acceptance: '\u9a8c\u6536\u6807\u51c6',
+      ownership: '\u4e1a\u52a1 / \u9a8c\u6536\u8d1f\u8d23\u4eba',
     },
     scopeLabels: {
       in: '\u5305\u542b',
@@ -634,6 +637,7 @@ export const structuredRequirementPanelCopy = {
       rules: 'Peraturan Perniagaan',
       integrations: 'Sistem Integrasi',
       acceptance: 'Kriteria Penerimaan',
+      ownership: 'Pemilik Perniagaan / Penerimaan',
     },
     scopeLabels: {
       in: 'Dalam',
@@ -786,7 +790,8 @@ export const structuredRequirementPanelCopy = {
       | 'pages'
       | 'rules'
       | 'integrations'
-      | 'acceptance',
+      | 'acceptance'
+      | 'ownership',
       string
     >
     scopeLabels: Record<'in' | 'out', string>

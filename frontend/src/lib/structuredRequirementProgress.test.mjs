@@ -28,7 +28,7 @@ function confirmedModel(overrides = {}) {
   }
 }
 
-test('top-level open questions do not block generation readiness', () => {
+test('reports exact field counts without inventing a readiness score', () => {
   const progress = computeStructuredRequirementProgress(
     confirmedModel({
       open_questions: ['Confirm API auth details in implementation planning.'],
@@ -38,11 +38,13 @@ test('top-level open questions do not block generation readiness', () => {
   assert.equal(progress.openQuestionCount, 1)
   assert.equal(progress.blockingQuestionCount, 0)
   assert.equal(progress.fullyConfirmed, true)
-  assert.equal(progress.readyToGenerate, true)
-  assert.equal(progress.readinessPercentage, 100)
+  assert.equal(progress.confirmedCount, 9)
+  assert.equal(progress.totalCount, 9)
+  assert.equal('readyToGenerate' in progress, false)
+  assert.equal('readinessPercentage' in progress, false)
 })
 
-test('field-level pending questions still block generation readiness', () => {
+test('field-level pending questions keep the detail snapshot unconfirmed', () => {
   const model = confirmedModel()
   model.collection_status.acceptance = {
     status: 'confirmed',
@@ -55,5 +57,20 @@ test('field-level pending questions still block generation readiness', () => {
   assert.equal(progress.openQuestionCount, 0)
   assert.equal(progress.blockingQuestionCount, 1)
   assert.equal(progress.fullyConfirmed, false)
-  assert.equal(progress.readyToGenerate, false)
+})
+
+test('page layout stays visible in detail counts without becoming an action gate', () => {
+  const model = confirmedModel()
+  model.collection_status.pages = {
+    status: 'missing',
+    reason: 'Derive screens from workflow and features.',
+    pending_questions: ['Confirm exact layout later.'],
+  }
+
+  const progress = computeStructuredRequirementProgress(model)
+
+  assert.equal(progress.fullyConfirmed, false)
+  assert.equal(progress.blockingQuestionCount, 0)
+  assert.equal(progress.confirmedCount, 8)
+  assert.equal(progress.totalCount, 9)
 })

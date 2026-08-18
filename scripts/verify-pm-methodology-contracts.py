@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import os
 import sys
 import tempfile
+import uuid
 from pathlib import Path
 
 
@@ -14,7 +16,7 @@ from app.services.requirement_collector import (
     STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
     RequirementCollectorService,
 )
-from app.services.session_store import SQLiteSessionStore
+from app.services.session_store import PostgreSQLSessionStore
 from app.services.structured_requirement_model import REQUIREMENT_ITEM_KEYS, normalize_structured_requirement_model
 
 
@@ -117,40 +119,71 @@ def main() -> int:
     assert rich_state["recommended_next_method"] == ""
 
     with tempfile.TemporaryDirectory() as tmpdir:
+        store = PostgreSQLSessionStore(
+            os.getenv(
+                "TEST_DATABASE_URL",
+                "postgresql://aipm:aipm_local_dev@127.0.0.1:5432/aipm",
+            ),
+            storage_dir=tmpdir,
+            schema=f"test_pm_contract_{uuid.uuid4().hex}",
+        )
         service = RequirementCollectorService(
             FakeLLMClient(),
-            SQLiteSessionStore(str(Path(tmpdir) / "rqmd.sqlite3")),
+            store,
         )
-        session = service.create_session(language="en")
-        service._save_structured_requirement_model_cache(
-            session.id,
-            STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
-            0,
-            sparse,
-        )
+        try:
+            session = service.create_session(language="en")
+            service._save_structured_requirement_model_cache(
+                session.id,
+                STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
+                0,
+                sparse,
+            )
 
-        pm_prompt = service._pm_prompt(session, "en")
-        assert "PM methodology state" in pm_prompt
-        assert "Opportunity Solution Tree" in pm_prompt
-        assert "What business outcome should this improve" in pm_prompt
+            pm_prompt = service._pm_prompt(session, "en")
+            assert "PM methodology state" in pm_prompt
+            assert "Opportunity Solution Tree" in pm_prompt
+            assert "What business outcome should this improve" in pm_prompt
 
-        progress = service._structured_requirement_progress(sparse)
-        quality_gate_block = service._document_quality_gate_block_markdown(
-            sparse,
-            progress,
-            "en",
-            "prd",
-            session,
-        )
-        assert "PM Methodology Gaps" in quality_gate_block
-        assert "Success metric" in quality_gate_block
-        assert "What metric and target will prove this requirement worked?" in quality_gate_block
+            progress = service._structured_requirement_progress(sparse)
+            quality_gate_block = service._document_quality_gate_block_markdown(
+                sparse,
+                progress,
+                "en",
+                "prd",
+                session,
+            )
+            assert "PM Methodology Gaps" in quality_gate_block
+            assert "Success metric" in quality_gate_block
+            assert (
+                "What metric and target will prove this requirement worked?"
+                in quality_gate_block
+            )
+        finally:
+            store.close(drop_schema=True)
 
-    app_vue = (PROJECT_ROOT / "frontend" / "src" / "App.vue").read_text(encoding="utf-8")
-    assert "buildDocumentGenerationMethodologyMessage" in app_vue
-    assert "pmMethodologyState.value.checks" in app_vue
-    assert "documentGenerationMethodologyMessage" in app_vue
-    assert ":generation-disabled=\"messagePipelineActive || switchingSession || documentGenerationConfirmOpen || !hasSession\"" in app_vue
+    frontend_root = PROJECT_ROOT / "frontend" / "src"
+    app_vue = (frontend_root / "App.vue").read_text(encoding="utf-8")
+    requirement_panel = (
+        frontend_root / "components" / "StructuredRequirementPanel.vue"
+    ).read_text(encoding="utf-8")
+    methodology_display = (
+        frontend_root / "lib" / "pmMethodologyDisplay.ts"
+    ).read_text(encoding="utf-8")
+
+    assert ':pm-methodology-state="pmMethodologyState"' in app_vue
+    assert (
+        ':generation-disabled="messagePipelineActive || switchingSession || !hasSession"'
+        in app_vue
+    )
+    assert (
+        "summarizePMMethodologyDisplay("
+        "props.pmMethodologyState, progress.value.readyToGenerate"
+        in requirement_panel
+    )
+    assert "if (structuredReadyToGenerate)" in methodology_display
+    assert "showNextQuestions: false" in methodology_display
+    assert "showNextQuestions: true" in methodology_display
 
     print("PM methodology contracts verified.")
     return 0

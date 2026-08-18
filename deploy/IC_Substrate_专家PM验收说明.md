@@ -18,7 +18,8 @@ python3 scripts/verify-pm-methodology-contracts.py
 
 覆盖范围：
 
-- 前端只暴露 `Production / Quality / TDI` 三个 IC Substrate 入口，其他部门归入 General。
+- “新建对话”的 IC Substrate 专家入口只暴露 `Production / Quality / TDI` 三条业务路线。
+- 模板库同时暴露全部 14 个启用的业务模板；非 IC Substrate 模板可直接启动模板采访，不强制映射到上述三条路线。
 - API、前端、后端均传递 `starter_department`。
 - 四语言输出锁定 `en / de / zh / ms`。
 - 部门识别由 `data/ic_substrate/domain_pack.json` 驱动，而不是硬编码关键词。
@@ -43,6 +44,7 @@ python3 scripts/verify-pm-methodology-contracts.py
 6. 检查右侧结构化需求模型和进度卡是否稳定，不应大幅跳动或丢失部门。
 7. 信息足够后生成 PRD，确认文档末尾包含 `IC Substrate 专家证据附录`。
 8. 下载文档时验证 Markdown 可用于 coding handoff，`?format=docx` 可得到 Word 文件。
+9. 打开模板库，确认显示 14 个模板；从财务管理等非 IC Substrate 模板启动采访时，不应出现业务路线校验错误。
 
 ## 3. 内网部署后最小检查
 
@@ -62,6 +64,7 @@ curl -s http://127.0.0.1:3102/api/templates >/tmp/aipm_templates.json
 可试用状态至少满足：
 
 - 三个 IC Substrate 入口都能进入对应专家轨道。
+- 14 个启用模板均可启动采访；普通业务模板不会错误显示 Production / Quality / TDI 作为模板场景选项。
 - AI PM 追问能落到业务动作、对象粒度、状态/公式/数据源、验收证据，而不是只问通用产品问题。
 - Mimo/OpenAI-compatible 内部模型即使输出 JSON 不稳定，也不会丢专家部门。
 - 最终 PRD 能明确区分已确认事实、待确认项、专家证据附录。

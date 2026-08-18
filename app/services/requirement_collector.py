@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 import secrets
 import threading
+import unicodedata
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -14,12 +16,56 @@ from xml.sax.saxutils import escape
 import zipfile
 
 from .business_template_library import BusinessTemplateLibrary
+from .build_brief import render_build_brief
+from .coding_contract import (
+    build_coding_contract as build_coding_contract_payload,
+    build_delivery_workflow as build_delivery_workflow_payload,
+    render_coding_contract_markdown,
+)
+from .data_source_policy import (
+    asserts_read_boundary,
+    first_approved_source,
+    is_observable_writeback_evidence,
+    is_specific_writeback_action,
+    line_requests_writeback,
+    normalize_writeback_authorization,
+)
+from .intake_workflow import (
+    INTAKE_MODE_DRAFT,
+    INTAKE_MODE_TEMPLATE,
+    build_intake_prompt_contract,
+    business_route_from_model,
+    business_route_from_template,
+    enforce_interview_response_contract,
+    normalize_business_route,
+    resolve_intake_mode,
+)
+from .interview_protocol import (
+    ProposalValidationError,
+    apply_proposal_to_model,
+    build_decision_proposal,
+    is_confirmation_text,
+    resolve_proposal_from_messages,
+    sanitize_assistant_summary,
+)
+from .interview_state import (
+    build_interview_state_v2,
+    decision_has_required_evidence_v2,
+)
 from .llm_client import LLMError
 from .ic_substrate_domain import build_ic_substrate_evidence_state as build_ic_substrate_evidence_state_payload
 from .pm_methodology import build_pm_methodology_state as build_pm_methodology_state_payload
-from .session_store import SQLiteSessionStore
+from .prompt_contracts import (
+    build_extraction_session_prompt,
+    build_runtime_state_prompt,
+    build_template_baseline_prompt,
+    interview_role_prompt,
+)
+from .session_launch import build_session_launch_context as build_session_launch_context_payload
+from .session_store import PostgreSQLSessionStore
 from .structured_requirement_model import (
     REQUIREMENT_ITEM_KEYS,
+    apply_delivery_evidence_gates,
     build_structured_requirement_model_prompt,
     empty_structured_requirement_model,
     normalize_structured_requirement_model,
@@ -634,6 +680,7 @@ STRUCTURED_REQUIREMENT_GENERATION_CORE_KEYS = (
     "features",
     "rules",
     "integrations",
+    "acceptance",
 )
 STRUCTURED_REQUIREMENT_STATUS_READINESS_POINTS = {
     "missing": 0.0,
@@ -666,10 +713,10 @@ DOCUMENT_TYPE_BY_MESSAGE_KIND = {
 
 DOCUMENT_FILENAME_LABELS = {
     PRD_MESSAGE_KIND: {
-        "en": "Requirements Document",
-        "de": "Anforderungsdokument",
-        "zh": "需求文档",
-        "ms": "Dokumen Keperluan",
+        "en": "Build-Brief",
+        "de": "Build-Brief",
+        "zh": "开发简报",
+        "ms": "Build-Brief",
     },
     DESIGN_MESSAGE_KIND: {
         "en": "Design Document",
@@ -906,15 +953,20 @@ class Session:
     applied_template_id: str = ""
     applied_template_name: str = ""
     start_function: str = START_FUNCTION_FROM_SCRATCH
+    language: str = "en"
     messages: list[dict[str, Any]] = field(default_factory=list)
 
 
 class RequirementCollectorService:
-    def __init__(self, llm_client: MiniMaxChatClient, session_store: SQLiteSessionStore) -> None:
+    def __init__(
+        self,
+        llm_client: MiniMaxChatClient,
+        session_store: PostgreSQLSessionStore,
+    ) -> None:
         self.llm_client = llm_client
         self.session_store = session_store
-        self.design_docs_dir = self.session_store.db_path.parent / "design_docs"
-        self.prd_docs_dir = self.session_store.db_path.parent / "prd_docs"
+        self.design_docs_dir = self.session_store.storage_dir / "design_docs"
+        self.prd_docs_dir = self.session_store.storage_dir / "prd_docs"
         self.prd_templates_dir = Path(__file__).resolve().parents[2] / "data" / "PRD_template"
         self.business_template_library = BusinessTemplateLibrary(self.prd_templates_dir)
         self._lock = threading.Lock()
@@ -926,11 +978,22 @@ class RequirementCollectorService:
         template_start_mode: str = TEMPLATE_START_MODE_GUIDED,
         starter_department: str | None = None,
         start_function: str | None = START_FUNCTION_FROM_SCRATCH,
+        intake_mode: str | None = None,
+        business_route: str | None = None,
     ) -> Session:
         session_id = str(uuid.uuid4())
         created_at = datetime.now(timezone.utc).isoformat()
         normalized_language = self._normalize_language(language)
         normalized_start_function = self._normalize_start_function(start_function)
+        resolved_intake_mode = resolve_intake_mode(
+            requested_mode=intake_mode,
+            template_id=template_id,
+            start_function=normalized_start_function,
+        )
+        if resolved_intake_mode == INTAKE_MODE_DRAFT:
+            normalized_start_function = START_FUNCTION_IMPROVE_DRAFT
+        elif resolved_intake_mode == INTAKE_MODE_TEMPLATE:
+            normalized_start_function = START_FUNCTION_FROM_SCRATCH
         applied_template_id = ""
         applied_template_name = ""
         title = ""
@@ -947,6 +1010,18 @@ class RequirementCollectorService:
             applied_template_name = template_detail["template_name"]
             title = applied_template_name
 
+        route_value = business_route if str(business_route or "").strip() else starter_department
+        if str(intake_mode or "").strip() and not str(route_value or "").strip():
+            raise ValueError("business_route is required for scratch, draft, and template intake.")
+        if str(business_route or "").strip():
+            starter_department_key = normalize_business_route(business_route, required=True)
+        else:
+            starter_department_key = self._normalize_ic_substrate_starter_department(route_value)
+        if not starter_department_key and template_detail is not None:
+            starter_department_key = normalize_business_route(
+                template_detail.get("business_route"),
+            )
+
         record = self.session_store.create_session(
             session_id=session_id,
             created_at=created_at,
@@ -954,11 +1029,9 @@ class RequirementCollectorService:
             applied_template_id=applied_template_id,
             applied_template_name=applied_template_name,
             start_function=normalized_start_function,
+            language=normalized_language,
         )
-        starter_department_key = self._normalize_ic_substrate_starter_department(starter_department)
-        if starter_department_key and (
-            template_detail is None or self._template_matches_ic_substrate_focus(template_detail)
-        ):
+        if starter_department_key:
             self._seed_session_from_starter_department(
                 session_id=session_id,
                 department=starter_department_key,
@@ -971,16 +1044,10 @@ class RequirementCollectorService:
         return self._session_from_record(record)
 
     def _normalize_ic_substrate_starter_department(self, department: str | None) -> str:
-        normalized = str(department or "").strip().lower()
-        aliases = {
-            "production": "production",
-            "prod": "production",
-            "quality": "quality",
-            "qdm": "quality",
-            "tdi": "tdi",
-            "general": "general",
-        }
-        return aliases.get(normalized, "")
+        try:
+            return normalize_business_route(department)
+        except ValueError:
+            return ""
 
     def _seed_session_from_starter_department(
         self,
@@ -1050,44 +1117,32 @@ class RequirementCollectorService:
             message_count=0,
             structured_requirement_model=model,
         )
-        self._save_structured_requirement_model_cache(
-            session_id=session_id,
-            cache_key=self._normalize_language(language),
-            message_count=0,
-            structured_requirement_model=model,
-        )
 
     def _prd_v0_intake_pack_open_question(self, department_label: str, language: str) -> str:
         normalized_language = self._normalize_language(language)
         if normalized_language == "zh":
-            return (
-                f"专家链路启动问题：请用一句话或 A/B/C + 补充，先确认 {department_label} 首版最关键的 5 个信息："
-                "business_action、primary_user_or_owner、source_of_truth、integration_writeback_boundary、acceptance_evidence；"
-                "unknown is OK，未知项会作为待确认假设继续追问，不会直接开放 Go Coding。"
-            )
+            return f"{department_label} 首版最需要改善的一个业务动作是什么？"
         if normalized_language == "de":
-            return (
-                f"Expertenketten-Startfrage: Bitte mit einem Satz oder A/B/C + Freitext die 5 wichtigsten Punkte fuer {department_label} klaeren: "
-                "business_action, primary_user_or_owner, source_of_truth, integration_writeback_boundary, acceptance_evidence; "
-                "unknown is OK; Unbekanntes bleibt pending assumption und oeffnet Go Coding noch nicht."
-            )
+            return f"Welche eine Geschaeftsaktion soll das erste {department_label} Release verbessern?"
         if normalized_language == "ms":
-            return (
-                f"Soalan mula expert chain: jawab dengan satu ayat atau A/B/C + teks ringkas untuk 5 maklumat utama {department_label}: "
-                "business_action, primary_user_or_owner, source_of_truth, integration_writeback_boundary, acceptance_evidence; "
-                "unknown is OK; perkara tidak pasti kekal sebagai assumption belum sah dan belum membuka Go Coding."
-            )
-        return (
-            f"Expert-chain starter question: answer in one sentence or A/B/C + free text for the 5 key fields in {department_label}: "
-            "business_action, primary_user_or_owner, source_of_truth, integration_writeback_boundary, acceptance_evidence; "
-            "unknown is OK; unknowns stay pending assumptions and do not unlock Go Coding yet."
-        )
+            return f"Apakah satu tindakan bisnes yang paling perlu diperbaiki untuk release pertama {department_label}?"
+        return f"What single business action should the first {department_label} release improve?"
 
     def get_session(self, session_id: str) -> Session | None:
         record = self.session_store.get_session(session_id)
         if record is None:
             return None
         return self._session_from_record(record)
+
+    def set_session_language(self, session_id: str, language: str) -> Session:
+        self.session_store.set_session_language(
+            session_id,
+            self._normalize_language(language),
+        )
+        session = self.get_session(session_id)
+        if session is None:
+            raise KeyError("Session not found.")
+        return session
 
     def list_sessions(self) -> list[dict[str, Any]]:
         return self.session_store.list_sessions()
@@ -1097,6 +1152,59 @@ class RequirementCollectorService:
 
     def get_business_template(self, template_id: str) -> dict[str, Any] | None:
         return self.business_template_library.get_template(template_id)
+
+    def build_session_launch_context(
+        self,
+        session: Session,
+        language: str,
+        *,
+        structured_requirement_model: dict[str, Any] | None = None,
+        conversation_chain_state: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        normalized_language = self._normalize_language(language)
+        model = normalize_structured_requirement_model(structured_requirement_model)
+        chain_state = conversation_chain_state
+        if not isinstance(chain_state, dict):
+            chain_state = self.build_conversation_chain_state(
+                session,
+                model,
+                normalized_language,
+            )
+
+        template = None
+        if session.applied_template_id:
+            template = self.business_template_library.get_localized_template(
+                session.applied_template_id,
+                normalized_language,
+            )
+
+        payload = build_session_launch_context_payload(
+            language=normalized_language,
+            session_title=session.title,
+            applied_template_id=session.applied_template_id,
+            applied_template_name=session.applied_template_name,
+            start_function=session.start_function,
+            has_messages=bool(session.messages),
+            template=template,
+            structured_requirement_model=model,
+            conversation_chain_state=chain_state,
+            intake_mode=resolve_intake_mode(
+                template_id=session.applied_template_id,
+                start_function=session.start_function,
+            ),
+            business_route=business_route_from_model(model),
+            user_turn_count=sum(
+                1
+                for message in session.messages
+                if isinstance(message, dict) and message.get("role") == "user"
+            ),
+        )
+        payload["interview_state"] = self.build_interview_state(
+            session,
+            model,
+            normalized_language,
+        )
+        return payload
 
     def _first_string_from_paths(self, payload: dict[str, Any], paths: tuple[str, ...]) -> str:
         for path in paths:
@@ -1224,12 +1332,36 @@ class RequirementCollectorService:
         user_message: str,
         language: str = "zh",
         display_message: str = "",
+        reply_context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         session = self.get_session(session_id)
         if session is None:
             raise KeyError("Session not found.")
 
-        response_language = self._language_for_user_message(language, user_message)
+        # Message request language is presentation-only. The session content
+        # language changes exclusively through the explicit PATCH endpoint, so
+        # a different UI locale cannot silently change extraction.
+        _ = language
+        response_language = self._normalize_language(session.language)
+        control_result = self._handle_interview_control_reply(
+            session,
+            user_message=user_message,
+            display_message=display_message,
+            language=response_language,
+            reply_context=reply_context,
+        )
+        if control_result is not None:
+            return control_result
+
+        previous_model = self.build_structured_requirement_model(
+            session_id,
+            response_language,
+        )
+        active_decision = self._active_interview_decision_id(
+            session,
+            previous_model,
+            response_language,
+        )
         self._append_message(session_id, "user", user_message, display_content=display_message)
         if not self._session_has_user_messages(session):
             self._update_session_title_from_message(session_id, display_message or user_message, response_language)
@@ -1237,52 +1369,74 @@ class RequirementCollectorService:
         # Build the structured model from the latest turn first, so the readiness-state
         # directive injected into the prompt reflects the current gate state. The LLM drives
         # the conversation; the directive constrains it up front and the guard backstops it.
-        self._build_and_cache_structured_requirement_model(
+        extracted_model = self._build_and_cache_structured_requirement_model(
             session,
             response_language,
             force_refresh=True,
         )
-        system_prompt = self._pm_prompt(session, response_language)
-        llm_messages = self._build_llm_messages(system_prompt, session.messages)
-        assistant_text_raw = self.llm_client.chat(llm_messages)
-        assistant_text, thinking_text = self._split_thinking(assistant_text_raw)
-        assistant_text = self._ensure_choice_question_format(assistant_text, response_language)
-        assistant_text = self._guard_assistant_readiness_response(
-            session_id,
-            assistant_text,
-            response_language,
+        extracted_model = self._promote_explicit_active_decision_answer(
+            session,
+            previous_model=previous_model,
+            extracted_model=extracted_model,
+            decision_id=active_decision,
+            user_message=user_message,
+            language=response_language,
         )
+        assistant_metadata = self._bounded_interview_turn_metadata(
+            session,
+            extracted_model,
+            decision_id=active_decision,
+            user_message=user_message,
+            language=response_language,
+        )
+        turn_metadata = (
+            assistant_metadata.get("interview_turn")
+            if isinstance(assistant_metadata, dict)
+            else None
+        )
+        if isinstance(turn_metadata, dict) and turn_metadata.get("kind") == "deferred":
+            assistant_text = self._deferred_decision_message(response_language)
+            thinking_text = ""
+        else:
+            system_prompt = self._pm_prompt(session, response_language)
+            llm_messages = self._build_llm_messages(
+                system_prompt,
+                session.messages,
+            )
+            assistant_text_raw = self.llm_client.chat(llm_messages)
+            assistant_text, thinking_text = self._split_thinking(
+                assistant_text_raw
+            )
+            assistant_text = sanitize_assistant_summary(
+                assistant_text,
+                response_language,
+            )
+            assistant_text = (
+                self._authoritative_interview_summary(
+                    extracted_model,
+                    active_decision,
+                    response_language,
+                )
+                or assistant_text
+            )
 
-        self._append_message(session_id, "assistant", assistant_text, thinking_text)
+        self._append_message(
+            session_id,
+            "assistant",
+            assistant_text,
+            thinking_text,
+            metadata=assistant_metadata,
+        )
         session = self._require_session(session_id)
 
         structured_requirement_model = self._promote_cached_structured_requirement_model(session, response_language)
-        conversation_chain_state = self.build_conversation_chain_state(
+        return self._build_message_result_payload(
             session,
             structured_requirement_model,
             response_language,
+            assistant_message=assistant_text,
+            assistant_thinking=thinking_text,
         )
-        pm_methodology_state = self.build_pm_methodology_state(
-            structured_requirement_model,
-            response_language,
-        )
-        ic_substrate_evidence_state = self.build_ic_substrate_evidence_state(
-            session,
-            structured_requirement_model,
-            response_language,
-        )
-        return {
-            "assistant_message": assistant_text,
-            "assistant_thinking": thinking_text,
-            "summary": structured_requirement_model,
-            "structured_requirement_model": structured_requirement_model,
-            "structured_requirement_sync_status": "ready",
-            "conversation_chain_state": conversation_chain_state,
-            "pm_methodology_state": pm_methodology_state,
-            "ic_substrate_evidence_state": ic_substrate_evidence_state,
-            "session_id": session.id,
-            "message_count": len(session.messages),
-        }
 
     def stream_user_message(
         self,
@@ -1290,12 +1444,57 @@ class RequirementCollectorService:
         user_message: str,
         language: str = "zh",
         display_message: str = "",
+        reply_context: dict[str, Any] | None = None,
     ) -> Iterator[dict[str, Any]]:
         session = self.get_session(session_id)
         if session is None:
             raise KeyError("Session not found.")
 
-        response_language = self._language_for_user_message(language, user_message)
+        # Keep REST and SSE on the same persisted content-language contract.
+        # Only an explicit session-language PATCH may change this value.
+        _ = language
+        response_language = self._normalize_language(session.language)
+        control_result = self._handle_interview_control_reply(
+            session,
+            user_message=user_message,
+            display_message=display_message,
+            language=response_language,
+            reply_context=reply_context,
+        )
+        if control_result is not None:
+            assistant_message = str(control_result.get("assistant_message", ""))
+            if assistant_message:
+                yield {"event": "content", "delta": assistant_message}
+            yield {
+                "event": "assistant_done",
+                "session_id": control_result["session_id"],
+                "message_count": control_result["message_count"],
+            }
+            yield {
+                "event": "summary",
+                **{
+                    key: value
+                    for key, value in control_result.items()
+                    if key not in {"assistant_message", "assistant_thinking"}
+                },
+            }
+            yield {
+                "event": "done",
+                "session_id": control_result["session_id"],
+                "message_count": control_result["message_count"],
+                "structured_requirement_sync_status": "ready",
+            }
+            return
+
+        previous_model = self.build_structured_requirement_model(
+            session_id,
+            response_language,
+        )
+        active_decision = self._active_interview_decision_id(
+            session,
+            previous_model,
+            response_language,
+        )
         self._append_message(session_id, "user", user_message, display_content=display_message)
         if not self._session_has_user_messages(session):
             self._update_session_title_from_message(session_id, display_message or user_message, response_language)
@@ -1303,56 +1502,87 @@ class RequirementCollectorService:
         # Build the structured model from the latest turn first, so the readiness-state
         # directive injected into the prompt reflects the current gate state. The LLM drives
         # the conversation; the directive constrains it up front and the guard backstops it.
-        self._build_and_cache_structured_requirement_model(
+        extracted_model = self._build_and_cache_structured_requirement_model(
             session,
             response_language,
             force_refresh=True,
         )
-
-        assistant_text_parts: list[str] = []
-        thinking_parts: list[str] = []
-        system_prompt = self._pm_prompt(session, response_language)
-        llm_messages = self._build_llm_messages(system_prompt, session.messages)
-        for item in self.llm_client.stream_chat(llm_messages):
-            text = item.get("text", "")
-            if not text:
-                continue
-
-            if item.get("type") == "thinking":
-                thinking_parts.append(text)
-                yield {"event": "thinking", "delta": text}
-                continue
-
-            assistant_text_parts.append(text)
-            yield {"event": "content", "delta": text}
-
-        assistant_text = "".join(assistant_text_parts).strip()
-        thinking_text = "".join(thinking_parts).strip()
-        assistant_text, content_embedded_thinking = self._split_thinking(assistant_text)
-        if content_embedded_thinking:
-            thinking_text = f"{thinking_text}\n{content_embedded_thinking}".strip()
-        if not assistant_text:
-            raise LLMError("LLM returned empty streamed content.")
-        formatted_assistant_text = self._ensure_choice_question_format(assistant_text, response_language)
-        if formatted_assistant_text != assistant_text:
-            assistant_delta = (
-                formatted_assistant_text[len(assistant_text):]
-                if formatted_assistant_text.startswith(assistant_text)
-                else f"\n\n{formatted_assistant_text}"
-            )
-            yield {"event": "content", "delta": assistant_delta}
-            assistant_text = formatted_assistant_text
-
-        guarded_assistant_text = self._guard_assistant_readiness_response(
-            session_id,
-            assistant_text,
-            response_language,
+        extracted_model = self._promote_explicit_active_decision_answer(
+            session,
+            previous_model=previous_model,
+            extracted_model=extracted_model,
+            decision_id=active_decision,
+            user_message=user_message,
+            language=response_language,
         )
-        if guarded_assistant_text != assistant_text:
-            yield {"event": "replace_content", "content": guarded_assistant_text}
-            assistant_text = guarded_assistant_text
 
-        self._append_message(session_id, "assistant", assistant_text, thinking_text)
+        assistant_metadata = self._bounded_interview_turn_metadata(
+            session,
+            extracted_model,
+            decision_id=active_decision,
+            user_message=user_message,
+            language=response_language,
+        )
+        turn_metadata = (
+            assistant_metadata.get("interview_turn")
+            if isinstance(assistant_metadata, dict)
+            else None
+        )
+        if isinstance(turn_metadata, dict) and turn_metadata.get("kind") == "deferred":
+            assistant_text = self._deferred_decision_message(response_language)
+            thinking_text = ""
+        else:
+            assistant_text_parts: list[str] = []
+            thinking_parts: list[str] = []
+            system_prompt = self._pm_prompt(session, response_language)
+            llm_messages = self._build_llm_messages(
+                system_prompt,
+                session.messages,
+            )
+            for item in self.llm_client.stream_chat(llm_messages):
+                text = item.get("text", "")
+                if not text:
+                    continue
+
+                if item.get("type") == "thinking":
+                    thinking_parts.append(text)
+                    yield {"event": "thinking", "delta": text}
+                    continue
+
+                assistant_text_parts.append(text)
+
+            assistant_text = "".join(assistant_text_parts).strip()
+            thinking_text = "".join(thinking_parts).strip()
+            assistant_text, content_embedded_thinking = self._split_thinking(
+                assistant_text
+            )
+            if content_embedded_thinking:
+                thinking_text = (
+                    f"{thinking_text}\n{content_embedded_thinking}".strip()
+                )
+            if not assistant_text:
+                raise LLMError("LLM returned empty streamed content.")
+            assistant_text = sanitize_assistant_summary(
+                assistant_text,
+                response_language,
+            )
+            assistant_text = (
+                self._authoritative_interview_summary(
+                    extracted_model,
+                    active_decision,
+                    response_language,
+                )
+                or assistant_text
+            )
+        yield {"event": "content", "delta": assistant_text}
+
+        self._append_message(
+            session_id,
+            "assistant",
+            assistant_text,
+            thinking_text,
+            metadata=assistant_metadata,
+        )
         session = self._require_session(session_id)
 
         if thinking_text:
@@ -1360,30 +1590,20 @@ class RequirementCollectorService:
         yield {"event": "assistant_done", "session_id": session.id, "message_count": len(session.messages)}
 
         structured_requirement_model = self._promote_cached_structured_requirement_model(session, response_language)
-        conversation_chain_state = self.build_conversation_chain_state(
+        result_payload = self._build_message_result_payload(
             session,
             structured_requirement_model,
             response_language,
-        )
-        pm_methodology_state = self.build_pm_methodology_state(
-            structured_requirement_model,
-            response_language,
-        )
-        ic_substrate_evidence_state = self.build_ic_substrate_evidence_state(
-            session,
-            structured_requirement_model,
-            response_language,
+            assistant_message=assistant_text,
+            assistant_thinking=thinking_text,
         )
         yield {
             "event": "summary",
-            "session_id": session.id,
-            "message_count": len(session.messages),
-            "summary": structured_requirement_model,
-            "structured_requirement_model": structured_requirement_model,
-            "structured_requirement_sync_status": "ready",
-            "conversation_chain_state": conversation_chain_state,
-            "pm_methodology_state": pm_methodology_state,
-            "ic_substrate_evidence_state": ic_substrate_evidence_state,
+            **{
+                key: value
+                for key, value in result_payload.items()
+                if key not in {"assistant_message", "assistant_thinking"}
+            },
         }
         yield {
             "event": "done",
@@ -1391,6 +1611,2238 @@ class RequirementCollectorService:
             "message_count": len(session.messages),
             "structured_requirement_sync_status": "ready",
         }
+
+    def _handle_interview_control_reply(
+        self,
+        session: Session,
+        *,
+        user_message: str,
+        display_message: str,
+        language: str,
+        reply_context: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        context = reply_context if isinstance(reply_context, dict) else {}
+        action = str(context.get("action", "")).strip()
+        if action and action not in {
+            "request_example",
+            "accept_proposal",
+            "defer_decision",
+        }:
+            raise ValueError("Unsupported reply_context action.")
+        if not action and not is_confirmation_text(user_message):
+            return None
+
+        current_model = self._current_cached_structured_requirement_model(session, language)
+        current_state = self.build_interview_state(session, current_model, language)
+        active_decision = current_state.get("next_decision")
+        active_decision_id = (
+            str(active_decision.get("decision_id", "")).strip()
+            if isinstance(active_decision, dict)
+            else ""
+        )
+
+        if action == "request_example":
+            requested_decision_id = str(context.get("decision_id", "")).strip()
+            try:
+                if not active_decision_id or requested_decision_id != active_decision_id:
+                    raise ProposalValidationError(
+                        "The requested example is not for the current decision."
+                    )
+                proposal = build_decision_proposal(
+                    active_decision_id,
+                    current_model,
+                    language,
+                )
+            except ProposalValidationError as exc:
+                return self._persist_interview_validation_reply(
+                    session,
+                    user_message=user_message,
+                    display_message=display_message,
+                    language=language,
+                    model=current_model,
+                    error=str(exc),
+                )
+
+            self._append_interview_control_user_message(
+                session,
+                user_message=user_message,
+                display_message=display_message,
+                language=language,
+                action=action,
+            )
+            assistant_message = self._proposal_assistant_message(proposal["text"], language)
+            self._append_message(
+                session.id,
+                "assistant",
+                assistant_message,
+                metadata={
+                    "interview_turn": {
+                        "decision_id": active_decision_id,
+                        "proposal": proposal,
+                        "can_defer": bool(active_decision.get("can_defer")),
+                    }
+                },
+            )
+            updated_session = self._require_session(session.id)
+            self._save_interview_model_at_current_message_count(
+                updated_session,
+                current_model,
+                language,
+            )
+            return self._build_message_result_payload(
+                updated_session,
+                current_model,
+                language,
+                assistant_message=assistant_message,
+            )
+
+        if action == "defer_decision":
+            requested_decision_id = str(context.get("decision_id", "")).strip()
+            if (
+                current_state.get("stage") != "brief_discovery"
+                or not active_decision_id
+                or requested_decision_id != active_decision_id
+                or not bool(active_decision.get("can_defer"))
+            ):
+                raise ValueError(
+                    "The decision can only be deferred after one incomplete answer."
+                )
+            deferred_record = self._build_deferred_decision_record(
+                session,
+                current_model,
+                active_decision_id,
+                language,
+                reason="user_deferred",
+                label=str(active_decision.get("label", "")).strip(),
+            )
+            self._append_interview_control_user_message(
+                session,
+                user_message=user_message,
+                display_message=display_message,
+                language=language,
+                action=action,
+            )
+            assistant_message = self._deferred_decision_message(language)
+            self._append_message(
+                session.id,
+                "assistant",
+                assistant_message,
+                metadata={
+                    "interview_turn": {
+                        "decision_id": active_decision_id,
+                        "deferred_decision_id": active_decision_id,
+                        "deferred": deferred_record,
+                        "kind": "deferred",
+                    }
+                },
+            )
+            updated_session = self._require_session(session.id)
+            self._save_interview_model_at_current_message_count(
+                updated_session,
+                current_model,
+                language,
+            )
+            return self._build_message_result_payload(
+                updated_session,
+                current_model,
+                language,
+                assistant_message=assistant_message,
+            )
+
+        try:
+            proposal = resolve_proposal_from_messages(
+                session.messages,
+                context if action else None,
+                free_text=user_message,
+            )
+            if proposal["decision_id"] != active_decision_id:
+                raise ProposalValidationError(
+                    "The proposal is no longer the active decision."
+                )
+            updated_model = apply_proposal_to_model(current_model, proposal)
+        except ProposalValidationError as exc:
+            return self._persist_interview_validation_reply(
+                session,
+                user_message=user_message,
+                display_message=display_message,
+                language=language,
+                model=current_model,
+                error=str(exc),
+            )
+
+        self._append_interview_control_user_message(
+            session,
+            user_message=user_message,
+            display_message=display_message,
+            language=language,
+            action="accept_proposal",
+        )
+        session_after_user = self._require_session(session.id)
+        self._save_interview_model_at_current_message_count(
+            session_after_user,
+            updated_model,
+            language,
+        )
+        assistant_message = self._accepted_proposal_message(proposal["text"], language)
+        self._append_message(
+            session.id,
+            "assistant",
+            assistant_message,
+            metadata={
+                "interview_turn": {
+                    "decision_id": proposal["decision_id"],
+                    "accepted_proposal_id": proposal["proposal_id"],
+                }
+            },
+        )
+        updated_session = self._require_session(session.id)
+        self._save_interview_model_at_current_message_count(
+            updated_session,
+            updated_model,
+            language,
+        )
+        return self._build_message_result_payload(
+            updated_session,
+            updated_model,
+            language,
+            assistant_message=assistant_message,
+        )
+
+    def _append_interview_control_user_message(
+        self,
+        session: Session,
+        *,
+        user_message: str,
+        display_message: str,
+        language: str,
+        action: str,
+    ) -> None:
+        localized_fallbacks = {
+            "request_example": {
+                "zh": "给我一个当前问题的例子。",
+                "en": "Show me one example for this decision.",
+                "de": "Zeige mir ein Beispiel für diese Entscheidung.",
+                "ms": "Tunjukkan satu contoh untuk keputusan ini.",
+            },
+            "accept_proposal": {
+                "zh": "采用这个示例。",
+                "en": "Use this example.",
+                "de": "Dieses Beispiel übernehmen.",
+                "ms": "Gunakan contoh ini.",
+            },
+            "defer_decision": {
+                "zh": "先暂存为假设，继续下一项。",
+                "en": "Keep this as an assumption and continue.",
+                "de": "Als Annahme vormerken und fortfahren.",
+                "ms": "Simpan sebagai andaian dan teruskan.",
+            },
+        }
+        normalized_language = self._normalize_language(language)
+        fallback = localized_fallbacks[action][normalized_language]
+        stored_content = str(user_message or "").strip() or fallback
+        visible_content = str(display_message or "").strip() or stored_content
+        self._append_message(
+            session.id,
+            "user",
+            stored_content,
+            display_content=visible_content,
+            metadata={"interview_reply_context": {"action": action}},
+        )
+
+    def _persist_interview_validation_reply(
+        self,
+        session: Session,
+        *,
+        user_message: str,
+        display_message: str,
+        language: str,
+        model: dict[str, Any],
+        error: str,
+    ) -> dict[str, Any]:
+        self._append_interview_control_user_message(
+            session,
+            user_message=user_message,
+            display_message=display_message,
+            language=language,
+            action="accept_proposal",
+        )
+        assistant_message = self._proposal_validation_message(language)
+        self._append_message(
+            session.id,
+            "assistant",
+            assistant_message,
+            metadata={"interview_turn": {"validation_error": str(error or "").strip()}},
+        )
+        updated_session = self._require_session(session.id)
+        self._save_interview_model_at_current_message_count(
+            updated_session,
+            model,
+            language,
+        )
+        return self._build_message_result_payload(
+            updated_session,
+            model,
+            language,
+            assistant_message=assistant_message,
+        )
+
+    def _proposal_assistant_message(self, proposal_text: str, language: str) -> str:
+        templates = {
+            "zh": "可采用的单一提案：\n\n{proposal}",
+            "en": "One proposal you can use:\n\n{proposal}",
+            "de": "Ein einzelner Vorschlag zur Übernahme:\n\n{proposal}",
+            "ms": "Satu cadangan yang boleh digunakan:\n\n{proposal}",
+        }
+        return templates[self._normalize_language(language)].format(proposal=proposal_text)
+
+    def _accepted_proposal_message(self, proposal_text: str, language: str) -> str:
+        templates = {
+            "zh": "已确认：{proposal}",
+            "en": "Confirmed: {proposal}",
+            "de": "Bestätigt: {proposal}",
+            "ms": "Disahkan: {proposal}",
+        }
+        return templates[self._normalize_language(language)].format(proposal=proposal_text)
+
+    def _deferred_decision_message(self, language: str) -> str:
+        templates = {
+            "zh": "已标为待确认（TBD）并继续。开发简报会明确列出；进入 Go Coding 前仍须补齐。",
+            "en": (
+                "Marked as TBD and moving on. The Build Brief will list it "
+                "explicitly, and it must be resolved before Go Coding."
+            ),
+            "de": (
+                "Als offen (TBD) markiert und fortgefahren. Der Build Brief "
+                "listet den Punkt; vor Go Coding muss er geklärt werden."
+            ),
+            "ms": (
+                "Ditanda sebagai TBD dan diteruskan. Build Brief akan "
+                "menyenaraikannya dan ia mesti diselesaikan sebelum Go Coding."
+            ),
+        }
+        return templates[self._normalize_language(language)]
+
+    def _authoritative_interview_summary(
+        self,
+        model: dict[str, Any],
+        decision_id: str,
+        language: str,
+    ) -> str:
+        """Summarize the active decision without letting the LLM relabel it."""
+
+        normalized = normalize_structured_requirement_model(model)
+        status_keys = {
+            "outcome": ("objective",),
+            "objective": ("objective",),
+            "actor_action": ("users",),
+            "users": ("users",),
+            "v1_flow": ("scope", "scenarios", "features"),
+            "scope": ("scope",),
+            "scenarios": ("scenarios",),
+            "features": ("features",),
+            "data_boundary": ("integrations",),
+            "integrations": ("integrations",),
+            "acceptance": ("acceptance",),
+            "rules": ("rules",),
+            "ownership": ("ownership",),
+        }.get(decision_id, ())
+        if not status_keys or any(
+            str(
+                self._value_at_path(
+                    normalized,
+                    f"collection_status.{key}.status",
+                )
+                or ""
+            ).casefold()
+            != "confirmed"
+            for key in status_keys
+        ):
+            return ""
+
+        summary_values: dict[str, list[str]] = {
+            "outcome": self._flatten_path_strings(
+                normalized,
+                "background.objective",
+            ),
+            "objective": self._flatten_path_strings(
+                normalized,
+                "background.objective",
+            ),
+            "actor_action": self._unique_strings(
+                [
+                    *self._flatten_path_strings(
+                        normalized,
+                        "product_context.primary_user",
+                    ),
+                    *self._flatten_path_strings(
+                        normalized,
+                        "product_context.decision_or_action",
+                    ),
+                ]
+            ),
+            "users": self._flatten_path_strings(
+                normalized,
+                "users_and_scenarios.target_users",
+            ),
+            "v1_flow": self._unique_strings(
+                [
+                    *self._flatten_path_strings(normalized, "scope.in_scope"),
+                    *self._flatten_path_strings(
+                        normalized,
+                        "scope.out_of_scope",
+                    ),
+                    *self._flatten_path_strings(
+                        normalized,
+                        "functional_requirements.overview",
+                    ),
+                ]
+            ),
+            "scope": self._unique_strings(
+                [
+                    *self._flatten_path_strings(normalized, "scope.in_scope"),
+                    *self._flatten_path_strings(
+                        normalized,
+                        "scope.out_of_scope",
+                    ),
+                ]
+            ),
+            "scenarios": self._flatten_path_strings(
+                normalized,
+                "users_and_scenarios.core_scenarios",
+            ),
+            "features": self._flatten_path_strings(
+                normalized,
+                "functional_requirements",
+            ),
+            "data_boundary": self._flatten_path_strings(
+                normalized,
+                "data_and_dependencies",
+            ),
+            "integrations": self._flatten_path_strings(
+                normalized,
+                "data_and_dependencies",
+            ),
+            "acceptance": self._flatten_path_strings(
+                normalized,
+                "acceptance_criteria",
+            ),
+            "rules": self._flatten_path_strings(
+                normalized,
+                "business_rules",
+            ),
+            "ownership": self._unique_strings(
+                [
+                    *self._flatten_path_strings(
+                        normalized,
+                        "product_context.business_owner",
+                    ),
+                    *self._flatten_path_strings(
+                        normalized,
+                        "product_context.acceptance_owner",
+                    ),
+                ]
+            ),
+        }
+        values: list[str] = []
+        seen_value_signatures: set[str] = set()
+        for value in summary_values.get(decision_id, []):
+            signature = self._compact_text_signature(value)
+            if not signature or signature in seen_value_signatures:
+                continue
+            seen_value_signatures.add(signature)
+            values.append(value)
+            if len(values) == 2:
+                break
+        if not values:
+            return ""
+
+        labels = {
+            "en": {
+                "outcome": "Confirmed measurable business outcome",
+                "objective": "Confirmed measurable business outcome",
+                "actor_action": "Confirmed user and business action",
+                "users": "Confirmed users",
+                "v1_flow": "Confirmed first-release scenario and scope",
+                "scope": "Confirmed scope",
+                "scenarios": "Confirmed core scenario",
+                "features": "Confirmed capabilities",
+                "data_boundary": "Confirmed data source and read/write boundary",
+                "integrations": "Confirmed data source and read/write boundary",
+                "acceptance": "Confirmed acceptance evidence",
+                "rules": "Confirmed business rules",
+                "ownership": "Confirmed business and acceptance ownership",
+            },
+            "zh": {
+                "outcome": "已确认可衡量业务结果",
+                "objective": "已确认可衡量业务结果",
+                "actor_action": "已确认用户与业务动作",
+                "users": "已确认用户",
+                "v1_flow": "已确认首版场景与范围",
+                "scope": "已确认范围",
+                "scenarios": "已确认核心场景",
+                "features": "已确认核心能力",
+                "data_boundary": "已确认数据来源与读写边界",
+                "integrations": "已确认数据来源与读写边界",
+                "acceptance": "已确认验收证据",
+                "rules": "已确认业务规则",
+                "ownership": "已确认业务与验收负责人",
+            },
+            "de": {
+                "outcome": "Messbares Geschäftsergebnis bestätigt",
+                "objective": "Messbares Geschäftsergebnis bestätigt",
+                "actor_action": "Nutzer und Geschäftsentscheidung bestätigt",
+                "users": "Nutzer bestätigt",
+                "v1_flow": "Szenario und Umfang der ersten Version bestätigt",
+                "scope": "Umfang bestätigt",
+                "scenarios": "Kernszenario bestätigt",
+                "features": "Funktionen bestätigt",
+                "data_boundary": "Datenquelle und Schreibgrenze bestätigt",
+                "integrations": "Datenquelle und Schreibgrenze bestätigt",
+                "acceptance": "Abnahmenachweis bestätigt",
+                "rules": "Geschäftsregeln bestätigt",
+                "ownership": "Geschäfts- und Abnahmeverantwortung bestätigt",
+            },
+            "ms": {
+                "outcome": "Hasil perniagaan boleh ukur disahkan",
+                "objective": "Hasil perniagaan boleh ukur disahkan",
+                "actor_action": "Pengguna dan tindakan perniagaan disahkan",
+                "users": "Pengguna disahkan",
+                "v1_flow": "Senario dan skop keluaran pertama disahkan",
+                "scope": "Skop disahkan",
+                "scenarios": "Senario teras disahkan",
+                "features": "Keupayaan disahkan",
+                "data_boundary": "Sumber data dan sempadan baca/tulis disahkan",
+                "integrations": "Sumber data dan sempadan baca/tulis disahkan",
+                "acceptance": "Bukti penerimaan disahkan",
+                "rules": "Peraturan perniagaan disahkan",
+                "ownership": "Pemilikan perniagaan dan penerimaan disahkan",
+            },
+        }
+        normalized_language = self._normalize_language(language)
+        label = labels[normalized_language].get(decision_id, "")
+        if not label:
+            return ""
+        if normalized_language == "zh":
+            content = "；".join(value.rstrip("。.!?！？") for value in values)
+            return f"{label}：{content}。"
+        content = "; ".join(value.rstrip("。.!?！？") for value in values)
+        return f"{label}: {content}."
+
+    def _proposal_validation_message(self, language: str) -> str:
+        messages = {
+            "zh": "当前没有可确认的单一有效提案。请直接写明要确认的内容，或先点击“查看示例”。",
+            "en": (
+                "There is no current single proposal to confirm. State the exact "
+                "answer, or request an example first."
+            ),
+            "de": (
+                "Es gibt keinen aktuellen einzelnen Vorschlag zur Bestätigung. "
+                "Bitte die genaue Antwort eingeben oder zuerst ein Beispiel anfordern."
+            ),
+            "ms": (
+                "Tiada cadangan tunggal semasa untuk disahkan. Nyatakan jawapan "
+                "tepat atau minta contoh terlebih dahulu."
+            ),
+        }
+        return messages[self._normalize_language(language)]
+
+    def _current_cached_structured_requirement_model(
+        self,
+        session: Session,
+        language: str,
+    ) -> dict[str, Any]:
+        message_count = self._message_count(session.messages)
+        model = self._get_latest_cached_structured_requirement_model(
+            session.id,
+            STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
+            message_count,
+        )
+        if model is None:
+            model = self._get_latest_cached_structured_requirement_model(
+                session.id,
+                self._normalize_language(language),
+                message_count,
+            )
+        return normalize_structured_requirement_model(model)
+
+    def _save_interview_model_at_current_message_count(
+        self,
+        session: Session,
+        model: dict[str, Any],
+        language: str,
+    ) -> None:
+        normalized_model = normalize_structured_requirement_model(model)
+        message_count = self._message_count(session.messages)
+        self._save_structured_requirement_model_cache(
+            session.id,
+            STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
+            message_count,
+            normalized_model,
+        )
+
+    def _build_message_result_payload(
+        self,
+        session: Session,
+        structured_requirement_model: dict[str, Any],
+        language: str,
+        *,
+        assistant_message: str,
+        assistant_thinking: str = "",
+    ) -> dict[str, Any]:
+        conversation_chain_state = self.build_conversation_chain_state(
+            session,
+            structured_requirement_model,
+            language,
+        )
+        pm_methodology_state = self.build_pm_methodology_state(
+            structured_requirement_model,
+            language,
+        )
+        ic_substrate_evidence_state = self.build_ic_substrate_evidence_state(
+            session,
+            structured_requirement_model,
+            language,
+        )
+        interview_state = self.build_interview_state(
+            session,
+            structured_requirement_model,
+            language,
+        )
+        return {
+            "assistant_message": assistant_message,
+            "assistant_thinking": assistant_thinking,
+            "summary": structured_requirement_model,
+            "structured_requirement_model": structured_requirement_model,
+            "structured_requirement_sync_status": "ready",
+            "conversation_chain_state": conversation_chain_state,
+            "pm_methodology_state": pm_methodology_state,
+            "ic_substrate_evidence_state": ic_substrate_evidence_state,
+            "interview_state": interview_state,
+            "session_id": session.id,
+            "message_count": len(session.messages),
+        }
+
+    def build_interview_state(
+        self,
+        session: Session,
+        structured_requirement_model: dict[str, Any],
+        language: str,
+    ) -> dict[str, Any]:
+        return build_interview_state_v2(
+            structured_requirement_model,
+            document_status=self._build_brief_document_status(
+                session,
+                structured_requirement_model,
+            ),
+            language=language,
+            active_proposal=self._latest_active_proposal(session.messages),
+            deferred_decision_ids=self._deferred_fast_decision_ids(
+                session.messages,
+            ),
+            defer_available_decision_id=self._defer_available_decision_id(
+                session.messages,
+            ),
+            strict_review_turn_count=self._strict_review_user_turn_count(
+                session.messages,
+            ),
+            business_route=business_route_from_model(structured_requirement_model),
+        )
+
+    def _active_interview_decision_id(
+        self,
+        session: Session,
+        model: dict[str, Any],
+        language: str,
+    ) -> str:
+        state = self.build_interview_state(session, model, language)
+        next_decision = state.get("next_decision")
+        if not isinstance(next_decision, dict):
+            return ""
+        return str(next_decision.get("decision_id") or "").strip()
+
+    def _bounded_interview_turn_metadata(
+        self,
+        session: Session,
+        model: dict[str, Any],
+        *,
+        decision_id: str,
+        user_message: str,
+        language: str,
+    ) -> dict[str, Any] | None:
+        """Offer one editable fallback instead of repeating an incomplete question."""
+
+        if not decision_id or self._looks_like_interview_clarification(user_message):
+            return None
+        state = self.build_interview_state(session, model, language)
+        next_decision = state.get("next_decision")
+        next_decision_id = (
+            str(next_decision.get("decision_id", "")).strip()
+            if isinstance(next_decision, dict)
+            else ""
+        )
+        if next_decision_id != decision_id:
+            return None
+        if state.get("stage") == "brief_discovery" and self._has_clarification_turn(
+            session.messages,
+            decision_id,
+        ):
+            deferred_record = self._build_deferred_decision_record(
+                session,
+                model,
+                decision_id,
+                language,
+                reason="clarification_exhausted",
+                label=str(next_decision.get("label", "")).strip(),
+            )
+            return {
+                "interview_turn": {
+                    "decision_id": decision_id,
+                    "deferred_decision_id": decision_id,
+                    "deferred": deferred_record,
+                    "kind": "deferred",
+                }
+            }
+        return {
+            "interview_turn": {
+                "decision_id": decision_id,
+                "kind": "clarification",
+                "attempt": 1,
+            }
+        }
+
+    @staticmethod
+    def _has_clarification_turn(
+        messages: list[dict[str, Any]],
+        decision_id: str,
+    ) -> bool:
+        for message in reversed(messages):
+            if not isinstance(message, dict) or message.get("role") != "assistant":
+                continue
+            metadata = message.get("metadata")
+            turn = metadata.get("interview_turn") if isinstance(metadata, dict) else None
+            if not isinstance(turn, dict):
+                continue
+            if str(turn.get("decision_id", "")).strip() != decision_id:
+                continue
+            return turn.get("kind") == "clarification"
+        return False
+
+    def _promote_explicit_active_decision_answer(
+        self,
+        session: Session,
+        *,
+        previous_model: dict[str, Any],
+        extracted_model: dict[str, Any],
+        decision_id: str,
+        user_message: str,
+        language: str,
+    ) -> dict[str, Any]:
+        """Promote only evidence grounded in the latest declarative user turn.
+
+        The active decision becomes confirmed. A broad answer may also advance
+        other fast decisions, but those fields remain pending confirmation for
+        strict review.
+        """
+
+        decision_specs: dict[
+            str,
+            tuple[tuple[tuple[str, ...], ...], tuple[str, ...]],
+        ] = {
+            "outcome": ((("background.objective",),), ("objective",)),
+            "objective": ((("background.objective",),), ("objective",)),
+            "actor_action": (
+                (
+                    (
+                        "product_context.primary_user",
+                        "users_and_scenarios.target_users",
+                    ),
+                    (
+                        "product_context.decision_or_action",
+                        "users_and_scenarios.core_scenarios",
+                    ),
+                ),
+                ("users",),
+            ),
+            "users": (
+                (
+                    (
+                        "product_context.primary_user",
+                        "users_and_scenarios.target_users",
+                    ),
+                ),
+                ("users",),
+            ),
+            "v1_flow": (
+                (
+                    ("scope.in_scope", "scope.out_of_scope"),
+                    ("users_and_scenarios.core_scenarios",),
+                    (
+                        "functional_requirements.overview",
+                        "functional_requirements.feature_details",
+                    ),
+                ),
+                ("scope", "scenarios", "features"),
+            ),
+            "scope": (
+                (("scope.in_scope", "scope.out_of_scope"),),
+                ("scope",),
+            ),
+            "scenarios": (
+                (("users_and_scenarios.core_scenarios",),),
+                ("scenarios",),
+            ),
+            "features": (
+                (
+                    (
+                        "functional_requirements.overview",
+                        "functional_requirements.feature_details",
+                    ),
+                ),
+                ("features",),
+            ),
+            "data_boundary": (
+                (("data_and_dependencies",),),
+                ("integrations",),
+            ),
+            "integrations": (
+                (("data_and_dependencies",),),
+                ("integrations",),
+            ),
+            "acceptance": ((("acceptance_criteria",),), ("acceptance",)),
+            "rules": ((("business_rules",),), ("rules",)),
+            "ownership": (
+                (
+                    ("product_context.business_owner",),
+                    ("product_context.acceptance_owner",),
+                ),
+                ("ownership",),
+            ),
+            "writeback": (
+                (
+                    ("writeback_authorization.target_system",),
+                    ("writeback_authorization.action",),
+                    ("writeback_authorization.authorization_owner",),
+                    ("writeback_authorization.acceptance_evidence",),
+                ),
+                ("integrations",),
+            ),
+        }
+        if self._looks_like_interview_clarification(user_message):
+            return normalize_structured_requirement_model(extracted_model)
+
+        previous = normalize_structured_requirement_model(previous_model)
+        current = normalize_structured_requirement_model(extracted_model)
+        if decision_id == "writeback":
+            self._augment_explicit_writeback_authorization(
+                current,
+                user_message,
+            )
+        if decision_id == "v1_flow":
+            self._augment_explicit_v1_flow_evidence(
+                previous,
+                current,
+                user_message,
+                decision_specs["v1_flow"][0],
+            )
+        self._augment_explicit_measurable_outcome_evidence(
+            current,
+            user_message,
+        )
+        self._augment_explicit_data_boundary_evidence(
+            current,
+            user_message,
+        )
+        self._augment_explicit_acceptance_evidence(
+            current,
+            user_message,
+        )
+        extracted_before_grounding = normalize_structured_requirement_model(
+            extracted_model
+        )
+        active_field_spec = decision_specs.get(decision_id)
+        active_evidence_paths = {
+            path
+            for paths in (active_field_spec[0] if active_field_spec else ())
+            for path in paths
+        }
+        evidence_paths = {
+            path
+            for evidence_groups, _status_keys in decision_specs.values()
+            for paths in evidence_groups
+            for path in paths
+        }
+        for path in evidence_paths:
+            if (
+                path.startswith("writeback_authorization.")
+                and decision_id != "writeback"
+            ):
+                # Writing into a source system may only be authorized while the
+                # writeback decision itself is active, so a fact volunteered
+                # during any other answer can never become an authorization.
+                self._set_value_at_path(
+                    current,
+                    path,
+                    self._value_at_path(previous, path),
+                )
+                continue
+            filtered_value = self._filter_turn_grounded_new_value(
+                self._value_at_path(previous, path),
+                self._value_at_path(current, path),
+                user_message,
+                expected_polarity=(
+                    -1
+                    if path.endswith(".out_of_scope")
+                    else 1
+                    if path.endswith(".in_scope")
+                    else None
+                ),
+                preserve_previous_items=path not in active_evidence_paths,
+            )
+            self._set_value_at_path(current, path, filtered_value)
+        if decision_id == "writeback":
+            self._release_writeback_request(current, user_message)
+        # Re-derive the authorization status from whatever survived grounding.
+        current["writeback_authorization"] = normalize_writeback_authorization(
+            current.get("writeback_authorization")
+        )
+        reason_by_language = {
+            "en": "The user explicitly answered the active InterviewStateV2 decision.",
+            "zh": "用户已明确回答当前 InterviewStateV2 决策。",
+            "de": "Der Nutzer hat die aktive InterviewStateV2-Entscheidung eindeutig beantwortet.",
+            "ms": "Pengguna telah menjawab keputusan InterviewStateV2 yang aktif dengan jelas.",
+        }
+        reason = reason_by_language.get(
+            self._normalize_language(language),
+            reason_by_language["en"],
+        )
+        model_changed = current != extracted_before_grounding
+        field_spec = active_field_spec
+        if field_spec is not None:
+            evidence_groups, status_keys = field_spec
+            if self._decision_has_turn_grounded_evidence(
+                previous,
+                current,
+                evidence_groups,
+                user_message,
+            ) and self._active_decision_has_required_evidence(
+                current,
+                decision_id,
+            ):
+                for key in status_keys:
+                    current["collection_status"][key] = {
+                        "status": "confirmed",
+                        "reason": reason,
+                        "pending_questions": [],
+                    }
+                model_changed = True
+
+        pending_reason_by_language = {
+            "en": (
+                "Captured from the user's same broad answer; retain for strict "
+                "review."
+            ),
+            "zh": "已从用户同一条完整回答中采集；保留到严格审查确认。",
+            "de": (
+                "Aus derselben umfassenden Nutzerantwort erfasst; für die "
+                "strenge Prüfung vorgemerkt."
+            ),
+            "ms": (
+                "Ditangkap daripada jawapan luas pengguna yang sama; simpan "
+                "untuk semakan ketat."
+            ),
+        }
+        pending_reason = pending_reason_by_language.get(
+            self._normalize_language(language),
+            pending_reason_by_language["en"],
+        )
+        for candidate_id in (
+            "outcome",
+            "actor_action",
+            "v1_flow",
+            "data_boundary",
+            "acceptance",
+        ):
+            if candidate_id == decision_id:
+                continue
+            evidence_groups, status_keys = decision_specs[candidate_id]
+            if not self._decision_has_turn_grounded_evidence(
+                previous,
+                current,
+                evidence_groups,
+                user_message,
+            ):
+                continue
+            if not self._active_decision_has_required_evidence(
+                current,
+                candidate_id,
+            ):
+                continue
+            for key in status_keys:
+                status = str(
+                    self._value_at_path(
+                        current,
+                        f"collection_status.{key}.status",
+                    )
+                    or ""
+                ).strip().casefold()
+                if status != "captured":
+                    continue
+                pending_questions = self._value_at_path(
+                    current,
+                    f"collection_status.{key}.pending_questions",
+                )
+                current["collection_status"][key] = {
+                    "status": "pending_confirmation",
+                    "reason": pending_reason,
+                    "pending_questions": (
+                        list(pending_questions)
+                        if isinstance(pending_questions, list)
+                        else []
+                    ),
+                }
+                model_changed = True
+
+        if model_changed:
+            self._save_interview_model_at_current_message_count(
+                session,
+                current,
+                language,
+            )
+        return current
+
+    def _augment_explicit_v1_flow_evidence(
+        self,
+        previous: dict[str, Any],
+        model: dict[str, Any],
+        user_message: str,
+        evidence_groups: tuple[tuple[str, ...], ...],
+    ) -> None:
+        """Complete the V1 evidence groups the extractor left partial.
+
+        Only runs once extraction already grounded one V1 group in this turn, so
+        an off-topic statement can never invent a first-release scope.
+        """
+
+        if not any(
+            self._decision_has_turn_grounded_evidence(
+                previous,
+                model,
+                (paths,),
+                user_message,
+            )
+            for paths in evidence_groups
+        ):
+            return
+
+        segments = [
+            segment.strip()
+            for segment in re.split(
+                r"[\n;；。!?！？]+|(?<!\d)\.(?!\d)",
+                str(user_message or ""),
+            )
+            if segment.strip()
+        ]
+        positive_segments = [
+            segment
+            for segment in segments
+            if self._grounding_polarity(segment) >= 0
+        ]
+        if not positive_segments:
+            return
+        flow_text = "; ".join(positive_segments)
+
+        scope = model.get("scope")
+        if not isinstance(scope, dict):
+            scope = {}
+            model["scope"] = scope
+        in_scope = self._string_list(scope.get("in_scope"))
+        if not any(
+            self._text_fragment_is_grounded(
+                item,
+                user_message,
+                expected_polarity=1,
+            )
+            for item in in_scope
+        ):
+            in_scope.append(flow_text)
+        scope["in_scope"] = self._unique_strings(in_scope)
+
+        negative_segments = [
+            segment
+            for segment in segments
+            if self._grounding_polarity(segment) < 0
+        ]
+        out_of_scope = self._string_list(scope.get("out_of_scope"))
+        if negative_segments and not any(
+            self._text_fragment_is_grounded(
+                item,
+                user_message,
+                expected_polarity=-1,
+            )
+            for item in out_of_scope
+        ):
+            out_of_scope.extend(negative_segments)
+        scope["out_of_scope"] = self._unique_strings(out_of_scope)
+
+        users_and_scenarios = model.get("users_and_scenarios")
+        if not isinstance(users_and_scenarios, dict):
+            users_and_scenarios = {}
+            model["users_and_scenarios"] = users_and_scenarios
+        scenarios = self._string_list(
+            users_and_scenarios.get("core_scenarios")
+        )
+        if not any(
+            self._text_fragment_is_grounded(item, user_message)
+            for item in scenarios
+        ):
+            scenarios.append(flow_text)
+        users_and_scenarios["core_scenarios"] = self._unique_strings(
+            scenarios
+        )
+
+        functional_requirements = model.get("functional_requirements")
+        if not isinstance(functional_requirements, dict):
+            functional_requirements = {}
+            model["functional_requirements"] = functional_requirements
+        overview = str(
+            functional_requirements.get("overview", "")
+        ).strip()
+        previous_overview = str(
+            self._value_at_path(previous, "functional_requirements.overview")
+            or ""
+        ).strip()
+        if not previous_overview and not self._text_fragment_is_grounded(
+            overview,
+            user_message,
+        ):
+            functional_requirements["overview"] = flow_text
+
+    _AUTHORIZATION_OWNER_PATTERNS = (
+        re.compile(r"authoriz(?:ed|es)\s+by\s+(?:the\s+)?([^;,.]+)", re.I),
+        re.compile(r"approved\s+by\s+(?:the\s+)?([^;,.]+)", re.I),
+        re.compile(r"由\s*([^，,；;。]+?)\s*(?:授权|批准)"),
+        re.compile(r"freigegeben\s+von\s+(?:der\s+|dem\s+)?([^;,.]+)", re.I),
+        re.compile(r"diluluskan\s+oleh\s+([^;,.]+)", re.I),
+    )
+
+    def _augment_explicit_writeback_authorization(
+        self,
+        model: dict[str, Any],
+        user_message: str,
+    ) -> None:
+        """Read the four authorization facts out of the user's own answer.
+
+        The interview offers complete authorization options, so the answer text
+        already carries every fact. Parsing it here keeps the decision solvable
+        without depending on the extraction model to re-read its own option,
+        and every value still comes verbatim from the user's message.
+        """
+
+        message = str(user_message or "")
+        owner = ""
+        for pattern in self._AUTHORIZATION_OWNER_PATTERNS:
+            match = pattern.search(message)
+            if match:
+                owner = match.group(1).strip()
+                break
+        if not owner:
+            return
+
+        clauses = [
+            clause.strip(" :：-—")
+            for clause in re.split(r"[\n;；。,，!?！？]+|(?<!\d)\.(?!\d)", message)
+            if clause.strip(" :：-—")
+        ]
+        evidence = next(
+            (
+                clause
+                for clause in clauses
+                if is_observable_writeback_evidence(clause)
+            ),
+            "",
+        )
+        action = next(
+            (
+                clause
+                for clause in clauses
+                if clause != evidence and is_specific_writeback_action(clause)
+            ),
+            "",
+        )
+        target = first_approved_source(message)
+        if not (target and action and evidence):
+            return
+
+        authorization = dict(model.get("writeback_authorization") or {})
+        authorization.update(
+            {
+                "target_system": target,
+                "action": action,
+                "authorization_owner": owner,
+                "acceptance_evidence": evidence,
+            }
+        )
+        model["writeback_authorization"] = normalize_writeback_authorization(
+            authorization
+        )
+
+    def _release_writeback_request(
+        self,
+        model: dict[str, Any],
+        user_message: str,
+    ) -> None:
+        """Drop a writeback request the user just declined.
+
+        Only runs while the writeback decision is active and only when the
+        answer itself asserts a read-only boundary, so the superseded request is
+        removed rather than left to block the interview forever.
+        """
+
+        if not asserts_read_boundary(user_message):
+            return
+        if any(
+            line_requests_writeback(segment)
+            and not asserts_read_boundary(segment)
+            for segment in re.split(
+                r"[\n;；。!?！？]+|(?<!\d)\.(?!\d)",
+                str(user_message or ""),
+            )
+        ):
+            return
+        dependencies = self._string_list(model.get("data_and_dependencies"))
+        remaining = [
+            dependency
+            for dependency in dependencies
+            if not line_requests_writeback(dependency)
+        ]
+        if remaining == dependencies:
+            return
+        model["data_and_dependencies"] = self._unique_strings(
+            [*remaining, str(user_message).strip()]
+        )
+        model["writeback_authorization"] = normalize_writeback_authorization(None)
+
+    def _augment_explicit_measurable_outcome_evidence(
+        self,
+        model: dict[str, Any],
+        user_message: str,
+    ) -> None:
+        """Preserve the user's exact measurable outcome when a paraphrase loses it."""
+
+        if decision_has_required_evidence_v2(model, "outcome"):
+            return
+        outcome_verb = re.compile(
+            r"(?:"
+            r"\b(?:reduce|increase|improve|shorten|lower|raise|cut|save|"
+            r"decrease|achieve)\b|"
+            r"(?:降低|减少|提升|提高|缩短|控制|达到)|"
+            r"\b(?:reduzieren|verbessern|erhöhen|senken|verkürzen)\b|"
+            r"\b(?:kurangkan|tingkatkan|tambah baik|pendekkan)\b"
+            r")",
+            flags=re.I,
+        )
+        background = model.get("background")
+        if not isinstance(background, dict):
+            background = {}
+            model["background"] = background
+        previous_objective = str(background.get("objective", ""))
+        for segment in re.split(
+            r"[\n;；。!?！？]+|(?<!\d)\.(?!\d)",
+            str(user_message or ""),
+        ):
+            match = outcome_verb.search(segment)
+            if match is None:
+                continue
+            candidate = segment[match.start() :].strip()
+            if not candidate:
+                continue
+            background["objective"] = candidate
+            if decision_has_required_evidence_v2(model, "outcome"):
+                return
+        background["objective"] = previous_objective
+
+    def _augment_explicit_data_boundary_evidence(
+        self,
+        model: dict[str, Any],
+        user_message: str,
+    ) -> None:
+        """Keep explicit source/boundary clauses when extraction omits them."""
+
+        normalized_message = unicodedata.normalize(
+            "NFKC",
+            str(user_message or ""),
+        ).casefold()
+        source_markers = (
+            "sql",
+            "sap",
+            "csv",
+            "excel",
+            "api",
+            "mes",
+            "qis",
+            "qms",
+            "upload",
+            "muat naik",
+            "database",
+            "data source",
+            "source of truth",
+            "上传",
+            "导入",
+            "数据库",
+            "数据源",
+            "quelle",
+            "datenquelle",
+            "sumber data",
+        )
+        boundary_markers = (
+            "read-only",
+            "read only",
+            "readonly",
+            "writeback",
+            "write back",
+            "write-back",
+            "只读",
+            "回写",
+            "nur lesend",
+            "rückschreiben",
+            "baca sahaja",
+            "baca saja",
+            "tulis balik",
+        )
+        if not (
+            any(marker in normalized_message for marker in source_markers)
+            and any(marker in normalized_message for marker in boundary_markers)
+        ):
+            return
+
+        relevant_segments = [
+            segment.strip()
+            for segment in re.split(r"[\n.;；。!?！？]+", str(user_message or ""))
+            if segment.strip()
+            and (
+                any(marker in segment.casefold() for marker in source_markers)
+                or any(
+                    marker in segment.casefold()
+                    for marker in boundary_markers
+                )
+            )
+        ]
+        if not relevant_segments:
+            return
+        dependencies = self._string_list(model.get("data_and_dependencies"))
+        model["data_and_dependencies"] = self._unique_strings(
+            [*dependencies, *relevant_segments]
+        )
+
+    def _augment_explicit_acceptance_evidence(
+        self,
+        model: dict[str, Any],
+        user_message: str,
+    ) -> None:
+        """Keep exact, observable acceptance evidence from the active answer."""
+
+        accepted_segments: list[str] = []
+        for segment in re.split(
+            r"[\n;；。!?！？]+|(?<!\d)\.(?!\d)",
+            str(user_message or ""),
+        ):
+            candidate = segment.strip()
+            if not candidate:
+                continue
+            probe = empty_structured_requirement_model()
+            probe["acceptance_criteria"] = [candidate]
+            if decision_has_required_evidence_v2(probe, "acceptance"):
+                accepted_segments.append(candidate)
+        if not accepted_segments:
+            return
+        criteria = self._string_list(model.get("acceptance_criteria"))
+        signatures = {
+            self._compact_text_signature(criterion)
+            for criterion in criteria
+        }
+        for segment in accepted_segments:
+            signature = self._compact_text_signature(segment)
+            if signature and signature not in signatures:
+                criteria.append(segment)
+                signatures.add(signature)
+        model["acceptance_criteria"] = self._unique_strings(
+            criteria
+        )
+
+    def _filter_turn_grounded_new_value(
+        self,
+        previous_value: Any,
+        current_value: Any,
+        user_message: str,
+        *,
+        expected_polarity: int | None,
+        preserve_previous_items: bool = False,
+    ) -> Any:
+        if isinstance(current_value, str):
+            if (
+                self._normalize_grounding_text(current_value)
+                == self._normalize_grounding_text(previous_value)
+            ):
+                return current_value
+            if self._text_fragment_is_grounded(
+                current_value,
+                user_message,
+                expected_polarity=expected_polarity,
+            ):
+                return current_value
+            return previous_value if isinstance(previous_value, str) else ""
+
+        if isinstance(current_value, list):
+            previous_items = previous_value if isinstance(previous_value, list) else []
+            previous_signatures = {
+                self._grounding_value_signature(item)
+                for item in previous_items
+            }
+            filtered: list[Any] = (
+                list(previous_items) if preserve_previous_items else []
+            )
+            filtered_signatures = {
+                self._grounding_value_signature(item)
+                for item in filtered
+            }
+            for item in current_value:
+                signature = self._grounding_value_signature(item)
+                if signature in filtered_signatures:
+                    continue
+                if signature in previous_signatures:
+                    filtered.append(item)
+                    filtered_signatures.add(signature)
+                    continue
+                fragments = self._flatten_strings(item)
+                if fragments and all(
+                    self._text_fragment_is_grounded(
+                        fragment,
+                        user_message,
+                        expected_polarity=expected_polarity,
+                    )
+                    for fragment in fragments
+                ):
+                    filtered.append(item)
+                    filtered_signatures.add(signature)
+            return filtered
+
+        return current_value
+
+    @staticmethod
+    def _grounding_value_signature(value: Any) -> str:
+        try:
+            return json.dumps(
+                value,
+                ensure_ascii=False,
+                sort_keys=True,
+                default=str,
+            )
+        except (TypeError, ValueError):
+            return str(value)
+
+    @staticmethod
+    def _compact_text_signature(value: Any) -> str:
+        text = unicodedata.normalize("NFKC", str(value or "")).casefold()
+        return re.sub(r"[^\w\u3400-\u9fff]+", "", text)
+
+    @staticmethod
+    def _set_value_at_path(
+        payload: dict[str, Any],
+        path: str,
+        value: Any,
+    ) -> None:
+        parts = path.split(".")
+        current = payload
+        for part in parts[:-1]:
+            child = current.get(part)
+            if not isinstance(child, dict):
+                child = {}
+                current[part] = child
+            current = child
+        current[parts[-1]] = value
+
+    def _decision_has_turn_grounded_evidence(
+        self,
+        previous: dict[str, Any],
+        current: dict[str, Any],
+        evidence_groups: tuple[tuple[str, ...], ...],
+        user_message: str,
+    ) -> bool:
+        """Require every decision evidence group to be new and user-grounded."""
+
+        for paths in evidence_groups:
+            previous_fragments = {
+                normalized
+                for path in paths
+                for fragment in self._flatten_strings(
+                    self._value_at_path(previous, path)
+                )
+                if (
+                    normalized := self._normalize_grounding_text(fragment)
+                )
+            }
+            new_fragments = [
+                (path, fragment)
+                for path in paths
+                for fragment in self._flatten_strings(
+                    self._value_at_path(current, path)
+                )
+                if self._normalize_grounding_text(fragment)
+                not in previous_fragments
+            ]
+            if not new_fragments or not all(
+                self._text_fragment_is_grounded(
+                    fragment,
+                    user_message,
+                    expected_polarity=(
+                        -1
+                        if path.endswith(".out_of_scope")
+                        else 1
+                        if path.endswith(".in_scope")
+                        else None
+                    ),
+                )
+                for path, fragment in new_fragments
+            ):
+                return False
+        return True
+
+    @staticmethod
+    def _normalize_grounding_text(value: Any) -> str:
+        text = unicodedata.normalize("NFKC", str(value or "")).casefold()
+        return " ".join(
+            part
+            for part in re.split(r"[^\w\u3400-\u9fff]+", text)
+            if part
+        )
+
+    @classmethod
+    def _text_fragment_is_grounded(
+        cls,
+        fragment: str,
+        user_message: str,
+        expected_polarity: int | None = None,
+    ) -> bool:
+        message_segments = [
+            segment.strip()
+            for segment in re.split(
+                r"[\n.;；。!?！？]+",
+                unicodedata.normalize("NFKC", str(user_message or "")),
+            )
+            if segment.strip()
+        ]
+        positive_segments = [
+            segment
+            for segment in message_segments
+            if cls._grounding_polarity(segment) >= 0
+        ]
+        negative_segments = [
+            segment
+            for segment in message_segments
+            if cls._grounding_polarity(segment) < 0
+        ]
+        message_chunks = list(message_segments)
+        for segments in (positive_segments, negative_segments):
+            combined = " ".join(segments).strip()
+            if combined and combined not in message_chunks:
+                message_chunks.append(combined)
+        return any(
+            cls._text_fragment_is_grounded_in_segment(
+                fragment,
+                chunk,
+                expected_polarity=expected_polarity,
+            )
+            for chunk in message_chunks
+        )
+
+    @classmethod
+    def _text_fragment_is_grounded_in_segment(
+        cls,
+        fragment: str,
+        user_message_segment: str,
+        *,
+        expected_polarity: int | None,
+    ) -> bool:
+        candidate = cls._normalize_grounding_text(fragment)
+        message = cls._normalize_grounding_text(user_message_segment)
+        if not candidate or not message:
+            return False
+
+        candidate_measurements = cls._grounding_measurements(fragment)
+        message_measurements = cls._grounding_measurements(user_message_segment)
+        if not candidate_measurements.issubset(message_measurements):
+            return False
+
+        candidate_numbers = set(re.findall(r"\d+(?:\.\d+)?", candidate))
+        message_numbers = set(re.findall(r"\d+(?:\.\d+)?", message))
+        if not candidate_numbers.issubset(message_numbers):
+            return False
+
+        candidate_polarity = (
+            expected_polarity
+            if expected_polarity is not None
+            else cls._grounding_polarity(candidate)
+        )
+        message_polarity = cls._grounding_polarity(message)
+        if expected_polarity is not None:
+            if expected_polarity < 0 and message_polarity >= 0:
+                return False
+            if expected_polarity > 0 and message_polarity < 0:
+                return False
+        elif candidate_polarity < 0 and message_polarity >= 0:
+            return False
+        elif (
+            message_polarity < 0
+            and (
+                cls._grounding_positive(candidate)
+                or cls._message_negates_candidate(candidate, message)
+            )
+        ):
+            return False
+
+        compact_candidate = candidate.replace(" ", "")
+        compact_message = message.replace(" ", "")
+        has_cjk = bool(re.search(r"[\u3400-\u9fff]", candidate))
+        minimum_exact = 2 if has_cjk else 4
+        if (
+            len(compact_candidate) >= minimum_exact
+            and compact_candidate in compact_message
+        ):
+            return True
+
+        # Short single-token identifiers ("MES", "SAP", "QIS") carry real signal
+        # but are too short for the substring and shared-token thresholds above.
+        # Requiring a whole-word hit keeps them grounded in the user's own words.
+        if (
+            len(compact_candidate) >= 2
+            and " " not in candidate
+            and re.search(
+                rf"(?<!\w){re.escape(candidate)}(?!\w)",
+                message,
+            )
+        ):
+            return True
+
+        if has_cjk:
+            candidate_cjk = "".join(
+                re.findall(r"[\u3400-\u9fff]", candidate)
+            )
+            message_cjk = "".join(re.findall(r"[\u3400-\u9fff]", message))
+            candidate_pairs = {
+                candidate_cjk[index : index + 2]
+                for index in range(max(0, len(candidate_cjk) - 1))
+            }
+            message_pairs = {
+                message_cjk[index : index + 2]
+                for index in range(max(0, len(message_cjk) - 1))
+            }
+            if not candidate_pairs:
+                return False
+            shared_pairs = candidate_pairs & message_pairs
+            return (
+                len(shared_pairs) >= 2
+                and len(shared_pairs) / len(candidate_pairs) >= 0.6
+            )
+
+        stopwords = {
+            "a",
+            "an",
+            "and",
+            "are",
+            "as",
+            "at",
+            "be",
+            "by",
+            "for",
+            "from",
+            "in",
+            "is",
+            "it",
+            "of",
+            "on",
+            "or",
+            "should",
+            "that",
+            "the",
+            "this",
+            "to",
+            "use",
+            "uses",
+            "using",
+            "v1",
+            "will",
+            "with",
+        }
+        candidate_tokens = {
+            cls._grounding_token_stem(token)
+            for token in re.findall(r"[a-z0-9]+", candidate)
+            if token not in stopwords
+        }
+        message_tokens = {
+            cls._grounding_token_stem(token)
+            for token in re.findall(r"[a-z0-9]+", message)
+            if token not in stopwords
+        }
+        if not candidate_tokens:
+            return False
+        shared_tokens = candidate_tokens & message_tokens
+        return (
+            len(shared_tokens) >= 2
+            and len(shared_tokens) / len(candidate_tokens) >= 0.6
+        )
+
+    @staticmethod
+    def _grounding_measurements(value: str) -> set[tuple[str, str]]:
+        unit_aliases = {
+            "%": "percent",
+            "percent": "percent",
+            "percentage": "percent",
+            "pct": "percent",
+            "prozent": "percent",
+            "peratus": "percent",
+            "秒": "second",
+            "second": "second",
+            "seconds": "second",
+            "sekunde": "second",
+            "sekunden": "second",
+            "saat": "second",
+            "分钟": "minute",
+            "minute": "minute",
+            "minutes": "minute",
+            "min": "minute",
+            "mins": "minute",
+            "minit": "minute",
+            "minuten": "minute",
+            "小时": "hour",
+            "hour": "hour",
+            "hours": "hour",
+            "hr": "hour",
+            "hrs": "hour",
+            "stunde": "hour",
+            "stunden": "hour",
+            "jam": "hour",
+            "天": "day",
+            "day": "day",
+            "days": "day",
+            "tag": "day",
+            "tage": "day",
+            "hari": "day",
+            "周": "week",
+            "week": "week",
+            "weeks": "week",
+            "woche": "week",
+            "wochen": "week",
+            "minggu": "week",
+            "月": "month",
+            "month": "month",
+            "months": "month",
+            "monat": "month",
+            "monate": "month",
+            "bulan": "month",
+            "季度": "quarter",
+            "quarter": "quarter",
+            "quarters": "quarter",
+            "quartal": "quarter",
+            "quartale": "quarter",
+            "suku": "quarter",
+            "年": "year",
+            "year": "year",
+            "years": "year",
+            "jahr": "year",
+            "jahre": "year",
+            "tahun": "year",
+            "行": "row",
+            "row": "row",
+            "rows": "row",
+            "zeile": "row",
+            "zeilen": "row",
+            "baris": "row",
+            "条": "record",
+            "record": "record",
+            "records": "record",
+            "item": "record",
+            "items": "record",
+            "lot": "lot",
+            "lots": "lot",
+            "batch": "batch",
+            "batches": "batch",
+            "批": "batch",
+        }
+        aliases = sorted(unit_aliases, key=len, reverse=True)
+        unit_pattern = "|".join(re.escape(alias) for alias in aliases)
+        normalized = unicodedata.normalize("NFKC", str(value or "")).casefold()
+        return {
+            (number, unit_aliases[unit.casefold()])
+            for number, unit in re.findall(
+                rf"(\d+(?:\.\d+)?)[\s-]*({unit_pattern})(?![\w\u3400-\u9fff])",
+                normalized,
+                flags=re.I,
+            )
+        }
+
+    @staticmethod
+    def _grounding_polarity(value: str) -> int:
+        text = unicodedata.normalize("NFKC", str(value or "")).casefold()
+        negative_patterns = (
+            r"\b(?:no|not|never|without|excluded?|excluding|"
+            r"out\s+of\s+scope|is\s+out|read[- ]only|cannot|can't|won't|"
+            r"disabled|forbidden?)\b",
+            r"\b(?:nicht|kein(?:e[rmns]?)?|ohne|ausgeschlossen|"
+            r"nur\s+lesend)\b",
+            r"\b(?:tidak|tanpa|dikecualikan|baca\s+sahaja)\b",
+            r"(?:不允许|不包含|不包括|不支持|不做|无需|只读|禁止|排除)",
+        )
+        return (
+            -1
+            if any(re.search(pattern, text, flags=re.I) for pattern in negative_patterns)
+            else 0
+        )
+
+    @classmethod
+    def _grounding_positive(cls, value: str) -> bool:
+        text = unicodedata.normalize("NFKC", str(value or "")).casefold()
+        if cls._grounding_polarity(text) < 0:
+            return False
+        positive_patterns = (
+            r"\b(?:allow(?:ed|s)?|enabled?|included?|write[- ]?back)\b",
+            r"\b(?:erlaubt|aktiviert|enthalten|zurückschreiben)\b",
+            r"\b(?:dibenarkan|diaktifkan|termasuk|tulis balik)\b",
+            r"(?:允许|启用|包含|包括|支持|回写)",
+        )
+        return any(
+            re.search(pattern, text, flags=re.I)
+            for pattern in positive_patterns
+        )
+
+    @staticmethod
+    def _message_negates_candidate(candidate: str, message: str) -> bool:
+        candidate_compact = candidate.replace(" ", "")
+        message_compact = message.replace(" ", "")
+        if candidate_compact and any(
+            marker + candidate_compact in message_compact
+            for marker in (
+                "不允许",
+                "不包含",
+                "不包括",
+                "不支持",
+                "无需",
+                "禁止",
+                "排除",
+            )
+        ):
+            return True
+
+        candidate_words = [
+            word
+            for word in re.findall(r"[a-z0-9]+", candidate)
+            if len(word) > 2
+        ]
+        if not candidate_words:
+            return False
+        first_word = re.escape(candidate_words[0])
+        last_word = re.escape(candidate_words[-1])
+        return bool(
+            re.search(
+                rf"(?:\b(?:no|without)\b[^.;]{{0,40}}{first_word}|"
+                rf"\bnot\b[^.;]{{0,40}}{last_word}|"
+                rf"{last_word}[^.;]{{0,24}}\b(?:out|excluded|disabled|"
+                rf"forbidden|not allowed)\b)",
+                message,
+                flags=re.I,
+            )
+        )
+
+    @staticmethod
+    def _grounding_token_stem(token: str) -> str:
+        """Normalize simple English inflections without broad fuzzy matching."""
+
+        if len(token) > 4 and token.endswith("ies"):
+            return f"{token[:-3]}y"
+        if len(token) > 5 and token.endswith("ied"):
+            return f"{token[:-3]}y"
+        if len(token) > 5 and token.endswith("ed"):
+            token = token[:-2]
+        if len(token) > 6 and token.endswith("ing"):
+            token = token[:-3]
+            if len(token) > 3 and token[-1:] == token[-2:-1]:
+                token = token[:-1]
+        if len(token) > 4 and token.endswith(
+            ("ches", "shes", "xes", "zes", "sses")
+        ):
+            token = token[:-2]
+        elif len(token) > 4 and token.endswith("s") and not token.endswith("ss"):
+            token = token[:-1]
+        if len(token) > 4 and token.endswith("e"):
+            token = token[:-1]
+        return token
+
+    def _active_decision_has_required_evidence(
+        self,
+        model: dict[str, Any],
+        decision_id: str,
+    ) -> bool:
+        return decision_has_required_evidence_v2(model, decision_id)
+
+    @staticmethod
+    def _looks_like_interview_clarification(user_message: str) -> bool:
+        text = str(user_message or "").strip().casefold()
+        if not text:
+            return True
+        if text.endswith(("?", "？")):
+            return True
+        question_prefixes = (
+            "what ",
+            "why ",
+            "how ",
+            "can ",
+            "could ",
+            "should ",
+            "do ",
+            "does ",
+            "is ",
+            "are ",
+            "什么",
+            "为什么",
+            "怎么",
+            "如何",
+            "是否",
+            "是不是",
+            "was ",
+            "warum ",
+            "wie ",
+            "kann ",
+            "apa ",
+            "kenapa ",
+            "bagaimana ",
+            "boleh ",
+        )
+        return text.startswith(question_prefixes)
+
+    def _latest_active_proposal(
+        self,
+        messages: list[dict[str, Any]],
+    ) -> dict[str, Any] | None:
+        if not messages:
+            return None
+        latest = messages[-1]
+        if not isinstance(latest, dict) or latest.get("role") != "assistant":
+            return None
+        metadata = latest.get("metadata")
+        turn = metadata.get("interview_turn") if isinstance(metadata, dict) else None
+        proposal = turn.get("proposal") if isinstance(turn, dict) else None
+        return proposal if isinstance(proposal, dict) else None
+
+    def _build_deferred_decision_record(
+        self,
+        session: Session,
+        model: dict[str, Any],
+        decision_id: str,
+        language: str,
+        *,
+        reason: str,
+        label: str = "",
+    ) -> dict[str, Any]:
+        evidence_paths = {
+            "outcome": ("background.objective",),
+            "actor_action": (
+                "product_context.primary_user",
+                "product_context.decision_or_action",
+            ),
+            "v1_flow": (
+                "scope.in_scope",
+                "scope.out_of_scope",
+                "users_and_scenarios.core_scenarios",
+            ),
+            "data_boundary": ("data_and_dependencies",),
+            "acceptance": ("acceptance_criteria",),
+        }
+        fragments = [
+            fragment
+            for path in evidence_paths.get(decision_id, ())
+            for fragment in self._flatten_strings(
+                self._value_at_path(model, path)
+            )
+        ]
+        evidence = "; ".join(self._unique_strings(fragments))[:500]
+        source_message_id = 0
+        for message in reversed(session.messages):
+            if not isinstance(message, dict) or message.get("role") != "user":
+                continue
+            metadata = message.get("metadata")
+            reply_context = (
+                metadata.get("interview_reply_context")
+                if isinstance(metadata, dict)
+                else None
+            )
+            if isinstance(reply_context, dict) and reply_context.get("action"):
+                continue
+            source_message_id = self._safe_int(message.get("message_id"))
+            break
+        return {
+            "decision_id": decision_id,
+            "label": label
+            or self._deferred_decision_label(decision_id, language),
+            "evidence": evidence,
+            "resolution": "open_tbd",
+            "reason": reason,
+            "source_message_id": source_message_id,
+        }
+
+    def _deferred_fast_decision_records(
+        self,
+        messages: list[dict[str, Any]],
+        model: dict[str, Any],
+        language: str,
+    ) -> list[dict[str, Any]]:
+        records_by_id: dict[str, dict[str, Any]] = {}
+        for message in messages:
+            if not isinstance(message, dict) or message.get("role") != "assistant":
+                continue
+            metadata = message.get("metadata")
+            turn = metadata.get("interview_turn") if isinstance(metadata, dict) else None
+            if not isinstance(turn, dict):
+                continue
+            deferred = turn.get("deferred")
+            if isinstance(deferred, dict):
+                record = dict(deferred)
+                decision_id = str(record.get("decision_id", "")).strip()
+            else:
+                decision_id = str(
+                    turn.get("deferred_decision_id", "")
+                ).strip()
+                record = {
+                    "decision_id": decision_id,
+                    "label": self._deferred_decision_label(
+                        decision_id,
+                        language,
+                    ),
+                    "evidence": "",
+                    "resolution": "open_tbd",
+                    "reason": "legacy_deferred",
+                    "source_message_id": 0,
+                }
+            if decision_id:
+                records_by_id[decision_id] = record
+        return [
+            record
+            for decision_id, record in records_by_id.items()
+            if not self._fast_decision_is_resolved(model, decision_id)
+        ]
+
+    @staticmethod
+    def _deferred_decision_label(decision_id: str, language: str) -> str:
+        labels = {
+            "en": {
+                "outcome": "Measurable business outcome",
+                "actor_action": "User and business action",
+                "v1_flow": "First-release scenario and scope",
+                "data_boundary": "Data source and read/write boundary",
+                "acceptance": "Observable acceptance evidence",
+            },
+            "zh": {
+                "outcome": "可衡量的业务结果",
+                "actor_action": "用户与业务动作",
+                "v1_flow": "首版场景与范围",
+                "data_boundary": "数据来源与读写边界",
+                "acceptance": "可观察的验收证据",
+            },
+            "de": {
+                "outcome": "Messbares Geschaeftsergebnis",
+                "actor_action": "Nutzer und Geschaeftsaktion",
+                "v1_flow": "Szenario und Umfang der ersten Version",
+                "data_boundary": "Datenquelle und Schreibgrenze",
+                "acceptance": "Beobachtbarer Abnahmenachweis",
+            },
+            "ms": {
+                "outcome": "Hasil perniagaan yang boleh diukur",
+                "actor_action": "Pengguna dan tindakan perniagaan",
+                "v1_flow": "Senario dan skop keluaran pertama",
+                "data_boundary": "Sumber data dan sempadan tulis",
+                "acceptance": "Bukti penerimaan yang boleh diperhatikan",
+            },
+        }
+        normalized_language = str(language or "").strip().lower()
+        if normalized_language.startswith("zh"):
+            normalized_language = "zh"
+        if normalized_language not in labels:
+            normalized_language = "en"
+        return labels[normalized_language].get(decision_id, decision_id)
+
+    def _fast_decision_is_resolved(
+        self,
+        model: dict[str, Any],
+        decision_id: str,
+    ) -> bool:
+        status_keys = {
+            "outcome": ("objective",),
+            "actor_action": ("users",),
+            "v1_flow": ("scope", "scenarios", "features"),
+            "data_boundary": ("integrations",),
+            "acceptance": ("acceptance",),
+        }.get(decision_id, ())
+        if not status_keys or not decision_has_required_evidence_v2(
+            model,
+            decision_id,
+        ):
+            return False
+        return all(
+            str(
+                self._value_at_path(
+                    model,
+                    f"collection_status.{key}.status",
+                )
+                or ""
+            ).strip().casefold()
+            in {"confirmed", "pending_confirmation"}
+            for key in status_keys
+        )
+
+    def _deferred_fast_decision_ids(
+        self,
+        messages: list[dict[str, Any]],
+    ) -> list[str]:
+        deferred_ids: list[str] = []
+        for message in messages:
+            if not isinstance(message, dict) or message.get("role") != "assistant":
+                continue
+            metadata = message.get("metadata")
+            turn = metadata.get("interview_turn") if isinstance(metadata, dict) else None
+            deferred_record = (
+                turn.get("deferred") if isinstance(turn, dict) else None
+            )
+            decision_id = ""
+            if isinstance(deferred_record, dict):
+                decision_id = str(
+                    deferred_record.get("decision_id", "")
+                ).strip()
+            if not decision_id and isinstance(turn, dict):
+                decision_id = str(
+                    turn.get("deferred_decision_id", "")
+                ).strip()
+            if decision_id and decision_id not in deferred_ids:
+                deferred_ids.append(decision_id)
+        return deferred_ids
+
+    def _defer_available_decision_id(
+        self,
+        messages: list[dict[str, Any]],
+    ) -> str:
+        for message in reversed(messages):
+            if not isinstance(message, dict) or message.get("role") != "assistant":
+                continue
+            metadata = message.get("metadata")
+            turn = metadata.get("interview_turn") if isinstance(metadata, dict) else None
+            if not isinstance(turn, dict):
+                return ""
+            if turn.get("kind") != "clarification" and not turn.get("can_defer"):
+                return ""
+            return str(turn.get("decision_id", "")).strip()
+        return ""
+
+    def _strict_review_user_turn_count(
+        self,
+        messages: list[dict[str, Any]],
+    ) -> int:
+        document_message_ids = [
+            self._safe_int(message.get("message_id"))
+            for message in messages
+            if isinstance(message, dict)
+            and self._message_kind(message) == PRD_MESSAGE_KIND
+        ]
+        if not document_message_ids:
+            return 0
+        latest_document_id = max(document_message_ids)
+        count = 0
+        for message in messages:
+            if (
+                not isinstance(message, dict)
+                or message.get("role") != "user"
+                or self._message_kind(message) != CHAT_MESSAGE_KIND
+                or self._safe_int(message.get("message_id")) <= latest_document_id
+            ):
+                continue
+            metadata = message.get("metadata")
+            reply_context = (
+                metadata.get("interview_reply_context")
+                if isinstance(metadata, dict)
+                else None
+            )
+            if isinstance(reply_context, dict) and reply_context.get("action"):
+                continue
+            if self._looks_like_interview_clarification(
+                str(message.get("content", ""))
+            ):
+                continue
+            count += 1
+        return count
+
+    def _build_brief_document_status(
+        self,
+        session: Session,
+        structured_requirement_model: dict[str, Any],
+    ) -> str:
+        document_messages = [
+            message
+            for message in session.messages
+            if isinstance(message, dict) and self._message_kind(message) == PRD_MESSAGE_KIND
+        ]
+        if not document_messages:
+            return "current" if self.get_saved_prd_document(session.id) is not None else "missing"
+        latest_document = max(
+            document_messages,
+            key=lambda message: self._safe_int(message.get("message_id")),
+        )
+        metadata = latest_document.get("metadata")
+        document_metadata = metadata.get("document") if isinstance(metadata, dict) else None
+        source_fingerprint = (
+            str(document_metadata.get("source_model_fingerprint", "")).strip()
+            if isinstance(document_metadata, dict)
+            else ""
+        )
+        if source_fingerprint:
+            current_model = self._canonical_model_for_fingerprint(
+                session,
+                structured_requirement_model,
+            )
+            return (
+                "current"
+                if secrets.compare_digest(
+                    source_fingerprint,
+                    self._structured_model_fingerprint(current_model),
+                )
+                else "stale"
+            )
+
+        document_message_id = self._safe_int(latest_document.get("message_id"))
+        has_later_user_message = any(
+            isinstance(message, dict)
+            and message.get("role") == "user"
+            and self._message_kind(message) == CHAT_MESSAGE_KIND
+            and self._safe_int(message.get("message_id")) > document_message_id
+            for message in session.messages
+        )
+        return "stale" if has_later_user_message else "current"
+
+    def _canonical_model_for_fingerprint(
+        self,
+        session: Session,
+        fallback: dict[str, Any],
+    ) -> dict[str, Any]:
+        canonical = self._get_latest_cached_structured_requirement_model(
+            session.id,
+            STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
+            self._message_count(session.messages),
+        )
+        return normalize_structured_requirement_model(canonical or fallback)
+
+    def _structured_model_fingerprint(self, model: dict[str, Any]) -> str:
+        encoded = json.dumps(
+            normalize_structured_requirement_model(model),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        return hashlib.sha256(encoded).hexdigest()
 
     def build_session_summary(self, session_id: str, language: str = "zh") -> dict[str, Any]:
         return self.build_structured_requirement_model(session_id, language)
@@ -1407,10 +3859,10 @@ class RequirementCollectorService:
         normalized_language = self._normalize_language(language)
         message_count = self._message_count(session.messages)
         if not force_refresh:
-            cached_model = self._get_cached_localized_structured_requirement_model(
+            cached_model = self._get_cached_canonical_structured_requirement_model(
                 session_id,
-                normalized_language,
                 message_count,
+                session.language,
             )
             if cached_model is not None:
                 return cached_model
@@ -1531,7 +3983,7 @@ class RequirementCollectorService:
         return bool(
             re.search(
                 r"(next step|click|please|you can|can now)[\s\S]{0,80}"
-                r"(generate documents|generate (?:the )?(?:formal )?(?:requirements? )?document|"
+                r"(generate documents|generate (?:the )?build brief|generate (?:the )?(?:formal )?(?:requirements? )?document|"
                 r"create (?:the )?(?:formal )?(?:requirements? )?document|document generation)",
                 lowered,
                 flags=re.IGNORECASE,
@@ -1544,7 +3996,7 @@ class RequirementCollectorService:
         if has_prd_document:
             if normalized == "zh":
                 return (
-                    "需求文档已经生成完成。请点击右侧 Go Coding / Open Vibe Coding 进入编码交接；"
+                    "开发简报已经生成完成。请点击右侧 Go Coding / Open Vibe Coding 进入编码交接；"
                     "只有范围变化或出现冲突时才需要继续补充。"
                 )
             if normalized == "de":
@@ -1558,14 +4010,14 @@ class RequirementCollectorService:
                     "untuk handoff coding; tambah maklumat hanya jika scope berubah atau ada konflik."
                 )
             return (
-                "The requirements document has been generated. Click Go Coding / Open Vibe Coding on the right "
+                "The Build Brief has been generated. Click Go Coding / Open Vibe Coding on the right "
                 "to start the coding handoff; only add more details if the scope changes or a conflict appears."
             )
 
         if normalized == "zh":
             return (
-                "结构化需求已经全部确认。请点击右侧 Generate Documents / 生成文档 生成正式需求文档；"
-                "文档生成后再进入 Go Coding / Vibe Coding 交接。"
+                "关键开发决策已经确认。请点击右侧“生成开发简报”；"
+                "简报生成后再进入 Go Coding / Vibe Coding 交接。"
             )
         if normalized == "de":
             return (
@@ -1578,8 +4030,8 @@ class RequirementCollectorService:
                 "untuk menjana dokumen rasmi; selepas itu barulah Go Coding / Vibe Coding."
             )
         return (
-            "All structured requirements are confirmed. Click Generate Documents on the right to generate the formal "
-            "requirements document; after the document exists, use Go Coding / Vibe Coding for the handoff."
+            "Required build decisions are confirmed. Click Generate Build Brief on the right; "
+            "after the brief exists, use Go Coding / Vibe Coding for the handoff."
         )
 
     def _assistant_claims_document_generation_ready(self, text: str) -> bool:
@@ -1699,7 +4151,7 @@ class RequirementCollectorService:
             "collection_status",
             {},
         )
-        for key in REQUIREMENT_ITEM_KEYS:
+        for key in STRUCTURED_REQUIREMENT_GENERATION_CORE_KEYS:
             item = collection_status.get(key)
             if not isinstance(item, dict):
                 continue
@@ -1877,16 +4329,13 @@ class RequirementCollectorService:
         evidence = blocker.get("evidence", "").strip()
         if self._is_degenerate_capture(evidence):
             evidence = ""
-        if evidence:
-            assumption_en = f"Use the current captured wording for {label}: {evidence}"
-            assumption_zh = f"按当前已捕获内容确认 {label}：{evidence}"
-            assumption_de = f"Aktuellen erfassten Wortlaut fuer {label} verwenden: {evidence}"
-            assumption_ms = f"Gunakan wording semasa untuk {label}: {evidence}"
-        else:
-            assumption_en = f"Use a practical v1 assumption for {label}"
-            assumption_zh = f"先按可落地的 v1 假设推进 {label}"
-            assumption_de = f"Eine praktikable V1-Annahme fuer {label} verwenden"
-            assumption_ms = f"Gunakan andaian v1 yang praktikal untuk {label}"
+        if not evidence:
+            return self._fallback_choice_block(language)
+
+        assumption_en = f"Use the current captured wording for {label}: {evidence}"
+        assumption_zh = f"按当前已捕获内容确认 {label}：{evidence}"
+        assumption_de = f"Aktuellen erfassten Wortlaut fuer {label} verwenden: {evidence}"
+        assumption_ms = f"Gunakan wording semasa untuk {label}: {evidence}"
         if language == "zh":
             return (
                 "请选择一个选项：\n"
@@ -1987,69 +4436,17 @@ class RequirementCollectorService:
 
         normalized_language = self._normalize_language(language)
         message_count = self._message_count(session.messages)
-        cached_entry = self.session_store.get_structured_requirement_cache_entry(
-            session_id,
-            normalized_language,
-        )
-        if cached_entry is None:
-            canonical_model = self._get_cached_canonical_structured_requirement_model(
-                session_id,
-                message_count,
-                normalized_language,
-            )
-            if canonical_model is not None:
-                conversation_chain_state = self.build_conversation_chain_state(
-                    session,
-                    canonical_model,
-                    normalized_language,
-                )
-                return {
-                    "structured_requirement_model": canonical_model,
-                    "structured_requirement_sync_status": "missing",
-                    "message_count": message_count,
-                    "conversation_chain_state": conversation_chain_state,
-                    "pm_methodology_state": self.build_pm_methodology_state(
-                        canonical_model,
-                        normalized_language,
-                    ),
-                    "ic_substrate_evidence_state": self.build_ic_substrate_evidence_state(
-                        session,
-                        canonical_model,
-                        normalized_language,
-                    ),
-                }
-            empty_model = self._empty_structured_requirement_model()
-            conversation_chain_state = self.build_conversation_chain_state(
-                session,
-                empty_model,
-                normalized_language,
-            )
-            return {
-                "structured_requirement_model": empty_model,
-                "structured_requirement_sync_status": "ready" if message_count == 0 else "missing",
-                "message_count": message_count,
-                "conversation_chain_state": conversation_chain_state,
-                "pm_methodology_state": self.build_pm_methodology_state(
-                    empty_model,
-                    normalized_language,
-                ),
-                "ic_substrate_evidence_state": self.build_ic_substrate_evidence_state(
-                    session,
-                    empty_model,
-                    normalized_language,
-                ),
-            }
-
-        cached_model = normalize_structured_requirement_model(cached_entry.get("model"))
-        cached_message_count = self._safe_int(cached_entry.get("message_count"))
         canonical_model = self._get_cached_canonical_structured_requirement_model(
             session_id,
-            cached_message_count,
-            normalized_language,
+            message_count,
+            session.language,
         )
-        if canonical_model is not None:
-            cached_model = self._with_canonical_collection_status(cached_model, canonical_model)
-        sync_status = "ready" if cached_message_count == message_count else "stale"
+        cached_model = canonical_model or self._empty_structured_requirement_model()
+        sync_status = (
+            "ready"
+            if canonical_model is not None or message_count == 0
+            else "missing"
+        )
         conversation_chain_state = self.build_conversation_chain_state(
             session,
             cached_model,
@@ -2065,6 +4462,11 @@ class RequirementCollectorService:
                 normalized_language,
             ),
             "ic_substrate_evidence_state": self.build_ic_substrate_evidence_state(
+                session,
+                cached_model,
+                normalized_language,
+            ),
+            "interview_state": self.build_interview_state(
                 session,
                 cached_model,
                 normalized_language,
@@ -2279,7 +4681,12 @@ class RequirementCollectorService:
 
         structured_requirement_model = self.build_structured_requirement_model(session_id, language)
         progress = self._structured_requirement_progress(structured_requirement_model)
-        if not progress["ready_to_generate"]:
+        interview_state = self.build_interview_state(
+            session,
+            structured_requirement_model,
+            language,
+        )
+        if not interview_state["brief"]["ready"]:
             return self._build_generated_document_result(
                 session_id=session_id,
                 document_kind=PRD_MESSAGE_KIND,
@@ -2295,25 +4702,20 @@ class RequirementCollectorService:
                 status="quality_gate_blocked",
                 save_history=False,
             )
-        doc_markdown = self.llm_client.chat(
-            self._build_prd_doc_messages(
-                session,
-                conversation_messages,
+        doc_markdown = render_build_brief(
+            structured_requirement_model,
+            title=session.title,
+            intake_mode=resolve_intake_mode(
+                template_id=session.applied_template_id,
+                start_function=session.start_function,
+            ),
+            business_route=business_route_from_model(structured_requirement_model),
+            language=language,
+            deferred_items=self._deferred_fast_decision_records(
+                session.messages,
                 structured_requirement_model,
-                progress,
                 language,
             ),
-            temperature=0.2,
-        )
-        doc_markdown, _ = self._split_thinking(doc_markdown)
-        doc_markdown = doc_markdown.strip()
-        if not doc_markdown:
-            doc_markdown = self._load_prd_template(session, language) or self._default_prd_doc(language)
-        doc_markdown = self._append_ic_substrate_prd_evidence_appendix(
-            doc_markdown,
-            session,
-            structured_requirement_model,
-            language,
         )
         return self._build_generated_document_result(
             session_id=session_id,
@@ -2321,7 +4723,7 @@ class RequirementCollectorService:
             language=language,
             doc_markdown=doc_markdown,
             structured_requirement_model=structured_requirement_model,
-            status="ok" if progress.get("fully_confirmed") else "draft_with_assumptions",
+            status="ok" if interview_state["review"]["ready"] else "draft_with_assumptions",
             save_history=save_history,
         )
 
@@ -2356,7 +4758,12 @@ class RequirementCollectorService:
 
         structured_requirement_model = self.build_structured_requirement_model(session_id, language)
         progress = self._structured_requirement_progress(structured_requirement_model)
-        if not progress["ready_to_generate"]:
+        interview_state = self.build_interview_state(
+            session,
+            structured_requirement_model,
+            language,
+        )
+        if not interview_state["brief"]["ready"]:
             doc_markdown = self._document_quality_gate_block_markdown(
                 structured_requirement_model,
                 progress,
@@ -2378,54 +4785,23 @@ class RequirementCollectorService:
                 ),
             }
             return
-        doc_parts: list[str] = []
-        thinking_parts: list[str] = []
-        llm_messages = self._build_prd_doc_messages(
-            session,
-            conversation_messages,
+        doc_markdown = render_build_brief(
             structured_requirement_model,
-            progress,
-            language,
+            title=session.title,
+            intake_mode=resolve_intake_mode(
+                template_id=session.applied_template_id,
+                start_function=session.start_function,
+            ),
+            business_route=business_route_from_model(structured_requirement_model),
+            language=language,
+            deferred_items=self._deferred_fast_decision_records(
+                session.messages,
+                structured_requirement_model,
+                language,
+            ),
         )
-        for item in self.llm_client.stream_chat(llm_messages, temperature=0.2):
-            text = item.get("text", "")
-            if not text:
-                continue
-
-            if item.get("type") == "thinking":
-                thinking_parts.append(text)
-                yield {"event": "thinking", "delta": text}
-                continue
-
-            doc_parts.append(text)
-            yield {"event": "content", "delta": text}
-
-        doc_markdown = "".join(doc_parts).strip()
-        thinking_text = "".join(thinking_parts).strip()
-        doc_markdown, content_embedded_thinking = self._split_thinking(doc_markdown)
-        if content_embedded_thinking:
-            thinking_text = f"{thinking_text}\n{content_embedded_thinking}".strip()
-
-        if not doc_markdown:
-            raise LLMError("LLM returned empty streamed PRD document.")
-
-        appended_doc_markdown = self._append_ic_substrate_prd_evidence_appendix(
-            doc_markdown,
-            session,
-            structured_requirement_model,
-            language,
-        )
-        if appended_doc_markdown != doc_markdown:
-            appendix_delta = (
-                appended_doc_markdown[len(doc_markdown):]
-                if appended_doc_markdown.startswith(doc_markdown)
-                else f"\n\n{appended_doc_markdown}"
-            )
-            yield {"event": "content", "delta": appendix_delta}
-            doc_markdown = appended_doc_markdown
-
-        if thinking_text:
-            yield {"event": "thinking_done", "thinking": thinking_text}
+        for offset in range(0, len(doc_markdown), 1200):
+            yield {"event": "content", "delta": doc_markdown[offset : offset + 1200]}
         yield {
             "event": "done",
             **self._build_generated_document_result(
@@ -2434,7 +4810,7 @@ class RequirementCollectorService:
                 language=language,
                 doc_markdown=doc_markdown,
                 structured_requirement_model=structured_requirement_model,
-                status="ok" if progress.get("fully_confirmed") else "draft_with_assumptions",
+                status="ok" if interview_state["review"]["ready"] else "draft_with_assumptions",
                 save_history=save_history,
             ),
         }
@@ -2509,12 +4885,27 @@ class RequirementCollectorService:
             session,
             structured_requirement_model,
         )
+        coding_contract = self._build_session_coding_contract(
+            session,
+            structured_requirement_model,
+            language=language,
+            has_prd_document=True,
+        )
+        coding_contract_markdown = render_coding_contract_markdown(coding_contract)
 
         return {
             "session_id": session_id,
             "title": session.title,
             "documents_ready": True,
+            "handoff_ready": coding_contract["delivery_readiness"]["ready_for_handoff"],
+            "handoff_gaps": coding_contract["blockers"],
+            "workflow_mode": coding_contract["workflow_mode"],
+            "coding_contract": coding_contract,
             "documents": {
+                "coding_contract": {
+                    "filename": "coding-contract.md",
+                    "content": coding_contract_markdown,
+                },
                 "prd": {
                     "filename": prd_filename,
                     "path": prd_absolute_path,
@@ -2537,6 +4928,7 @@ class RequirementCollectorService:
                 design_path=design_absolute_path,
                 language=language,
                 ic_substrate_evidence=ic_substrate_evidence,
+                coding_contract=coding_contract,
             ),
             "ic_substrate_evidence": ic_substrate_evidence,
         }
@@ -2576,10 +4968,49 @@ class RequirementCollectorService:
             )
             or self._empty_structured_requirement_model()
         )
+        interview_state = self.build_interview_state(
+            session,
+            structured_requirement_model,
+            normalized_language,
+        )
         ic_substrate_evidence = self._ic_substrate_readiness_evidence_gate(
             session,
             structured_requirement_model,
         )
+        coding_contract = self._build_session_coding_contract(
+            session,
+            structured_requirement_model,
+            language=normalized_language,
+            has_prd_document=True,
+        )
+        coding_contract_markdown = render_coding_contract_markdown(coding_contract)
+        contract_ready = bool(
+            coding_contract["delivery_readiness"]["ready_for_handoff"]
+        )
+        handoff_ready = bool(
+            contract_ready and interview_state["actions"]["can_handoff"]
+        )
+        if interview_state["actions"]["can_handoff"]:
+            handoff_gaps = coding_contract["blockers"]
+        else:
+            next_decision = interview_state.get("next_decision")
+            next_label = (
+                str(next_decision.get("label", "")).strip()
+                if isinstance(next_decision, dict)
+                else ""
+            )
+            handoff_gaps = [
+                {
+                    "key": (
+                        str(next_decision.get("decision_id", "")).strip()
+                        if isinstance(next_decision, dict)
+                        else ""
+                    )
+                    or interview_state["stage"],
+                    "label": next_label or interview_state["stage"],
+                    "status": interview_state["brief"]["document_status"],
+                }
+            ]
         prd_download_url = self._legacy_document_download_url(session_id, PRD_MESSAGE_KIND)
         design_download_url = (
             self._legacy_document_download_url(session_id, DESIGN_MESSAGE_KIND)
@@ -2593,6 +5024,7 @@ class RequirementCollectorService:
             design_path=design_filename,
             language=normalized_language,
             ic_substrate_evidence=ic_substrate_evidence,
+            coding_contract=coding_contract,
         )
         now = datetime.now(timezone.utc)
         expires_at = (now + timedelta(minutes=DEFAULT_HANDOFF_TTL_MINUTES)).isoformat()
@@ -2603,11 +5035,25 @@ class RequirementCollectorService:
             "session_id": session_id,
             "title": session.title,
             "language": normalized_language,
+            "workflow_mode": coding_contract["workflow_mode"],
             "documents_ready": True,
-            "handoff_ready": True,
+            "handoff_ready": handoff_ready,
+            "handoff_gaps": handoff_gaps,
+            "interview_state": interview_state,
             "methodology_ready": True,
+            "coding_contract": coding_contract,
+            "coding_contract_markdown": coding_contract_markdown,
             "implementation_prompt": implementation_prompt,
             "documents": [
+                {
+                    "kind": "coding_contract",
+                    "filename": "coding-contract.md",
+                    "mime_type": "text/markdown; charset=utf-8",
+                    "download_url": (
+                        f"/api/sessions/{session_id}/coding-contract"
+                        f"?language={normalized_language}"
+                    ),
+                },
                 {
                     "kind": "prd",
                     "filename": prd_filename,
@@ -2630,6 +5076,49 @@ class RequirementCollectorService:
             "ic_substrate_evidence": ic_substrate_evidence,
             "expires_at": expires_at,
         }
+
+    def build_coding_contract(self, session_id: str, language: str = "zh") -> dict[str, Any]:
+        session = self.get_session(session_id)
+        if session is None:
+            raise KeyError("Session not found.")
+
+        message_count = self._message_count(session.messages)
+        structured_requirement_model = (
+            self._get_latest_cached_structured_requirement_model(
+                session_id,
+                STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
+                message_count,
+            )
+            or self._empty_structured_requirement_model()
+        )
+        return self._build_session_coding_contract(
+            session,
+            structured_requirement_model,
+            language=language,
+            has_prd_document=self.get_saved_prd_document(session_id) is not None,
+        )
+
+    def _build_session_coding_contract(
+        self,
+        session: Session,
+        structured_requirement_model: dict[str, Any],
+        *,
+        language: str,
+        has_prd_document: bool,
+    ) -> dict[str, Any]:
+        return build_coding_contract_payload(
+            structured_requirement_model,
+            session_id=session.id,
+            title=session.title,
+            workflow_mode=resolve_intake_mode(
+                template_id=session.applied_template_id,
+                start_function=session.start_function,
+            ),
+            template_id=session.applied_template_id,
+            template_name=session.applied_template_name,
+            language=self._normalize_language(language),
+            has_prd_document=has_prd_document,
+        )
 
     def create_coding_handoff(self, session_id: str, language: str = "zh") -> dict[str, Any]:
         payload = self.build_browser_handoff_payload(session_id, language)
@@ -2719,7 +5208,7 @@ class RequirementCollectorService:
         language: str,
         force_refresh: bool = False,
     ) -> dict[str, Any]:
-        normalized_language = self._normalize_language(language)
+        canonical_language = self._normalize_language(session.language)
         message_count = self._message_count(session.messages)
         previous_canonical_model = self._get_latest_cached_structured_requirement_model(
             session.id,
@@ -2731,18 +5220,21 @@ class RequirementCollectorService:
             canonical_model = self._get_cached_canonical_structured_requirement_model(
                 session.id,
                 message_count,
-                normalized_language,
+                canonical_language,
             )
 
         if canonical_model is None:
-            canonical_model = self._build_structured_requirement_model(session, normalized_language)
+            canonical_model = self._build_structured_requirement_model(
+                session,
+                canonical_language,
+            )
             canonical_model = self._merge_structured_requirement_collection_status(
                 canonical_model,
                 previous_canonical_model,
             )
-            canonical_model = self._apply_recent_choice_confirmation_to_model(
+            canonical_model = apply_delivery_evidence_gates(
                 canonical_model,
-                session.messages,
+                language=canonical_language,
             )
             self._save_structured_requirement_model_cache(
                 session.id,
@@ -2750,24 +5242,8 @@ class RequirementCollectorService:
                 message_count,
                 canonical_model,
             )
-            structured_requirement_model = canonical_model
-        else:
-            structured_requirement_model = self._build_structured_requirement_model(
-                session,
-                normalized_language,
-            )
 
-        structured_requirement_model = self._with_canonical_collection_status(
-            structured_requirement_model,
-            canonical_model,
-        )
-        self._save_structured_requirement_model_cache(
-            session.id,
-            normalized_language,
-            message_count,
-            structured_requirement_model,
-        )
-        return structured_requirement_model
+        return canonical_model
 
     def _promote_cached_structured_requirement_model(
         self,
@@ -2789,16 +5265,17 @@ class RequirementCollectorService:
         normalized_language = self._normalize_language(language)
         message_count = self._message_count(session.messages)
 
-        # Try to find the model cached during the pre-reply extraction.
+        # Only the canonical cache may be promoted into the authoritative slot.
+        # A historical localized cache can contain translated or stale evidence.
         cached_model = self._get_latest_cached_structured_requirement_model(
             session.id,
-            normalized_language,
+            STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
             message_count,
         )
         if cached_model is None:
             cached_model = self._get_latest_cached_structured_requirement_model(
                 session.id,
-                STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
+                normalized_language,
                 message_count,
             )
 
@@ -2808,12 +5285,6 @@ class RequirementCollectorService:
             self._save_structured_requirement_model_cache(
                 session.id,
                 STRUCTURED_REQUIREMENT_CANONICAL_CACHE_KEY,
-                message_count,
-                cached_model,
-            )
-            self._save_structured_requirement_model_cache(
-                session.id,
-                normalized_language,
                 message_count,
                 cached_model,
             )
@@ -2832,6 +5303,10 @@ class RequirementCollectorService:
             return current
 
         previous = normalize_structured_requirement_model(previous_model)
+        current = self._preserve_missing_structured_requirement_evidence(
+            current,
+            previous,
+        )
         current_status = current["collection_status"]
         previous_status = previous["collection_status"]
         merged_status: dict[str, Any] = {}
@@ -2842,6 +5317,55 @@ class RequirementCollectorService:
             )
         current["collection_status"] = merged_status
         current = self._preserve_previous_requesting_department(current, previous)
+        return current
+
+    def _preserve_missing_structured_requirement_evidence(
+        self,
+        current_model: dict[str, Any],
+        previous_model: dict[str, Any],
+    ) -> dict[str, Any]:
+        current = normalize_structured_requirement_model(current_model)
+        previous = normalize_structured_requirement_model(previous_model)
+
+        nested_fields = {
+            "document_info": ("project_name", "requirement_name"),
+            "product_context": (
+                "requesting_department",
+                "business_owner",
+                "software_type",
+                "primary_user",
+                "decision_or_action",
+                "acceptance_owner",
+            ),
+            "background": ("summary", "objective"),
+            "scope": ("in_scope", "out_of_scope"),
+            "users_and_scenarios": ("target_users", "core_scenarios"),
+            "functional_requirements": ("overview", "feature_details"),
+            "page_and_interaction": ("pages", "interaction_flow"),
+        }
+        for section, fields in nested_fields.items():
+            current_section = current[section]
+            previous_section = previous[section]
+            for field in fields:
+                if current_section.get(field) or not previous_section.get(field):
+                    continue
+                previous_value = previous_section[field]
+                current_section[field] = (
+                    list(previous_value)
+                    if isinstance(previous_value, list)
+                    else previous_value
+                )
+
+        for field in (
+            "business_rules",
+            "copywriting",
+            "data_and_dependencies",
+            "risks_and_notes",
+            "acceptance_criteria",
+        ):
+            if not current.get(field) and previous.get(field):
+                current[field] = list(previous[field])
+
         return current
 
     def _preserve_previous_requesting_department(
@@ -2945,9 +5469,7 @@ class RequirementCollectorService:
 
         assistant_text = str(previous_assistant.get("content", "") or "")
         option_a_text = self._extract_option_a_text(assistant_text)
-        return self._requirement_key_from_confirmation_text(
-            "\n".join([latest_user_text, option_a_text, assistant_text]),
-        )
+        return self._requirement_key_from_confirmation_text(option_a_text)
 
     def _looks_like_option_a_confirmation(self, text: str) -> bool:
         normalized = " ".join(str(text or "").strip().split()).lower()
@@ -3028,29 +5550,6 @@ class RequirementCollectorService:
         if cached_message_count < 0 or cached_message_count > max_message_count:
             return None
         return normalize_structured_requirement_model(cached_entry.get("model"))
-
-    def _get_cached_localized_structured_requirement_model(
-        self,
-        session_id: str,
-        language: str,
-        message_count: int,
-    ) -> dict[str, Any] | None:
-        cached_model = self._get_cached_structured_requirement_model(
-            session_id,
-            language,
-            message_count,
-        )
-        if cached_model is None:
-            return None
-
-        canonical_model = self._get_cached_canonical_structured_requirement_model(
-            session_id,
-            message_count,
-            language,
-        )
-        if canonical_model is None:
-            return cached_model
-        return self._with_canonical_collection_status(cached_model, canonical_model)
 
     def _get_cached_canonical_structured_requirement_model(
         self,
@@ -3166,6 +5665,8 @@ class RequirementCollectorService:
             thinking = str(item.get("thinking", "")).strip()
             if thinking:
                 payload["thinking"] = thinking
+            metadata = item.get("metadata")
+            payload["metadata"] = metadata if isinstance(metadata, dict) else {}
             download_filename = str(item.get("download_filename", "")).strip()
             if download_filename:
                 payload["download_filename"] = download_filename
@@ -3210,6 +5711,7 @@ class RequirementCollectorService:
             applied_template_id=str(record.get("applied_template_id", "")).strip(),
             applied_template_name=str(record.get("applied_template_name", "")).strip(),
             start_function=self._normalize_start_function(record.get("start_function", START_FUNCTION_FROM_SCRATCH)),
+            language=self._normalize_language(record.get("language", "en")),
             created_at=record["created_at"],
             updated_at=record.get("updated_at", record["created_at"]),
             messages=self._hydrate_message_payloads(
@@ -3451,13 +5953,27 @@ class RequirementCollectorService:
         normalized_language = self._normalize_language(language)
         template = self._resolve_business_template(session, normalized_language)
         model = normalize_structured_requirement_model(structured_requirement_model)
+        workflow_mode = resolve_intake_mode(
+            template_id=session.applied_template_id,
+            start_function=session.start_function,
+        )
+        delivery_workflow = build_delivery_workflow_payload(
+            model,
+            workflow_mode=workflow_mode,
+            language=normalized_language,
+            has_prd_document=self.get_saved_prd_document(session.id) is not None,
+        )
         matches_ic_substrate = self._session_matches_ic_substrate_expert_chain(
             session,
             normalized_language,
             model,
         )
         if template is None and not session.applied_template_name and not matches_ic_substrate:
-            return {"enabled": False}
+            return {
+                "enabled": False,
+                "workflow_mode": workflow_mode,
+                "delivery_workflow": delivery_workflow,
+            }
 
         if template is not None:
             template_context = template
@@ -3580,6 +6096,8 @@ class RequirementCollectorService:
         return {
             "enabled": True,
             "mode": mode,
+            "workflow_mode": workflow_mode,
+            "delivery_workflow": delivery_workflow,
             "template_id": session.applied_template_id,
             "template_name": session.applied_template_name or str(template_context.get("template_name", "")),
             "current_track": current_node["track"],
@@ -6839,19 +9357,33 @@ class RequirementCollectorService:
         }
 
     def _structured_requirement_model_prompt(self, session: Session, language: str) -> str:
-        prompt_parts = [build_structured_requirement_model_prompt(language)]
-        prompt_parts.append(self._structured_requirement_skill_extraction_guidance(language))
-        prompt_parts.append(self._ic_substrate_structured_extraction_contract(session, language))
-        template_addendum = self._business_template_pm_addendum(session, language)
-        if template_addendum:
-            prompt_parts.append(
-                "Template-aware extraction rules:\n"
-                "- Use the applied business template as additional context for what information matters most.\n"
-                "- Keep the structured requirement schema unchanged.\n"
-                "- If the template contains fields not represented directly in the schema, map them into the closest schema section or preserve them as open questions.\n"
-                + "\n"
-                + template_addendum
-            )
+        # Extraction always runs in the session language. The canonical model
+        # stores the user's own words, so a request in another language must
+        # never make the extractor translate the evidence that grounding checks.
+        language = self._normalize_language(session.language or language)
+        mode = resolve_intake_mode(
+            template_id=session.applied_template_id,
+            start_function=session.start_function,
+        )
+        model = self._latest_structured_requirement_model_for_prompt(session, language)
+        template = self._resolve_business_template(session, language)
+        route = business_route_from_model(model) or business_route_from_template(template)
+
+        prompt_parts = [
+            build_structured_requirement_model_prompt(language),
+            build_extraction_session_prompt(
+                mode=mode,
+                business_route=route,
+                language=language,
+            ),
+        ]
+        template_baseline = build_template_baseline_prompt(
+            template,
+            fallback_name=session.applied_template_name,
+            language=language,
+        )
+        if template_baseline:
+            prompt_parts.append(template_baseline)
         return "\n\n".join(part for part in prompt_parts if part)
 
     def _build_design_doc_messages(
@@ -7287,6 +9819,7 @@ class RequirementCollectorService:
         storage_path: str = "",
         display_content: str = "",
         created_at: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> int:
         created_at_value = created_at or datetime.now(timezone.utc).isoformat()
         return self.session_store.append_message(
@@ -7299,6 +9832,7 @@ class RequirementCollectorService:
             download_filename=download_filename,
             storage_path=storage_path,
             display_content=display_content,
+            metadata=metadata,
         )
 
     def _require_session(self, session_id: str) -> Session:
@@ -7721,6 +10255,58 @@ class RequirementCollectorService:
         total = self._safe_int(progress.get("total_count"))
         score = self._safe_int(pm_state.get("score"))
         zh = normalized == "zh"
+        workflow_mode = resolve_intake_mode(
+            template_id=session.applied_template_id,
+            start_function=session.start_function,
+        )
+        if normalized == "zh":
+            if workflow_mode == "template":
+                route_directive = (
+                    "采访路线 = 模板基线校验\n"
+                    "- 先核对模板预填内容，只追问差异、冲突和空缺；不要从空白重新采访。"
+                )
+            elif workflow_mode == "draft":
+                route_directive = (
+                    "采访路线 = 草稿补缺\n"
+                    "- 保留草稿已明确事实，只追问缺口、冲突和未确认假设；不要重复询问。"
+                )
+            else:
+                route_directive = (
+                    "采访路线 = 从零发现\n"
+                    "- 从业务目标和用户动作开始逐步收敛；不要引入任何模板默认值。"
+                )
+        elif normalized == "ms":
+            if workflow_mode == "template":
+                route_directive = (
+                    "INTERVIEW ROUTE = TEMPLATE VALIDATION\n"
+                    "- Sahkan garis dasar yang dipraisi dan tanya hanya perubahan, konflik dan jurang."
+                )
+            elif workflow_mode == "draft":
+                route_directive = (
+                    "INTERVIEW ROUTE = DRAFT GAP CLOSURE\n"
+                    "- Kekalkan fakta draft dan tanya hanya jurang, konflik atau assumption yang belum disahkan."
+                )
+            else:
+                route_directive = (
+                    "INTERVIEW ROUTE = SCRATCH DISCOVERY\n"
+                    "- Temui hasil dan tindakan pengguna secara berperingkat tanpa andaian templat."
+                )
+        else:
+            if workflow_mode == "template":
+                route_directive = (
+                    "INTERVIEW ROUTE = TEMPLATE VALIDATION\n"
+                    "- Validate the prefilled baseline and ask only about deltas, conflicts, and gaps. Do not restart discovery from a blank page."
+                )
+            elif workflow_mode == "draft":
+                route_directive = (
+                    "INTERVIEW ROUTE = DRAFT GAP CLOSURE\n"
+                    "- Preserve extracted draft facts and ask only about gaps, conflicts, or unconfirmed assumptions. Never re-ask answered points."
+                )
+            else:
+                route_directive = (
+                    "INTERVIEW ROUTE = SCRATCH DISCOVERY\n"
+                    "- Discover the outcome and user action progressively. Do not import template defaults or invented assumptions."
+                )
 
         # Phase 1 - collecting: the structured Fully Confirmed gate is not passed yet.
         if not structured_ready:
@@ -7728,77 +10314,130 @@ class RequirementCollectorService:
             blocker_question = str(blocker.get("question", "")).strip()
             blocker_label = str(blocker.get("label", "")).strip()
             if zh:
-                return (
+                return route_directive + "\n\n" + (
                     "就绪状态机（权威指示，优先级最高，覆盖任何相反说法）：\n"
                     f"- 阶段=采集中。结构化门禁未过：已确认 {confirmed}/{total}（覆盖 {cov}%、确认 {conf}%）。PM Methodology {score}% 仅作质量参考，不阻断生成。\n"
-                    "- 严禁声称“需求已足够/已完整/可以生成文档/可以 Go Coding”，严禁让用户点 Generate 或 Open Vibe Coding；它们只有结构化全部确认后才会亮。\n"
+                    "- 严禁声称“需求已足够/可以生成开发简报/可以 Go Coding”，严禁让用户点 Generate 或 Open Vibe Coding；它们只有关键开发决策确认后才会亮。\n"
                     "- 本轮只补这一个结构化缺口：只问一个问题，结尾给 A/B/C。不要为方法论分数单独追问。\n"
                     "- 数据接口与每个 KPI 公式是上线必备项：若当前缺口是数据接口或公式且用户给不出确切值，A/B/C 必须有一项为“采用以下假设并继续”（该假设记入 ASSUMPTIONS）；接口假设只能在 SQL Server、SAP、Excel/CSV upload 三类中选，绝不能因含糊回答（如“从 MES/QIS/QMS 取”）就标确认。\n"
                     f"- 下一个缺口（{blocker_label}）：{blocker_question}"
                 )
-            return (
+            return route_directive + "\n\n" + (
                 "READINESS STATE MACHINE (authoritative, highest priority, overrides any contrary statement):\n"
                 f"- Phase = collecting. Structured gate not passed: {confirmed}/{total} confirmed (coverage {cov}%, confirmation {conf}%). PM Methodology {score}% is an advisory quality score only and does NOT block generation.\n"
-                "- Do NOT claim the requirement is enough/complete/ready, and do NOT tell the user to click Generate or Open Vibe Coding; those unlock only after every structured item is confirmed.\n"
+                "- Do NOT claim the requirement is sufficient, and do NOT tell the user to click Generate or Open Vibe Coding; those unlock only after every required build decision is confirmed.\n"
                 "- This turn close exactly one structured gap: one question, end with A/B/C. Do not raise separate questions just to lift the methodology score.\n"
                 "- The data interface and every KPI formula are mandatory for go-live: if the current gap is the data interface or a formula and the user has no exact value, one of the A/B/C options MUST be 'use this stated assumption and continue' (recorded under ASSUMPTIONS); interface assumptions must choose SQL Server, SAP, or Excel/CSV upload, and vague answers like 'from MES/QIS/QMS' are never confirmed.\n"
                 f"- Next gap ({blocker_label}): {blocker_question}"
             )
 
-        # Phase 2 - ready to generate: structured fully confirmed, document not produced yet.
+        # Phase 2 - ready to generate: required build decisions are confirmed.
         if not has_prd:
             if zh:
-                return (
+                return route_directive + "\n\n" + (
                     "就绪状态机（权威指示，优先级最高）：\n"
-                    f"- 阶段=可生成。结构化需求已全部确认，右侧 “Generate Documents” 按钮已可点（PM Methodology {score}% 为参考分）。\n"
-                    "- 请告诉用户需求已就绪、点击右侧 “Generate Documents” 生成正式文档；可顺带提一句方法论上还能补强的点，但不要当作阻断项、也不要因此不让生成。\n"
-                    "- 生成文档之前还不要声称可以 Go Coding。"
+                    f"- 阶段=可生成。关键开发决策已确认，右侧“生成开发简报”按钮已可点（PM Methodology {score}% 为参考分）。\n"
+                    "- 请告诉用户需求已足够交付、点击右侧按钮生成开发简报；非阻断项保留在 Open Items，不要继续拉长采访。\n"
+                    "- 生成开发简报之前还不要声称可以 Go Coding。"
                 )
-            return (
+            return route_directive + "\n\n" + (
                 "READINESS STATE MACHINE (authoritative, highest priority):\n"
-                f"- Phase = ready to generate. All structured items are confirmed; the right-side \"Generate Documents\" button is enabled (PM Methodology {score}% is advisory).\n"
-                "- Tell the user the requirement is ready and to click \"Generate Documents\"; you may note optional methodology improvements but never treat them as blockers or withhold generation.\n"
-                "- Do not claim Go Coding is ready until the document has been generated."
+                f"- Phase = ready to generate. Required build decisions are confirmed; \"Generate Build Brief\" is enabled (PM Methodology {score}% is advisory).\n"
+                "- Tell the user the requirement is sufficient for delivery and to generate the Build Brief. Keep non-blocking unknowns in Open Items and stop extending the interview.\n"
+                "- Do not claim Go Coding is ready until the Build Brief has been generated."
             )
 
         # Phase 3 - ready for handoff: structured confirmed and the document exists.
         if zh:
-            return (
+            return route_directive + "\n\n" + (
                 "就绪状态机（权威指示，优先级最高）：\n"
-                "- 阶段=可交接。结构化已全部确认且正式文档已生成。\n"
+                "- 阶段=可交接。关键开发决策已确认且开发简报已生成。\n"
                 "- 可以引导用户点击右侧 Open Vibe Coding 进入编码交接；不要再开新澄清问题，除非出现冲突或新范围。"
             )
-        return (
+        return route_directive + "\n\n" + (
             "READINESS STATE MACHINE (authoritative, highest priority):\n"
-            "- Phase = ready for handoff. Structured requirements are confirmed and the document exists.\n"
+            "- Phase = ready for handoff. Required build decisions are confirmed and the Build Brief exists.\n"
             "- Guide the user to click Open Vibe Coding for the coding handoff; do not open new clarification questions unless a conflict or new scope appears."
         )
 
     def _pm_prompt(self, session: Session, language: str) -> str:
         language = self._normalize_language(language)
-        normalized = self._normalize_prompt_template(session.prompt_template)
-        base_prompt = PM_SYSTEM_PROMPT_ZH if language == "zh" else PM_SYSTEM_PROMPT
-        prompt_parts = [base_prompt]
-        prompt_parts.append(self._readiness_phase_directive_for_prompt(session, language))
-        prompt_parts.append(self._skill_style_ai_pm_method_prompt(language))
-        methodology_state_addendum = self._pm_methodology_state_for_prompt(session, language)
-        if methodology_state_addendum:
-            prompt_parts.append(methodology_state_addendum)
-        template_addendum = self._business_template_pm_addendum(session, language)
-        if template_addendum:
-            prompt_parts.append(template_addendum)
-        elif normalized == PROMPT_TEMPLATE_PERSONAL_PROJECT:
-            addendum = PERSONAL_PROJECT_PM_ADDENDUM_ZH_V2 if language == "zh" else PERSONAL_PROJECT_PM_ADDENDUM_V2
-            prompt_parts.append(addendum)
-            if self._session_matches_ic_substrate_expert_chain(session, language):
-                prompt_parts.append(self._ic_substrate_conversation_chain_addendum(language))
-        chain_state_addendum = self._conversation_chain_state_for_prompt(session, language)
-        if chain_state_addendum:
-            prompt_parts.append(chain_state_addendum)
-        draft_completion_addendum = self._draft_completion_pm_addendum(session, language)
-        if draft_completion_addendum:
-            prompt_parts.append(draft_completion_addendum)
-        prompt_parts.append(DEFAULT_TECH_STACK_POLICY_ZH if language == "zh" else DEFAULT_TECH_STACK_POLICY)
+        model = self._latest_structured_requirement_model_for_prompt(session, language)
+        mode = resolve_intake_mode(
+            template_id=session.applied_template_id,
+            start_function=session.start_function,
+        )
+        template = self._resolve_business_template(session, language)
+        route = business_route_from_model(model) or business_route_from_template(template)
+
+        interview_state = self.build_interview_state(session, model, language)
+        structured_ready = bool(interview_state["brief"]["ready"])
+        phase = str(interview_state["stage"])
+        next_decision = interview_state.get("next_decision")
+        blocker = (
+            {
+                "label": next_decision.get("label", ""),
+                "question": next_decision.get("question", ""),
+            }
+            if isinstance(next_decision, dict)
+            else {}
+        )
+
+        prompt_parts = [interview_role_prompt(language)]
+        prompt_parts.append(
+            build_intake_prompt_contract(
+                mode=mode,
+                business_route=route,
+                user_turn_count=sum(
+                    1
+                    for message in session.messages
+                    if isinstance(message, dict) and message.get("role") == "user"
+                ),
+                language=language,
+            )
+        )
+        template_baseline = build_template_baseline_prompt(
+            template,
+            fallback_name=session.applied_template_name,
+            language=language,
+        )
+        if template_baseline:
+            prompt_parts.append(template_baseline)
+        methodology_state = (
+            ""
+            if structured_ready
+            else self._pm_methodology_state_for_prompt(session, language)
+        )
+        if methodology_state:
+            prompt_parts.append(methodology_state)
+        prompt_parts.append(
+            build_runtime_state_prompt(
+                model=model,
+                phase=phase,
+                blocker=blocker,
+                progress={
+                    "confirmed_count": interview_state["brief"][
+                        "confirmed_decisions"
+                    ],
+                    "total_count": interview_state["brief"]["total_decisions"],
+                },
+                language=language,
+            )
+        )
+        prompt_parts.append(
+            (
+                "可见回复合同（最高优先级）：只总结本轮新确认的事实，最多两点；"
+                "不要提问，不要输出 A/B/C 或其他选项，不要输出阶段、分数或百分比。"
+                "唯一下一问题由界面的 InterviewStateV2 卡片展示。"
+                if language == "zh"
+                else (
+                    "VISIBLE RESPONSE CONTRACT (highest priority): summarize at most two "
+                    "newly confirmed facts. Do not ask a question, offer A/B/C choices, "
+                    "or mention stages, scores, or percentages. The only next question "
+                    "is rendered by the InterviewStateV2 card."
+                )
+            )
+        )
         prompt_parts.append(self._language_output_instruction(language))
         return "\n\n".join(part for part in prompt_parts if part)
 
@@ -7855,8 +10494,64 @@ class RequirementCollectorService:
         design_path: str,
         language: str,
         ic_substrate_evidence: dict[str, Any] | None = None,
+        coding_contract: dict[str, Any] | None = None,
     ) -> str:
         normalized = self._normalize_language(language)
+        if coding_contract is not None:
+            contract_json = json.dumps(
+                coding_contract,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+            instructions = {
+                "zh": (
+                    "你正在为一个已确认的工程合同实现可运行系统。\n"
+                    "PRIMARY EXECUTION CONTRACT\n"
+                    "1. `coding_contract` 是唯一的主执行依据；Build Brief 仅作上下文补充。\n"
+                    "2. 严格按 P-01 到 P-05 顺序实现，每个包满足 done_when 后再继续。\n"
+                    "3. 所有功能、页面、规则和验收都保留合同 ID，便于代码和测试追踪。\n"
+                    "4. 不推测公式、字段、状态、owner、SLA、写回或范围外功能。\n"
+                    "5. 有未决信息时记录到 ASSUMPTIONS.md，并采用最保守的只读行为。\n"
+                    "6. 最终必须给出可运行项目、关键路径测试、README 和验证结果。"
+                ),
+                "de": (
+                    "Implementiere ein lauffaehiges System aus einem bestaetigten Engineering-Vertrag.\n"
+                    "PRIMARY EXECUTION CONTRACT\n"
+                    "1. `coding_contract` ist die primaere Ausfuehrungsquelle; der Build Brief dient nur als Zusatzkontext.\n"
+                    "2. Fuehre P-01 bis P-05 der Reihe nach aus und erfuellen jeweils `done_when`.\n"
+                    "3. Behalte Vertrags-IDs in Code und Tests fuer die Rueckverfolgbarkeit bei.\n"
+                    "4. Erfinde keine Formeln, Felder, Status, Owner, SLAs, Writebacks oder zusaetzlichen Scope.\n"
+                    "5. Offene Punkte nach ASSUMPTIONS.md schreiben und konservatives Read-only-Verhalten nutzen.\n"
+                    "6. Liefere ein lauffaehiges Projekt, Tests, README und Verifikation."
+                ),
+                "ms": (
+                    "Laksanakan sistem yang boleh dijalankan daripada kontrak kejuruteraan yang disahkan.\n"
+                    "PRIMARY EXECUTION CONTRACT\n"
+                    "1. `coding_contract` ialah sumber pelaksanaan utama; Build Brief hanya konteks sokongan.\n"
+                    "2. Laksanakan P-01 hingga P-05 mengikut urutan dan penuhi setiap `done_when`.\n"
+                    "3. Kekalkan ID kontrak dalam kod dan ujian untuk kebolehkesanan.\n"
+                    "4. Jangan reka formula, medan, status, pemilik, SLA, writeback atau skop tambahan.\n"
+                    "5. Catat perkara belum selesai dalam ASSUMPTIONS.md dan gunakan tingkah laku baca sahaja.\n"
+                    "6. Hasilkan projek boleh jalan, ujian, README dan bukti pengesahan."
+                ),
+                "en": (
+                    "Implement one runnable system from a confirmed engineering contract.\n"
+                    "PRIMARY EXECUTION CONTRACT\n"
+                    "1. Treat `coding_contract` as the primary execution source; the Build Brief is supporting context only.\n"
+                    "2. Execute P-01 through P-05 in order and satisfy each packet's `done_when` before continuing.\n"
+                    "3. Preserve contract IDs in code and tests for traceability.\n"
+                    "4. Do not invent formulas, fields, states, owners, SLAs, writeback, or extra scope.\n"
+                    "5. Record unresolved details in ASSUMPTIONS.md and use conservative read-only behavior.\n"
+                    "6. Finish with a runnable project, critical-path tests, README, and verification evidence."
+                ),
+            }
+            return (
+                f"{instructions.get(normalized, instructions['en'])}\n\n"
+                f"Session: {session_title or 'Untitled Session'} ({session_id})\n"
+                f"Build Brief: {prd_path}\n\n"
+                f"coding_contract={contract_json}"
+            ).strip()
+
         template = IMPLEMENTATION_PROMPT_TEMPLATE_BY_LANGUAGE.get(normalized, IMPLEMENTATION_PROMPT_TEMPLATE_EN)
         design_instruction = self._implementation_design_instruction(design_path, normalized)
         prompt = template.format(
@@ -7934,10 +10629,6 @@ class RequirementCollectorService:
             return normalized
         return "zh"
 
-    def _language_for_user_message(self, language: str | None, user_message: str) -> str:
-        _ = user_message
-        return self._normalize_language(language)
-
     def _parse_datetime(self, raw_value: Any) -> datetime | None:
         try:
             parsed = datetime.fromisoformat(str(raw_value))
@@ -7951,7 +10642,12 @@ class RequirementCollectorService:
         normalized = self._normalize_language(language)
         return OUTPUT_LANGUAGE_INSTRUCTIONS.get(normalized, OUTPUT_LANGUAGE_INSTRUCTIONS["en"])
 
-    def _ensure_choice_question_format(self, text: str, language: str) -> str:
+    def _ensure_choice_question_format(
+        self,
+        text: str,
+        language: str,
+        previous_user_message: str = "",
+    ) -> str:
         stripped = text.strip()
         if not stripped:
             return stripped
@@ -7959,7 +10655,19 @@ class RequirementCollectorService:
             return stripped
         if self._has_choice_options(stripped):
             return stripped
+        if self._is_fallback_choice_reply(previous_user_message, language):
+            return stripped
         return f"{stripped}\n\n{self._fallback_choice_block(language)}"
+
+    def _is_fallback_choice_reply(self, text: str, language: str) -> bool:
+        normalized = " ".join(str(text or "").split()).casefold()
+        if not normalized:
+            return False
+        fallback_choices = self._fallback_choice_block(language).splitlines()[1:]
+        return any(
+            normalized == " ".join(choice.split()).casefold()
+            for choice in fallback_choices
+        )
 
     def _looks_like_clarification_question(self, text: str, language: str) -> bool:
         normalized = self._normalize_language(language)
@@ -7991,28 +10699,28 @@ class RequirementCollectorService:
         if normalized == "zh":
             return (
                 "为了继续推进，我先给三个选项：\n"
-                "A. 先按一个可落地的 v1 假设推进\n"
-                "B. 我补充真实业务口径或例外情况\n"
+                "A. 我现在补充准确答案\n"
+                "B. 请给一个可编辑的示例\n"
                 "C. 这个点先保持待确认"
             )
         if normalized == "de":
             return (
                 "Zum Weiterkommen schlage ich drei Optionen vor:\n"
-                "A. Mit einer praktikablen V1-Annahme fortfahren\n"
-                "B. Ich ergaenze die echte Fachdefinition oder Ausnahme\n"
+                "A. Ich gebe jetzt die genaue Antwort\n"
+                "B. Zeige mir ein konkretes Beispiel zum Bearbeiten\n"
                 "C. Diesen Punkt vorerst offen lassen"
             )
         if normalized == "ms":
             return (
                 "Untuk teruskan, saya cadangkan tiga pilihan:\n"
-                "A. Teruskan dengan andaian v1 yang praktikal\n"
-                "B. Saya tambah definisi bisnes sebenar atau pengecualian\n"
+                "A. Saya akan beri jawapan tepat sekarang\n"
+                "B. Tunjukkan satu contoh konkrit untuk saya sunting\n"
                 "C. Kekalkan perkara ini sebagai belum disahkan"
             )
         return (
             "To keep moving, choose one option:\n"
-            "A. Use a practical v1 assumption and continue\n"
-            "B. I will provide the exact wording or an exception\n"
+            "A. I will provide the exact answer now\n"
+            "B. Show me one concrete example to edit\n"
             "C. Leave this pending for now"
         )
 
@@ -8115,6 +10823,12 @@ class RequirementCollectorService:
                 doc_markdown=doc_markdown,
             )
 
+        session = self._require_session(session_id)
+        interview_state = self.build_interview_state(
+            session,
+            structured_requirement_model,
+            language,
+        )
         return {
             "session_id": session_id,
             "document_markdown": doc_markdown,
@@ -8124,6 +10838,7 @@ class RequirementCollectorService:
             "saved_at": persisted["saved_at"],
             "summary": structured_requirement_model,
             "structured_requirement_model": structured_requirement_model,
+            "interview_state": interview_state,
             "status": status,
             "prd_v0_ready": False,
         }
@@ -8143,6 +10858,11 @@ class RequirementCollectorService:
             doc_markdown=doc_markdown,
             created_at=created_at,
         )
+        session = self._require_session(session_id)
+        source_model = self._canonical_model_for_fingerprint(
+            session,
+            self._empty_structured_requirement_model(),
+        )
         message_id = self._append_message(
             session_id=session_id,
             role="assistant",
@@ -8151,6 +10871,15 @@ class RequirementCollectorService:
             download_filename=download_filename,
             storage_path=str(file_path),
             created_at=created_at.isoformat(),
+            metadata={
+                "document": {
+                    "schema_version": "2.0",
+                    "source_model_fingerprint": self._structured_model_fingerprint(
+                        source_model
+                    ),
+                    "source_chat_message_count": self._message_count(session.messages),
+                }
+            },
         )
         return {
             "message_id": message_id,
@@ -8949,12 +11678,21 @@ class RequirementCollectorService:
         # Top-level open_questions are PRD caveats/notes, not a chat-loop gate. Only
         # field-level pending_questions block generation because they are tied to a
         # specific structured requirement item the user still needs to confirm.
-        blocking_question_count = pending_question_count
+        blocking_question_count = sum(
+            len(
+                self._string_list(
+                    collection_status.get(key, {}).get("pending_questions")
+                    if isinstance(collection_status.get(key), dict)
+                    else []
+                )
+            )
+            for key in STRUCTURED_REQUIREMENT_GENERATION_CORE_KEYS
+        )
         fully_confirmed = (
             total_count > 0
             and confirmed_count == total_count
             and conflict_count == 0
-            and blocking_question_count == 0
+            and pending_question_count == 0
         )
         total_weight = sum(
             STRUCTURED_REQUIREMENT_PROGRESS_WEIGHTS.get(key, 1.0)
@@ -8976,10 +11714,18 @@ class RequirementCollectorService:
             statuses_by_name.get(key) == "confirmed"
             for key in STRUCTURED_REQUIREMENT_GENERATION_CORE_KEYS
         )
-        # Formal-document gate (kept in sync with frontend structuredRequirementProgress.ts):
-        # every structured requirement item must be confirmed. This app no longer
-        # treats pending fields as a PRD V0/draft handoff path.
-        ready_to_generate = fully_confirmed
+        core_conflict_count = sum(
+            1
+            for key in STRUCTURED_REQUIREMENT_GENERATION_CORE_KEYS
+            if statuses_by_name.get(key) == "conflict"
+        )
+        ready_to_generate = (
+            core_requirements_confirmed
+            and core_conflict_count == 0
+            and blocking_question_count == 0
+        )
+        if ready_to_generate:
+            readiness_percentage = 100
 
         return {
             "total_count": total_count,

@@ -14,6 +14,7 @@ from xml.etree import ElementTree
 from flask import Blueprint, Response, current_app, jsonify, request, send_file, stream_with_context
 
 from .services.llm_client import LLMError
+from .services.coding_contract import render_coding_contract_markdown
 from .services.requirement_collector import RequirementCollectorService
 from .services.asr_client import ASRError
 
@@ -120,6 +121,36 @@ def _request_language(default: str = "zh") -> str:
     payload = request.get_json(silent=True) or {}
     language = str(payload.get("language", request.args.get("language", default))).strip().lower()
     return language or default
+
+
+def _reply_context_from_payload(
+    payload: dict[str, object],
+) -> tuple[dict[str, str] | None, str]:
+    raw_context = payload.get("reply_context")
+    if raw_context is None:
+        return None, ""
+    if not isinstance(raw_context, dict):
+        return None, "Field `reply_context` must be an object."
+    action = str(raw_context.get("action", "")).strip()
+    decision_id = str(raw_context.get("decision_id", "")).strip()
+    proposal_id = str(raw_context.get("proposal_id", "")).strip()
+    if action not in {
+        "request_example",
+        "accept_proposal",
+        "defer_decision",
+    }:
+        return None, "Unsupported `reply_context.action`."
+    if not decision_id:
+        return None, "Field `reply_context.decision_id` is required."
+    if action == "accept_proposal" and not proposal_id:
+        return None, "Field `reply_context.proposal_id` is required."
+    context = {
+        "action": action,
+        "decision_id": decision_id,
+    }
+    if proposal_id:
+        context["proposal_id"] = proposal_id
+    return context, ""
 
 
 def _truncate_attachment_text(text: str) -> tuple[str, bool]:
@@ -429,6 +460,44 @@ def _structured_requirement_response(
     return response
 
 
+def _session_detail_payload(
+    service: RequirementCollectorService,
+    session,
+    language: str,
+) -> dict[str, object]:
+    snapshot = service.get_structured_requirement_snapshot(session.id, language)
+    structured_requirement_model = snapshot["structured_requirement_model"]
+    conversation_chain_state = snapshot["conversation_chain_state"]
+    launch_context = service.build_session_launch_context(
+        session,
+        language,
+        structured_requirement_model=structured_requirement_model,
+        conversation_chain_state=conversation_chain_state,
+    )
+    return {
+        "session_id": session.id,
+        "title": session.title,
+        "language": session.language,
+        "prompt_template": session.prompt_template,
+        "applied_template_id": session.applied_template_id,
+        "applied_template_name": session.applied_template_name,
+        "start_function": session.start_function,
+        "intake_mode": launch_context["mode"],
+        "business_route": launch_context["business_route"],
+        "created_at": session.created_at,
+        "updated_at": session.updated_at,
+        "messages": session.messages,
+        "summary": structured_requirement_model,
+        "structured_requirement_model": structured_requirement_model,
+        "structured_requirement_sync_status": snapshot["structured_requirement_sync_status"],
+        "conversation_chain_state": conversation_chain_state,
+        "pm_methodology_state": snapshot["pm_methodology_state"],
+        "ic_substrate_evidence_state": snapshot["ic_substrate_evidence_state"],
+        "interview_state": snapshot["interview_state"],
+        "launch_context": launch_context,
+    }
+
+
 @api.post("/sessions")
 def create_session():
     service = _get_service()
@@ -437,6 +506,8 @@ def create_session():
     template_start_mode = str(payload.get("template_start_mode", "guided")).strip().lower()
     starter_department = str(payload.get("starter_department", "")).strip()
     start_function = str(payload.get("start_function", "from_scratch")).strip().lower()
+    intake_mode = str(payload.get("intake_mode", "")).strip().lower()
+    business_route = str(payload.get("business_route", "")).strip().lower()
     language = _request_language()
     try:
         session = service.create_session(
@@ -445,32 +516,15 @@ def create_session():
             template_start_mode=template_start_mode,
             starter_department=starter_department,
             start_function=start_function,
+            intake_mode=intake_mode or None,
+            business_route=business_route or None,
         )
     except KeyError:
         return jsonify({"error": "Business template not found."}), HTTPStatus.NOT_FOUND
     except ValueError as exc:
         return jsonify({"error": str(exc)}), HTTPStatus.BAD_REQUEST
-    structured_requirement_snapshot = service.get_structured_requirement_snapshot(session.id, language)
     return (
-        jsonify(
-            {
-                "session_id": session.id,
-                "title": session.title,
-                "prompt_template": session.prompt_template,
-                "applied_template_id": session.applied_template_id,
-                "applied_template_name": session.applied_template_name,
-                "start_function": session.start_function,
-                "created_at": session.created_at,
-                "updated_at": session.updated_at,
-                "messages": session.messages,
-                "summary": structured_requirement_snapshot["structured_requirement_model"],
-                "structured_requirement_model": structured_requirement_snapshot["structured_requirement_model"],
-                "structured_requirement_sync_status": structured_requirement_snapshot["structured_requirement_sync_status"],
-                "conversation_chain_state": structured_requirement_snapshot["conversation_chain_state"],
-                "pm_methodology_state": structured_requirement_snapshot["pm_methodology_state"],
-                "ic_substrate_evidence_state": structured_requirement_snapshot["ic_substrate_evidence_state"],
-            }
-        ),
+        jsonify(_session_detail_payload(service, session, language)),
         HTTPStatus.CREATED,
     )
 
@@ -531,30 +585,25 @@ def get_session(session_id: str):
     session = service.get_session(session_id)
     if session is None:
         return jsonify({"error": "Session not found."}), HTTPStatus.NOT_FOUND
-    structured_requirement_snapshot = service.get_structured_requirement_snapshot(
-        session_id,
-        _request_language(),
-    )
+    return jsonify(_session_detail_payload(service, session, _request_language()))
 
-    return jsonify(
-        {
-            "session_id": session.id,
-            "title": session.title,
-            "prompt_template": session.prompt_template,
-            "applied_template_id": session.applied_template_id,
-            "applied_template_name": session.applied_template_name,
-            "start_function": session.start_function,
-            "created_at": session.created_at,
-            "updated_at": session.updated_at,
-            "messages": session.messages,
-            "summary": structured_requirement_snapshot["structured_requirement_model"],
-            "structured_requirement_model": structured_requirement_snapshot["structured_requirement_model"],
-            "structured_requirement_sync_status": structured_requirement_snapshot["structured_requirement_sync_status"],
-            "conversation_chain_state": structured_requirement_snapshot["conversation_chain_state"],
-            "pm_methodology_state": structured_requirement_snapshot["pm_methodology_state"],
-            "ic_substrate_evidence_state": structured_requirement_snapshot["ic_substrate_evidence_state"],
-        }
-    )
+
+@api.patch("/sessions/<session_id>/language")
+def update_session_language(session_id: str):
+    payload = request.get_json(silent=True) or {}
+    language = str(payload.get("language", "")).strip().lower()
+    if language not in {"en", "de", "zh", "ms"}:
+        return (
+            jsonify({"error": "Field `language` must be one of: en, de, zh, ms."}),
+            HTTPStatus.BAD_REQUEST,
+        )
+
+    service = _get_service()
+    try:
+        session = service.set_session_language(session_id, language)
+    except KeyError:
+        return jsonify({"error": "Session not found."}), HTTPStatus.NOT_FOUND
+    return jsonify(_session_detail_payload(service, session, session.language))
 
 
 @api.delete("/sessions/<session_id>")
@@ -602,14 +651,25 @@ def send_message(session_id: str):
     user_message = str(payload.get("message", "")).strip()
     display_message = str(payload.get("display_message", "")).strip()
     language = str(payload.get("language", "zh")).strip()
-    if not user_message:
+    reply_context, reply_context_error = _reply_context_from_payload(payload)
+    if reply_context_error:
+        return jsonify({"error": reply_context_error}), HTTPStatus.BAD_REQUEST
+    if not user_message and reply_context is None:
         return jsonify({"error": "Field `message` is required."}), HTTPStatus.BAD_REQUEST
 
     service = _get_service()
     try:
-        result = service.send_user_message(session_id, user_message, language, display_message)
+        result = service.send_user_message(
+            session_id,
+            user_message,
+            language,
+            display_message,
+            reply_context=reply_context,
+        )
     except KeyError:
         return jsonify({"error": "Session not found."}), HTTPStatus.NOT_FOUND
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), HTTPStatus.BAD_REQUEST
     except LLMError as exc:
         return jsonify({"error": str(exc)}), HTTPStatus.BAD_GATEWAY
 
@@ -622,14 +682,23 @@ def stream_message(session_id: str):
     user_message = str(payload.get("message", "")).strip()
     display_message = str(payload.get("display_message", "")).strip()
     language = str(payload.get("language", "zh")).strip()
-    if not user_message:
+    reply_context, reply_context_error = _reply_context_from_payload(payload)
+    if reply_context_error:
+        return jsonify({"error": reply_context_error}), HTTPStatus.BAD_REQUEST
+    if not user_message and reply_context is None:
         return jsonify({"error": "Field `message` is required."}), HTTPStatus.BAD_REQUEST
 
     service = _get_service()
 
     def event_stream():
         try:
-            for item in service.stream_user_message(session_id, user_message, language, display_message):
+            for item in service.stream_user_message(
+                session_id,
+                user_message,
+                language,
+                display_message,
+                reply_context=reply_context,
+            ):
                 event_name = item.get("event", "message")
                 data = json.dumps(item, ensure_ascii=False)
                 yield f"event: {event_name}\n"
@@ -906,6 +975,24 @@ def download_prd_doc(session_id: str):
     return _send_generated_document_file(service, result)
 
 
+@api.get("/sessions/<session_id>/coding-contract")
+def get_coding_contract(session_id: str):
+    language = _request_language()
+    service = _get_service()
+    try:
+        contract = service.build_coding_contract(session_id, language)
+    except KeyError:
+        return jsonify({"error": "Session not found."}), HTTPStatus.NOT_FOUND
+
+    if request.args.get("format", "").strip().lower() == "json":
+        return jsonify(contract)
+
+    markdown = render_coding_contract_markdown(contract)
+    response = Response(markdown, mimetype="text/markdown")
+    response.headers["Content-Disposition"] = "attachment; filename=coding-contract.md"
+    return response
+
+
 @api.get("/sessions/<session_id>/implementation-context")
 def get_implementation_context(session_id: str):
     language = _request_language()
@@ -957,7 +1044,12 @@ def create_coding_handoff(session_id: str):
     payload = result.get("payload") if isinstance(result.get("payload"), dict) else result
     if not payload.get("handoff_ready", True):
         handoff_gaps = payload.get("handoff_gaps") or payload.get("methodology_gaps", [])
-        gap_summary = ", ".join(str(item) for item in handoff_gaps) or "handoff gate not ready"
+        gap_summary = ", ".join(
+            str(item.get("label") or item.get("key") or item.get("status") or item)
+            if isinstance(item, dict)
+            else str(item)
+            for item in handoff_gaps
+        ) or "handoff gate not ready"
         return (
             jsonify(
                 {
@@ -974,7 +1066,11 @@ def create_coding_handoff(session_id: str):
         "expires_at": result["expires_at"],
         "documents_ready": payload.get("documents_ready", True),
         "handoff_ready": payload.get("handoff_ready", True),
+        "handoff_gaps": payload.get("handoff_gaps", []),
         "methodology_ready": payload.get("methodology_ready", True),
+        "workflow_mode": payload.get("workflow_mode", "scratch"),
+        "coding_contract": payload.get("coding_contract", {}),
+        "coding_contract_markdown": payload.get("coding_contract_markdown", ""),
         "implementation_prompt": payload.get("implementation_prompt", ""),
         "documents": payload.get("documents", []),
         "ic_substrate_evidence": payload.get("ic_substrate_evidence", {}),

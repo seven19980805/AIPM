@@ -1,0 +1,40 @@
+{
+  "template_id": "ai_pm_quality_inspection_zh_cn",
+  "template_key": "ai_pm_quality_inspection",
+  "template_name": "Quality 质量检验基线",
+  "template_category": "ai_pm_baseline",
+  "business_domain": "Quality",
+  "business_route": "quality",
+  "product_scope": "ai_pm_v2",
+  "language": "zh-CN",
+  "version": "2.0.0",
+  "status": "enabled",
+  "description": "适用于检验、缺陷复核、处置、放行、CAPA 和证据判断的紧凑基线；所有基线内容仍需用户确认。",
+  "tags": ["quality", "inspection", "defect", "release"],
+  "applicable_scenarios": ["质量复核看板", "缺陷处置或放行流程"],
+  "render_config": {
+    "format": "markdown",
+    "markdown_relative_path": "data/PRD_template/ai-pm-quality-inspection.zh-CN.md"
+  },
+  "storage_model": "structured_requirement_template.v2",
+  "sections": [
+    {"section_key": "outcome", "section_title": "业务结果", "sort_order": 1, "fields": [{"field_key": "outcome.decision"}]},
+    {"section_key": "users", "section_title": "用户与负责人", "sort_order": 2, "fields": [{"field_key": "users.primary"}]},
+    {"section_key": "scope", "section_title": "首版范围", "sort_order": 3, "fields": [{"field_key": "scope.boundary"}]},
+    {"section_key": "workflow", "section_title": "业务流程", "sort_order": 4, "fields": [{"field_key": "workflow.primary"}]},
+    {"section_key": "rules", "section_title": "业务规则", "sort_order": 5, "fields": [{"field_key": "rules.confirmed"}]},
+    {"section_key": "data", "section_title": "数据边界", "sort_order": 6, "fields": [{"field_key": "data.source"}]},
+    {"section_key": "acceptance", "section_title": "验收证据", "sort_order": 7, "fields": [{"field_key": "acceptance.evidence"}]}
+  ],
+  "prompt_hints": [
+    {"key": "baseline", "text": "模板只是未确认基线，不能当作用户事实。"},
+    {"key": "data", "text": "数据只能来自 SQL Server、SAP 或用户手动上传 Excel/CSV。"}
+  ],
+  "prompt_questions": [
+    {"key": "scenario", "question": "首先要改善哪个质量判断或动作？"},
+    {"key": "user", "question": "谁负责这个判断和证据？"},
+    {"key": "scope", "question": "最小可用首版是什么？"},
+    {"key": "rule", "question": "哪个缺陷、放行或关闭规则是硬约束？"},
+    {"key": "acceptance", "question": "什么证据能让验收负责人签字？"}
+  ]
+}

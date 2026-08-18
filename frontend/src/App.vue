@@ -3,21 +3,67 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 
 import type { BusinessTemplateDetail, BusinessTemplateSummary } from './types/businessTemplate'
 import MarkdownRenderer from './components/MarkdownRenderer.vue'
+import EmptySessionLanding from './components/interview/EmptySessionLanding.vue'
+import NextDecisionCard from './components/interview/NextDecisionCard.vue'
 import RequirementMarkdownPreview from './components/RequirementMarkdownPreview.vue'
-import StructuredRequirementPanel from './components/StructuredRequirementPanel.vue'
+import TemplateCatalog from './components/TemplateCatalog.vue'
+import ConversationWorkspace from './components/workspace/ConversationWorkspace.vue'
+import RequirementInspector from './components/workspace/RequirementInspector.vue'
+import WorkspaceHeader from './components/workspace/WorkspaceHeader.vue'
+import { apiJson, apiUrl } from './api/http'
+import {
+  createSessionRequest as requestSessionCreation,
+  fetchSession,
+  fetchSessions,
+  updateSessionLanguage,
+} from './api/sessions'
+import {
+  fetchBusinessTemplate,
+  fetchBusinessTemplates,
+} from './api/templates'
+import { buildIntakeSessionRequest } from './features/session/intakeSession'
+import {
+  extractSessionLaunchContext,
+  shouldResetSessionWorkspace,
+} from './features/session/sessionLaunch'
+import { buildTemplateSessionRequest } from './features/templates/templateStart'
+import {
+  loadLanguagePreference,
+  saveLanguagePreference,
+} from './features/preferences/languagePreference'
+import { createSessionLanguageSync } from './features/session/sessionLanguageSync'
+import { buildMessageRequestBody } from './features/interview/messageRequest'
+import {
+  buildGoCodingTargetUrl,
+  closeGoCodingWindow,
+  isGoCodingTargetReachable,
+  navigateGoCodingWindow,
+  reserveGoCodingWindow,
+  type GoCodingWindow,
+} from './features/handoff/goCodingWindow'
 import { extractChoiceReplyOptions, type ChoiceReplyOption } from './lib/choiceReplyOptions'
-import { computeStructuredRequirementProgress } from './lib/structuredRequirementProgress'
 import type {
   ChatMessage,
   ChatMessagePayload,
+  BusinessRoute,
   CodingHandoffCreateResponse,
   GeneratedDocumentResponse,
+  IntakeMode,
   LanguageCode,
   MessageResponse,
   PromptTemplate,
   SessionDetail,
+  SessionLaunchContext,
+  SessionLaunchSuggestion,
   SessionSummary,
+  StartFunction,
 } from './types/session'
+import {
+  extractInterviewState,
+  shouldShowLegacyChoiceReplies,
+  type InterviewReplyContext,
+  type InterviewStateV2,
+} from './types/interviewState'
 import {
   createEmptyConversationChainState,
   createEmptyICSubstrateEvidenceState,
@@ -28,6 +74,7 @@ import {
   extractPMMethodologyState,
   extractStructuredRequirementModel,
   hasStructuredRequirementContent,
+  mergePMMethodologyState,
   type ConversationChainState,
   type ICSubstrateEvidenceState,
   type PMMethodologyState,
@@ -54,8 +101,7 @@ type PendingAttachment = {
   visualCount: number
 }
 
-type StartFunction = 'from_scratch' | 'improve_draft'
-type NewChatDepartmentKey = 'production' | 'quality' | 'tdi' | 'others'
+type NewChatDepartmentKey = BusinessRoute
 type FastSeedShapeKey =
   | 'dashboard'
   | 'tracker'
@@ -98,7 +144,6 @@ const messages = ref<ChatMessage[]>([])
 const chatList = ref<HTMLElement | null>(null)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const attachmentInputRef = ref<HTMLInputElement | null>(null)
-const languageMenuRef = ref<HTMLDetailsElement | null>(null)
 
 const THEME_STORAGE_KEY = 'ats-aipm-theme'
 const SESSION_TITLE_MAX_CHARS = 10
@@ -122,9 +167,11 @@ const structuredRequirementModel = ref<StructuredRequirementModel>(createEmptySt
 const conversationChainState = ref<ConversationChainState>(createEmptyConversationChainState())
 const pmMethodologyState = ref<PMMethodologyState>(createEmptyPMMethodologyState())
 const icSubstrateEvidenceState = ref<ICSubstrateEvidenceState>(createEmptyICSubstrateEvidenceState())
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+const interviewState = ref<InterviewStateV2 | null>(null)
+const sessionLaunchContext = ref<SessionLaunchContext | null>(null)
 const GO_CODING_URL = resolveExternalUrl(import.meta.env.VITE_GO_CODING_URL, 'http://localhost:8888')
 let structuredRequirementRequestToken = 0
+let sessionDetailRequestToken = 0
 let structuredRequirementRefreshTimer: ReturnType<typeof window.setTimeout> | null = null
 const activeReplyCount = ref(0)
 const activeMessagePipelineCount = ref(0)
@@ -134,9 +181,6 @@ const loadingTemplateDetail = ref(false)
 const templateDialogError = ref('')
 const selectedBusinessTemplateId = ref('')
 const previewPanelOpen = ref(false)
-const documentGenerationConfirmOpen = ref(false)
-const documentGenerationConfirmMessage = ref('')
-const documentGenerationMethodologyMessage = ref('')
 const deleteSessionConfirmOpen = ref(false)
 const deleteSessionConfirmTargetId = ref('')
 const currentWorkspaceView = ref<'chat' | 'templates'>('chat')
@@ -150,9 +194,15 @@ const audioContext = ref<AudioContext | null>(null)
 const scriptProcessor = ref<ScriptProcessorNode | null>(null)
 
 const hasSession = computed(() => Boolean(sessionId.value))
-const currentLanguage = ref<LanguageCode>('en')
+const currentLanguage = ref<LanguageCode>(
+  loadLanguagePreference(resolveLanguagePreferenceStorage()),
+)
+const sessionContentLanguage = ref<LanguageCode | ''>('')
+let languageSwitchIsExplicit = false
+const syncSessionLanguage = createSessionLanguageSync(updateSessionLanguage)
 const themeMode = ref<ThemeMode>(resolveInitialThemeMode())
-const sidebarCollapsed = ref(false)
+const sidebarCollapsed = ref(resolveInitialSidebarCollapsed())
+const inspectorOpen = ref(false)
 const sending = computed(() => activeReplyCount.value > 0)
 const messagePipelineActive = computed(() => activeMessagePipelineCount.value > 0)
 const syncingStructuredRequirement = computed(() => activeStructuredRequirementSyncCount.value > 0)
@@ -162,9 +212,8 @@ const canSendComposerMessage = computed(() =>
   !generatingDocuments.value &&
   !switchingSession.value,
 )
-const structuredRequirementProgress = computed(() =>
-  computeStructuredRequirementProgress(structuredRequirementModel.value),
-)
+const showReasoning =
+  import.meta.env.DEV && String(import.meta.env.VITE_SHOW_REASONING || '').toLowerCase() === 'true'
 const PRD_V0_MINIMUM_USER_SEED_LENGTH = 4
 const PRD_V0_CHOICE_ONLY_MAX_LENGTH = 160
 const hasUserRequirementSeed = computed(() =>
@@ -181,7 +230,7 @@ const translations = {
     historyEmpty: 'No conversation history yet',
     untitledChat: 'New Chat',
     newChat: 'New Chat',
-    generatePrd: 'Generate Documents',
+    generatePrd: 'Generate Build Brief',
     generatePrdV0: 'Continue discovery',
     generatingPrd: 'Generating documents...',
     sending: 'Sending...',
@@ -205,11 +254,12 @@ const translations = {
     failedToCreate: 'Failed to create session',
     failedToLoadHistory: 'Failed to load conversation history',
     failedToLoadSession: 'Failed to load session',
+    languageSwitchFailed: 'Could not switch the session language. The previous language is still in use.',
     failedToGenerate: 'Failed to generate documents',
     microphoneAccessError: 'Unable to access microphone',
     speechRecognitionError: 'Speech recognition failed',
     attachmentUploadError: 'Failed to read attachment',
-    prdDocLabel: 'Requirements Doc',
+    prdDocLabel: 'Build Brief',
     designDocLabel: 'Design Doc',
     downloadMarkdown: 'Download DOCX',
     streamingError: 'Streaming response error',
@@ -256,6 +306,7 @@ const translations = {
     templateSessionBadge: 'Template session',
     failedToLoadTemplates: 'Failed to load template library',
     failedToOpenGoCoding: 'Failed to open coding workspace',
+    goCodingUnavailable: 'The configured Coding workspace is not reachable. Start it or check VITE_GO_CODING_URL, then try again.',
     newChatStartTitle: 'What do you want to build today?',
     newChatStartSubtitle: 'Start a conversation first. Use templates or upload a draft only when you already have one.',
     newChatProductionDesc: 'Production planning, yield, WIP, lot flow, output, and operating dashboards.',
@@ -283,7 +334,7 @@ const translations = {
     historyEmpty: 'Noch kein Verlauf vorhanden',
     untitledChat: 'Neuer Chat',
     newChat: 'Neuer Chat',
-    generatePrd: 'Dokumente erzeugen',
+    generatePrd: 'Build Brief erzeugen',
     generatePrdV0: 'Discovery fortsetzen',
     generatingPrd: 'Dokumente werden erzeugt...',
     sending: 'Wird gesendet...',
@@ -307,11 +358,12 @@ const translations = {
     failedToCreate: 'Chat konnte nicht erstellt werden',
     failedToLoadHistory: 'Verlauf konnte nicht geladen werden',
     failedToLoadSession: 'Chat konnte nicht geladen werden',
+    languageSwitchFailed: 'Sprache konnte nicht gewechselt werden. Die bisherige Sprache bleibt aktiv.',
     failedToGenerate: 'Dokumente konnten nicht erstellt werden',
     microphoneAccessError: 'Kein Zugriff auf das Mikrofon',
     speechRecognitionError: 'Spracherkennung fehlgeschlagen',
     attachmentUploadError: 'Anhang konnte nicht gelesen werden',
-    prdDocLabel: 'Anforderungsdokument',
+    prdDocLabel: 'Build Brief',
     designDocLabel: 'Design-Dokument',
     downloadMarkdown: 'DOCX herunterladen',
     streamingError: 'Fehler bei der Streaming-Antwort',
@@ -358,6 +410,7 @@ const translations = {
     templateSessionBadge: 'Vorlagen-Sitzung',
     failedToLoadTemplates: 'Vorlagenbibliothek konnte nicht geladen werden',
     failedToOpenGoCoding: 'Coding-Workspace konnte nicht geoeffnet werden',
+    goCodingUnavailable: 'Das konfigurierte Coding-Workspace ist nicht erreichbar. Starte es oder pruefe VITE_GO_CODING_URL und versuche es erneut.',
     newChatStartTitle: 'Was moechtest du heute bauen?',
     newChatStartSubtitle: 'Starte zuerst eine Unterhaltung. Nutze Vorlagen oder lade einen Draft nur hoch, wenn bereits einer existiert.',
     newChatProductionDesc: 'Produktionsplanung, Yield, WIP, Lot Flow, Output und operative Dashboards.',
@@ -385,7 +438,7 @@ const translations = {
     historyEmpty: '还没有历史会话',
     untitledChat: '新建对话',
     newChat: '新建对话',
-    generatePrd: '生成文档',
+    generatePrd: '生成开发简报',
     generatePrdV0: '继续访谈',
     generatingPrd: '正在生成文档...',
     sending: '发送中...',
@@ -409,11 +462,12 @@ const translations = {
     failedToCreate: '创建对话失败',
     failedToLoadHistory: '加载历史会话失败',
     failedToLoadSession: '加载会话失败',
+    languageSwitchFailed: '切换会话语言失败，仍在使用原来的语言。',
     failedToGenerate: '生成文档失败',
     microphoneAccessError: '无法访问麦克风',
     speechRecognitionError: '语音识别失败',
     attachmentUploadError: '附件读取失败',
-    prdDocLabel: '需求文档',
+    prdDocLabel: '开发简报',
     designDocLabel: '设计文档',
     downloadMarkdown: '下载 DOCX',
     streamingError: '流式响应错误',
@@ -460,6 +514,7 @@ const translations = {
     templateSessionBadge: '模板会话',
     failedToLoadTemplates: '加载模板库失败',
     failedToOpenGoCoding: '打开 Coding 工作区失败',
+    goCodingUnavailable: '配置的 Coding 工作区当前不可访问。请先启动该服务或检查 VITE_GO_CODING_URL，然后重试。',
     newChatStartTitle: '今天想做什么系统？',
     newChatStartSubtitle: '默认从零对话；也可以打开模板库，已有半成品再上传完善。',
     newChatProductionDesc: '生产计划、良率、WIP、lot 流转、产出和运营看板。',
@@ -486,7 +541,7 @@ const translations = {
     historyEmpty: 'Belum ada sejarah perbualan',
     untitledChat: 'Sembang Baharu',
     newChat: 'Sembang Baharu',
-    generatePrd: 'Jana Dokumen',
+    generatePrd: 'Jana Build Brief',
     generatePrdV0: 'Teruskan discovery',
     generatingPrd: 'Sedang menjana dokumen...',
     sending: 'Menghantar...',
@@ -510,11 +565,12 @@ const translations = {
     failedToCreate: 'Gagal mencipta sesi',
     failedToLoadHistory: 'Gagal memuatkan sejarah perbualan',
     failedToLoadSession: 'Gagal memuatkan sesi',
+    languageSwitchFailed: 'Gagal menukar bahasa sesi. Bahasa sebelumnya masih digunakan.',
     failedToGenerate: 'Gagal menjana dokumen',
     microphoneAccessError: 'Tidak dapat mengakses mikrofon',
     speechRecognitionError: 'Pengecaman suara gagal',
     attachmentUploadError: 'Gagal membaca lampiran',
-    prdDocLabel: 'Dokumen Keperluan',
+    prdDocLabel: 'Build Brief',
     designDocLabel: 'Dokumen Reka Bentuk',
     downloadMarkdown: 'Muat Turun DOCX',
     streamingError: 'Ralat respons penstriman',
@@ -561,6 +617,7 @@ const translations = {
     templateSessionBadge: 'Sesi templat',
     failedToLoadTemplates: 'Gagal memuatkan pustaka templat',
     failedToOpenGoCoding: 'Gagal membuka workspace coding',
+    goCodingUnavailable: 'Workspace Coding yang dikonfigurasi tidak dapat dicapai. Mulakan servis itu atau semak VITE_GO_CODING_URL, kemudian cuba lagi.',
     newChatStartTitle: 'Apa yang mahu dibina hari ini?',
     newChatStartSubtitle: 'Mulakan perbualan dahulu. Guna templat atau muat naik draft hanya jika sudah ada.',
     newChatProductionDesc: 'Production planning, yield, WIP, lot flow, output dan dashboard operasi.',
@@ -615,6 +672,8 @@ const shellCopy = {
     currentConversationEmpty: 'The active session summary will appear here once the conversation starts.',
     activeSession: 'Active topic',
     messageCountLabel: 'Messages',
+    requirements: 'Requirements',
+    closeRequirements: 'Close requirements',
   },
   de: {
     heroTag: 'AT&S Requirements Workspace',
@@ -650,6 +709,8 @@ const shellCopy = {
     currentConversationEmpty: 'Sobald die Unterhaltung startet, erscheint hier eine Zusammenfassung der aktiven Sitzung.',
     activeSession: 'Aktives Thema',
     messageCountLabel: 'Nachrichten',
+    requirements: 'Anforderungen',
+    closeRequirements: 'Anforderungen schliessen',
   },
   zh: {
     heroTag: 'AT&S 需求工作台',
@@ -685,6 +746,8 @@ const shellCopy = {
     currentConversationEmpty: '系统将自动记录当前对话，并支持会话追溯。',
     activeSession: '当前主题',
     messageCountLabel: '消息数',
+    requirements: '需求',
+    closeRequirements: '关闭需求面板',
   },  ms: {
     heroTag: 'AT&S requirements workspace',
     heroLead: 'Halo,',
@@ -719,6 +782,8 @@ const shellCopy = {
     currentConversationEmpty: 'Ringkasan sesi aktif akan muncul di sini sebaik sahaja perbualan bermula.',
     activeSession: 'Topik aktif',
     messageCountLabel: 'Mesej',
+    requirements: 'Requirement',
+    closeRequirements: 'Tutup panel requirement',
   },
 } satisfies Record<
   LanguageCode,
@@ -756,6 +821,8 @@ const shellCopy = {
     currentConversationEmpty: string
     activeSession: string
     messageCountLabel: string
+    requirements: string
+    closeRequirements: string
   }
 >
 
@@ -780,18 +847,6 @@ const activeIcSubstrateDepartment = computed<'production' | 'quality' | 'tdi' | 
   }
   return ''
 })
-const assistantIntroText = computed(() => {
-  if (activeIcSubstrateDepartment.value === 'production') {
-    return shellText.value.assistantIntroProduction
-  }
-  if (activeIcSubstrateDepartment.value === 'quality') {
-    return shellText.value.assistantIntroQuality
-  }
-  if (activeIcSubstrateDepartment.value === 'tdi') {
-    return shellText.value.assistantIntroTdi
-  }
-  return shellText.value.assistantIntro
-})
 const composerPlaceholderText = computed(() => {
   if (activeIcSubstrateDepartment.value === 'production') {
     return shellText.value.composerPlaceholderProduction
@@ -804,8 +859,15 @@ const composerPlaceholderText = computed(() => {
   }
   return shellText.value.composerPlaceholder
 })
-const welcomeChoiceOptions = computed(() => extractChoiceReplyOptions(assistantIntroText.value))
-const documentGenerationActionLabel = computed(() => t.value.generatePrd)
+const documentGenerationActionLabel = computed(
+  () =>
+    ({
+      en: 'Generate Build Brief',
+      zh: '生成开发简报',
+      de: 'Build Brief erzeugen',
+      ms: 'Jana Build Brief',
+    })[currentLanguage.value],
+)
 function icSubstrateDepartmentRouteLabel(department: string): string {
   if (department === 'production') {
     return 'Production'
@@ -877,12 +939,15 @@ const composerFastSeedOptions = computed<FastSeedOption[]>(() => {
 const latestPrdDocument = computed(() => findLatestDocumentMessage('prd_doc'))
 const latestDesignDocument = computed(() => findLatestDocumentMessage('design_doc'))
 const canGenerateDocumentsForCurrentState = computed(() =>
-  structuredRequirementProgress.value.readyToGenerate,
+  Boolean(interviewState.value?.actions.can_generate_brief),
 )
 const canOpenGoCoding = computed(() =>
   hasSession.value &&
-  canGenerateDocumentsForCurrentState.value &&
-  Boolean(latestPrdDocument.value),
+  Boolean(interviewState.value?.actions.can_handoff),
+)
+const briefProgressLabel = computed(
+  () =>
+    `${interviewState.value?.brief.confirmed_decisions ?? 0}/${interviewState.value?.brief.total_decisions ?? 5}`,
 )
 type ConversationGoalStepKey = 'seed' | 'interview' | 'handoff'
 const conversationGoalVisible = computed(() =>
@@ -890,7 +955,7 @@ const conversationGoalVisible = computed(() =>
   Boolean(activeIcSubstrateDepartment.value || hasUserRequirementSeed.value || latestPrdDocument.value),
 )
 const conversationGoalCurrentStep = computed<ConversationGoalStepKey>(() => {
-  if (structuredRequirementProgress.value.readyToGenerate) {
+  if (interviewState.value?.brief.ready) {
     return 'handoff'
   }
   if (hasUserMessage.value) {
@@ -1002,18 +1067,22 @@ const conversationGoalSteps = computed(() =>
 const showProcessRail = computed(() => false)
 const composerGoCodingReadyCta = computed(() => canOpenGoCoding.value)
 const composerGoCodingHelpText = computed(() => {
-  if (!structuredRequirementProgress.value.readyToGenerate) {
-    const blockers = structuredRequirementProgress.value.blockingQuestionCount
+  if (!interviewState.value?.brief.ready) {
+    const remaining = Math.max(
+      (interviewState.value?.brief.total_decisions ?? 5) -
+        (interviewState.value?.brief.confirmed_decisions ?? 0),
+      0,
+    )
     if (currentLanguage.value === 'zh') {
-      return `需求信息还不够稳定；右侧仍有 ${blockers} 个字段级阻塞问题。先补齐关键缺口，再生成文档。`
+      return `还需确认 ${remaining} 项快速决策；请回答输入框上方的唯一问题。`
     }
     if (currentLanguage.value === 'de') {
-      return `Die Anforderung ist noch nicht stabil genug; rechts bleiben ${blockers} blockierende Feldfragen. Klaere zuerst die groessten Luecken, dann Dokumente erzeugen.`
+      return `${remaining} Schnellentscheidungen sind noch offen. Beantworte die einzelne Frage ueber dem Eingabefeld.`
     }
     if (currentLanguage.value === 'ms') {
-      return `Requirement belum cukup stabil; masih ada ${blockers} soalan field yang menghalang. Tutup gap utama dahulu, kemudian jana dokumen.`
+      return `${remaining} keputusan pantas masih belum selesai. Jawab satu soalan di atas ruang input.`
     }
-    return `Requirements are not stable enough yet; ${blockers} blocking field questions remain. Close the key gaps first, then generate documents.`
+    return `${remaining} quick decisions remain. Answer the single question above the composer.`
   }
   if (!latestPrdDocument.value) {
     if (currentLanguage.value === 'zh') {
@@ -1066,7 +1135,10 @@ const conversationGoalActionDisabled = computed(() => {
   return true
 })
 function goCodingNotReadyMessage(): string {
-  if (structuredRequirementProgress.value.readyToGenerate && !latestPrdDocument.value) {
+  if (
+    interviewState.value?.brief.ready &&
+    interviewState.value?.brief.document_status !== 'current'
+  ) {
     if (currentLanguage.value === 'zh') {
       return 'Go Coding 需要先有生成完成的需求文档。请先点击“生成文档”，确认文档 OK 后再交接到 Vibe Coding。'
     }
@@ -1096,7 +1168,6 @@ const selectedBusinessTemplate = computed<BusinessTemplateDetail | null>(() => {
   }
   return businessTemplateDetails.value[templateId] ?? null
 })
-let documentGenerationConfirmResolver: ((confirmed: boolean) => void) | null = null
 let deleteSessionConfirmResolver: ((confirmed: boolean) => void) | null = null
 const languageOptions: Array<{ code: LanguageCode; label: string }> = [
   { code: 'en', label: 'English' },
@@ -1108,7 +1179,6 @@ const icSubstrateStartDepartments: Array<{ key: NewChatDepartmentKey; label: str
   { key: 'production', label: 'Production', description: 'newChatProductionDesc', disabled: false },
   { key: 'quality', label: 'Quality', description: 'newChatQualityDesc', disabled: false },
   { key: 'tdi', label: 'TDI', description: 'newChatTdiDesc', disabled: false },
-  { key: 'others', label: 'Others', description: 'newChatOthersDesc', disabled: true },
 ]
 const sidebarToggleAriaLabel = computed(() =>
   sidebarCollapsed.value ? t.value.expandSidebar : t.value.collapseSidebar,
@@ -1123,9 +1193,6 @@ const newChatActionDisabled = computed(
     Boolean(applyingTemplateId.value),
 )
 
-const currentLanguageLabel = computed(
-  () => languageOptions.find((option) => option.code === currentLanguage.value)?.label || languageOptions[0].label,
-)
 const themeToggleLabel = computed(() => {
   const target = themeMode.value === 'dark' ? 'light' : 'dark'
   if (currentLanguage.value === 'zh') {
@@ -1193,6 +1260,47 @@ const sessionCountLabel = computed(() => `${sessions.value.length} ${t.value.ses
 const templateCountLabel = computed(() => `${localizedBusinessTemplates.value.length} ${t.value.templatesLabel}`)
 const isChatView = computed(() => currentWorkspaceView.value === 'chat')
 const isTemplateLibraryView = computed(() => currentWorkspaceView.value === 'templates')
+
+function asBusinessRoute(value: unknown): BusinessRoute | '' {
+  const normalized = String(value || '').trim().toLowerCase()
+  return normalized === 'production' || normalized === 'quality' || normalized === 'tdi'
+    ? normalized
+    : ''
+}
+
+const emptySessionRouteSelected = computed<BusinessRoute | ''>(
+  () => asBusinessRoute(sessionLaunchContext.value?.business_route) || activeIcSubstrateDepartment.value,
+)
+const emptySessionRouteOptions = computed<Array<{
+  id: BusinessRoute
+  label: string
+  text: string
+}>>(() => {
+  const launchOptions = new Map<BusinessRoute, SessionLaunchSuggestion>()
+  for (const suggestion of sessionLaunchContext.value?.suggestions ?? []) {
+    const route = asBusinessRoute(suggestion.id)
+    if (route) {
+      launchOptions.set(route, suggestion)
+    }
+  }
+  return icSubstrateStartDepartments
+    .filter((department) => !department.disabled)
+    .map((department) => {
+      const launchOption = launchOptions.get(department.key)
+      return {
+        id: department.key,
+        label: launchOption?.label || department.label,
+        text: newChatDepartmentDescription(department.key),
+      }
+    })
+})
+const emptySessionStarters = computed(() => {
+  if (!emptySessionRouteSelected.value) {
+    return []
+  }
+  return (sessionLaunchContext.value?.suggestions ?? [])
+    .filter((suggestion) => !asBusinessRoute(suggestion.id))
+})
 const previewToggleLabel = computed(() => {
   if (currentLanguage.value === 'zh') {
     return previewPanelOpen.value ? '收起预览' : '预览文档'
@@ -1261,7 +1369,7 @@ const fastDiscoveryRoundCurrent = computed(() =>
 )
 const fastDiscoveryRoundLabel = computed(() => {
   const round = fastDiscoveryRoundCurrent.value
-  if (structuredRequirementProgress.value.readyToGenerate) {
+  if (interviewState.value?.brief.ready) {
     if (currentLanguage.value === 'zh') return latestPrdDocument.value ? '可交接 Vibe Coding' : '文档可生成'
     if (currentLanguage.value === 'de') return latestPrdDocument.value ? 'Handoff bereit' : 'Dokument bereit'
     if (currentLanguage.value === 'ms') return latestPrdDocument.value ? 'Handoff ready' : 'Dokumen ready'
@@ -1661,14 +1769,46 @@ const templateTagLabels: Record<string, Record<LanguageCode, string>> = {
   },
 }
 function selectLanguage(lang: LanguageCode) {
+  // Only a switch the user actually performed may persist the session's
+  // content language; every other assignment is presentation-only.
+  languageSwitchIsExplicit = true
   currentLanguage.value = lang
-  if (languageMenuRef.value) {
-    languageMenuRef.value.open = false
+}
+
+function resolveLanguagePreferenceStorage(): Storage | null {
+  if (typeof window === 'undefined') {
+    return null
+  }
+  try {
+    return window.localStorage
+  } catch {
+    return null
   }
 }
 
 function toggleSidebar() {
   sidebarCollapsed.value = !sidebarCollapsed.value
+  if (!sidebarCollapsed.value) {
+    inspectorOpen.value = false
+  }
+}
+
+function closeCompactOverlays() {
+  sidebarCollapsed.value = true
+  inspectorOpen.value = false
+}
+
+function toggleInspector() {
+  inspectorOpen.value = !inspectorOpen.value
+  if (inspectorOpen.value) {
+    sidebarCollapsed.value = true
+  }
+}
+
+function closeSidebarOnCompactView() {
+  if (typeof window !== 'undefined' && window.matchMedia('(max-width: 1040px)').matches) {
+    sidebarCollapsed.value = true
+  }
 }
 
 function togglePreviewPanel() {
@@ -1681,11 +1821,13 @@ function closePreviewPanel() {
 
 function openChatView() {
   currentWorkspaceView.value = 'chat'
+  closeSidebarOnCompactView()
 }
 
 function openTemplateLibraryView() {
   closePreviewPanel()
   currentWorkspaceView.value = 'templates'
+  closeSidebarOnCompactView()
 }
 
 function clearError() {
@@ -1741,13 +1883,6 @@ function sessionTemplateName(session: SessionSummary): string {
   )
 }
 
-function apiUrl(path: string): string {
-  if (!API_BASE_URL) {
-    return path
-  }
-  return `${API_BASE_URL}${path}`
-}
-
 function absoluteApiUrl(path: string): string {
   return new URL(apiUrl(path), window.location.origin).toString()
 }
@@ -1793,6 +1928,11 @@ function resolveInitialThemeMode(): ThemeMode {
   }
 
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
+function resolveInitialSidebarCollapsed(): boolean {
+  return typeof window !== 'undefined'
+    && Boolean(window.matchMedia?.('(max-width: 1040px)').matches)
 }
 
 function toggleThemeMode() {
@@ -1889,12 +2029,18 @@ function resetStructuredRequirementState() {
   conversationChainState.value = createEmptyConversationChainState()
   pmMethodologyState.value = createEmptyPMMethodologyState()
   icSubstrateEvidenceState.value = createEmptyICSubstrateEvidenceState()
+  interviewState.value = null
   structuredRequirementError.value = ''
   loadingStructuredRequirement.value = false
   activeStructuredRequirementSyncCount.value = 0
 }
 
 function applyStructuredRequirementPayload(payload: unknown) {
+  const nextInterviewState = extractInterviewState(payload)
+  if (nextInterviewState) {
+    interviewState.value = nextInterviewState
+  }
+
   const chainState = extractConversationChainState(payload)
   if (chainState) {
     conversationChainState.value = chainState
@@ -1902,7 +2048,10 @@ function applyStructuredRequirementPayload(payload: unknown) {
 
   const methodologyState = extractPMMethodologyState(payload)
   if (methodologyState) {
-    pmMethodologyState.value = methodologyState
+    pmMethodologyState.value = mergePMMethodologyState(
+      pmMethodologyState.value,
+      methodologyState,
+    )
   }
 
   const evidenceState = extractICSubstrateEvidenceState(payload)
@@ -2055,22 +2204,6 @@ function formatMessageTime(timestamp?: string): string {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date)
-}
-
-async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(apiUrl(path), {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    ...init,
-  })
-
-  const data = await response.json().catch(() => ({}))
-  if (!response.ok) {
-    const errorMessage = typeof data?.error === 'string' ? data.error : `Request failed: ${response.status}`
-    throw new Error(errorMessage)
-  }
-  return data as T
 }
 
 function attachmentContextText(payload: AttachmentExtractionResponse): string {
@@ -2258,12 +2391,11 @@ function downloadLatestGeneratedDocument(kind: 'prd' | 'design') {
   triggerDocumentDownload(target.downloadUrl, target.downloadFilename)
 }
 
-function redirectToGoCoding(token: string) {
-  const targetUrl = new URL(GO_CODING_URL)
-  targetUrl.searchParams.set('source', 'rqmd')
-  targetUrl.searchParams.set('handoff_token', token)
-  targetUrl.searchParams.set('pm_api_base_url', pmApiBaseUrlForExternalHandoff())
-  window.open(targetUrl.toString(), '_blank', 'noopener')
+function redirectToGoCoding(token: string, popup: GoCodingWindow) {
+  navigateGoCodingWindow(
+    popup,
+    buildGoCodingTargetUrl(GO_CODING_URL, token, pmApiBaseUrlForExternalHandoff()),
+  )
 }
 
 async function openGoCoding() {
@@ -2279,29 +2411,39 @@ async function openGoCoding() {
   }
 
   clearError()
+  const popup = reserveGoCodingWindow(window.open.bind(window))
+  if (!popup) {
+    globalError.value = t.value.failedToOpenGoCoding
+    return
+  }
   openingGoCoding.value = true
+  let redirected = false
 
   try {
+    if (!await isGoCodingTargetReachable(GO_CODING_URL)) {
+      globalError.value = t.value.goCodingUnavailable
+      return
+    }
     const payload = await apiJson<CodingHandoffCreateResponse>(
       `/api/sessions/${sessionId.value}/coding-handoff?language=${encodeURIComponent(currentLanguage.value)}`,
       {
         method: 'POST',
       },
     )
-    redirectToGoCoding(payload.handoff_token)
+    redirectToGoCoding(payload.handoff_token, popup)
+    redirected = true
   } catch (error) {
     globalError.value = formatError(error, t.value.failedToOpenGoCoding)
   } finally {
+    if (!redirected) {
+      closeGoCodingWindow(popup)
+    }
     openingGoCoding.value = false
   }
 }
 
 async function openGoCodingWhenReady(): Promise<boolean> {
   await nextTick()
-  if (!structuredRequirementProgress.value.readyToGenerate && sessionId.value) {
-    await loadStructuredRequirement(sessionId.value, { background: false })
-    await nextTick()
-  }
   if (!canOpenGoCoding.value && sessionId.value) {
     await syncCurrentSessionDetail(sessionId.value)
     await nextTick()
@@ -2315,8 +2457,8 @@ async function openGoCodingWhenReady(): Promise<boolean> {
 }
 
 async function loadSessions() {
-  const data = await apiJson<{ sessions: SessionSummary[] }>('/api/sessions')
-  sessions.value = (data.sessions ?? []).map((item) => ({
+  const data = await fetchSessions()
+  sessions.value = data.map((item) => ({
     ...item,
     prompt_template: normalizePromptTemplate(item.prompt_template),
     applied_template_id: item.applied_template_id || '',
@@ -2325,8 +2467,7 @@ async function loadSessions() {
 }
 
 async function loadBusinessTemplates() {
-  const data = await apiJson<{ templates: BusinessTemplateSummary[] }>('/api/templates')
-  businessTemplates.value = data.templates ?? []
+  businessTemplates.value = await fetchBusinessTemplates()
 }
 
 async function ensureBusinessTemplateDetail(templateId: string): Promise<BusinessTemplateDetail> {
@@ -2335,7 +2476,7 @@ async function ensureBusinessTemplateDetail(templateId: string): Promise<Busines
     return cached
   }
 
-  const detail = await apiJson<BusinessTemplateDetail>(`/api/templates/${templateId}`)
+  const detail = await fetchBusinessTemplate(templateId)
   businessTemplateDetails.value = {
     ...businessTemplateDetails.value,
     [templateId]: detail,
@@ -2344,26 +2485,25 @@ async function ensureBusinessTemplateDetail(templateId: string): Promise<Busines
 }
 
 function buildDocumentGenerationConfirmMessage(): string {
-  const progress = structuredRequirementProgress.value
+  const nextQuestion = interviewState.value?.next_decision?.question || ''
   if (currentLanguage.value === 'zh') {
-    return `当前文档就绪度为 ${progress.readinessPercentage}%，收集覆盖率为 ${progress.collectionCoveragePercentage}%，确认完成度为 ${progress.confirmationPercentage}%。生成文档需要无冲突、覆盖率至少 75%、确认完成度至少 40%；Go Coding 只能在文档生成并确认 OK 后交接到 Vibe Coding。请先补齐右侧关键缺口。`
+    return nextQuestion
+      ? `快速决策尚未完成。请先回答：${nextQuestion}`
+      : '快速决策尚未完成，请继续回答当前问题后再生成开发简报。'
   }
   if (currentLanguage.value === 'de') {
-    return `Die Dokumentreife liegt bei ${progress.readinessPercentage}%, die Erfassungsquote bei ${progress.collectionCoveragePercentage}% und der Bestaetigungsstand bei ${progress.confirmationPercentage}%. Dokumenterzeugung braucht keine Konflikte, mindestens 75% Abdeckung und mindestens 40% Bestaetigung; Go Coding uebergibt erst nach erzeugtem und geprueftem Dokument an Vibe Coding. Bitte zuerst die groessten Luecken klaeren.`
+    return nextQuestion
+      ? `Die Schnellentscheidungen sind noch nicht abgeschlossen. Bitte beantworte zuerst: ${nextQuestion}`
+      : 'Die Schnellentscheidungen sind noch nicht abgeschlossen. Beantworte die aktive Frage, bevor du den Build Brief erzeugst.'
   }
   if (currentLanguage.value === 'ms') {
-    return `Kesediaan dokumen kini ${progress.readinessPercentage}%, liputan kutipan ${progress.collectionCoveragePercentage}% dan kemajuan pengesahan ${progress.confirmationPercentage}%. Penjanaan dokumen perlukan tiada konflik, liputan sekurang-kurangnya 75% dan pengesahan sekurang-kurangnya 40%; Go Coding hanya handoff ke Vibe Coding selepas dokumen dijana dan OK. Sila tutup gap utama dahulu.`
+    return nextQuestion
+      ? `Keputusan pantas belum lengkap. Jawab dahulu: ${nextQuestion}`
+      : 'Keputusan pantas belum lengkap. Jawab soalan aktif sebelum menjana Build Brief.'
   }
-  return `Document readiness is ${progress.readinessPercentage}%, collection coverage is ${progress.collectionCoveragePercentage}%, and confirmation progress is ${progress.confirmationPercentage}%. Document generation requires no conflicts, at least 75% coverage, and at least 40% confirmation; Go Coding only hands off to Vibe Coding after the document has been generated and reviewed. Please resolve the key gaps first.`
-}
-
-function resolveDocumentGenerationConfirm(confirmed: boolean) {
-  documentGenerationConfirmOpen.value = false
-  documentGenerationConfirmMessage.value = ''
-  documentGenerationMethodologyMessage.value = ''
-  const resolver = documentGenerationConfirmResolver
-  documentGenerationConfirmResolver = null
-  resolver?.(confirmed)
+  return nextQuestion
+    ? `The quick decisions are not complete. Answer this first: ${nextQuestion}`
+    : 'The quick decisions are not complete. Answer the active question before generating the Build Brief.'
 }
 
 function requestDeleteSessionConfirm(targetSessionId: string): Promise<boolean> {
@@ -2450,27 +2590,48 @@ async function loadSession(targetSessionId: string) {
   }
 
   clearError()
+  const requestToken = ++sessionDetailRequestToken
   switchingSession.value = true
 
   try {
-    const data = await apiJson<SessionDetail>(
-      `/api/sessions/${targetSessionId}?language=${encodeURIComponent(currentLanguage.value)}`,
-    )
-    applySessionDetail(data)
+    const data = await fetchSession(targetSessionId, currentLanguage.value)
+    if (requestToken !== sessionDetailRequestToken) {
+      return
+    }
+    applySessionDetail(data, { resetComposer: true })
     await nextTick()
     scrollToBottom()
   } catch (error) {
+    if (requestToken !== sessionDetailRequestToken) {
+      return
+    }
     globalError.value = formatError(error, t.value.failedToLoadSession)
   } finally {
-    switchingSession.value = false
+    if (requestToken === sessionDetailRequestToken) {
+      switchingSession.value = false
+    }
   }
 }
 
-function applySessionDetail(data: SessionDetail) {
+function applySessionDetail(
+  data: SessionDetail,
+  options: { resetComposer?: boolean } = {},
+) {
+  if (shouldResetSessionWorkspace(sessionId.value, data.session_id)) {
+    resetStructuredRequirementState()
+  }
+  if (options.resetComposer) {
+    inputText.value = ''
+    pendingAttachment.value = null
+    if (attachmentInputRef.value) {
+      attachmentInputRef.value.value = ''
+    }
+  }
   sessionId.value = data.session_id
+  sessionContentLanguage.value = data.language || ''
   messages.value = normalizeMessages(data.messages ?? [])
-  structuredRequirementError.value = ''
   applyStructuredRequirementPayload(data)
+  sessionLaunchContext.value = extractSessionLaunchContext(data, currentLanguage.value)
   if (shouldRefreshStructuredRequirement(data.structured_requirement_sync_status)) {
     void loadStructuredRequirement(
       data.session_id,
@@ -2487,9 +2648,7 @@ async function syncCurrentSessionDetail(targetSessionId: string) {
   }
 
   try {
-    const data = await apiJson<SessionDetail>(
-      `/api/sessions/${targetSessionId}?language=${encodeURIComponent(currentLanguage.value)}`,
-    )
+    const data = await fetchSession(targetSessionId, currentLanguage.value)
     if (sessionId.value !== targetSessionId) {
       return
     }
@@ -2506,6 +2665,8 @@ async function createSession(
     templateId?: string
     starterDepartment?: string
     startFunction?: StartFunction
+    intakeMode?: IntakeMode
+    businessRoute?: string
   } = {},
 ) {
   if (messagePipelineActive.value || generatingDocuments.value || loadingSession.value) {
@@ -2513,24 +2674,33 @@ async function createSession(
   }
 
   clearError()
+  ++sessionDetailRequestToken
   loadingSession.value = true
   currentWorkspaceView.value = 'chat'
 
   try {
-    const data = await apiJson<SessionDetail>('/api/sessions', {
-      method: 'POST',
-      body: JSON.stringify({
-        language: currentLanguage.value,
-        ...(options.templateId ? { template_id: options.templateId } : {}),
-        ...(options.starterDepartment ? { starter_department: options.starterDepartment } : {}),
-        ...(options.startFunction ? { start_function: options.startFunction } : {}),
-      }),
-    })
+    const payload = options.templateId
+      ? buildTemplateSessionRequest(
+        options.templateId,
+        currentLanguage.value,
+        {
+          businessRoute: options.businessRoute || options.starterDepartment,
+        },
+      )
+      : options.intakeMode && (options.businessRoute || options.starterDepartment)
+        ? buildIntakeSessionRequest(
+          options.intakeMode,
+          options.businessRoute || options.starterDepartment || '',
+          currentLanguage.value,
+        )
+        : {
+          language: currentLanguage.value,
+          ...(options.starterDepartment ? { starter_department: options.starterDepartment } : {}),
+          ...(options.startFunction ? { start_function: options.startFunction } : {}),
+        }
+    const data = await requestSessionCreation(payload)
 
-    sessionId.value = data.session_id
-    messages.value = normalizeMessages(data.messages ?? [])
-    resetStructuredRequirementState()
-    applyStructuredRequirementPayload(data)
+    applySessionDetail(data, { resetComposer: true })
     await loadSessions()
     await nextTick()
     scrollToBottom()
@@ -2547,6 +2717,7 @@ function openNewChatChooser() {
   if (newChatActionDisabled.value) {
     return
   }
+  closeSidebarOnCompactView()
   newChatChooserOpen.value = true
 }
 
@@ -3048,10 +3219,7 @@ function newChatDepartmentDescription(department: NewChatDepartmentKey): string 
   if (department === 'quality') {
     return t.value.newChatQualityDesc
   }
-  if (department === 'tdi') {
-    return t.value.newChatTdiDesc
-  }
-  return t.value.newChatOthersDesc
+  return t.value.newChatTdiDesc
 }
 
 async function openDraftNewChatPicker(department: string, autoGenerateDocuments = false) {
@@ -3074,6 +3242,8 @@ async function startIcSubstrateNewChat(
   const created = await createSession({
     starterDepartment: department,
     startFunction,
+    intakeMode: startFunction === 'improve_draft' ? 'draft' : 'scratch',
+    businessRoute: department,
   })
   if (!created && draftAttachment) {
     await restoreDraftAttachmentForManualRetry(draftAttachment)
@@ -3095,6 +3265,17 @@ async function startIcSubstrateNewChat(
     autoResizeTextarea()
     textareaRef.value?.focus()
   }
+}
+
+async function selectEmptySessionRoute(route: BusinessRoute) {
+  if (
+    messages.value.length ||
+    emptySessionRouteSelected.value ||
+    newChatActionDisabled.value
+  ) {
+    return
+  }
+  await startIcSubstrateNewChat(route, 'from_scratch')
 }
 
 function openTemplateLibraryFromNewChatChooser() {
@@ -3165,8 +3346,7 @@ async function launchBusinessTemplateSession(
   templateId: string,
   options: {
     closeDialog?: boolean
-    starterDepartment?: string
-    startFunction?: StartFunction
+    businessRoute?: string
   } = {},
 ) {
   if (
@@ -3185,10 +3365,12 @@ async function launchBusinessTemplateSession(
   templateDialogError.value = ''
 
   try {
+    const template = localizedBusinessTemplates.value.find((item) => item.template_id === templateId)
+    const businessRoute = options.businessRoute || template?.business_route || template?.business_domain || ''
     const created = await createSession({
       templateId,
-      starterDepartment: options.starterDepartment,
-      startFunction: options.startFunction,
+      intakeMode: 'template',
+      businessRoute,
     })
     if (created) {
       currentWorkspaceView.value = 'chat'
@@ -3234,6 +3416,7 @@ async function selectSession(targetSessionId: string) {
   }
   currentWorkspaceView.value = 'chat'
   await loadSession(targetSessionId)
+  closeSidebarOnCompactView()
 }
 
 async function deleteSession(targetSessionId: string) {
@@ -3370,6 +3553,7 @@ async function sendMessageStream(
   language: LanguageCode = 'zh',
   pipelineState?: { replyReleased: boolean; syncStarted: boolean },
   displayMessage?: string,
+  replyContext?: InterviewReplyContext,
 ): Promise<{ receivedSummary: boolean }> {
   let receivedSummary = false
   const response = await fetch(apiUrl(`/api/sessions/${session}/messages/stream`), {
@@ -3377,7 +3561,14 @@ async function sendMessageStream(
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ message, language, display_message: displayMessage || message }),
+    body: JSON.stringify(
+      buildMessageRequestBody({
+        message,
+        language,
+        displayMessage: displayMessage || message,
+        replyContext,
+      }),
+    ),
   })
 
   if (!response.ok) {
@@ -3465,10 +3656,18 @@ async function sendMessageFallback(
   assistantMessage: ChatMessage,
   language: LanguageCode = 'zh',
   displayMessage?: string,
+  replyContext?: InterviewReplyContext,
 ) {
   const data = await apiJson<MessageResponse>(`/api/sessions/${session}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ message, language, display_message: displayMessage || message }),
+    body: JSON.stringify(
+      buildMessageRequestBody({
+        message,
+        language,
+        displayMessage: displayMessage || message,
+        replyContext,
+      }),
+    ),
   })
 
   const parsed = parseThinkContent(data.assistant_message || '')
@@ -3627,22 +3826,6 @@ async function sendPrdDocFallback(
   await sendDocumentFallback(session, 'prd-doc', assistantMessage, language)
 }
 
-async function sendDesignDocStream(
-  session: string,
-  assistantMessage: ChatMessage,
-  language: LanguageCode = 'zh',
-) {
-  await sendDocumentStream(session, 'design-doc', assistantMessage, language)
-}
-
-async function sendDesignDocFallback(
-  session: string,
-  assistantMessage: ChatMessage,
-  language: LanguageCode = 'zh',
-) {
-  await sendDocumentFallback(session, 'design-doc', assistantMessage, language)
-}
-
 function scrollToBottom() {
   const align = (remainingFrames = 2) => {
     if (!chatList.value) {
@@ -3744,25 +3927,6 @@ function buildChoiceReplyValue(option: ChoiceReplyOption): string {
   return `${option.value}\n${seedTail}`
 }
 
-function welcomeChoiceSeedShape(option: ChoiceReplyOption): FastSeedShapeKey | '' {
-  if (!activeIcSubstrateDepartment.value) {
-    return ''
-  }
-  const optionIndex = ({ A: 0, B: 1, C: 2 } as Partial<Record<ChoiceReplyOption['key'], number>>)[option.key]
-  if (optionIndex === undefined) {
-    return ''
-  }
-  return fastSeedShapeKeysForDepartment(activeIcSubstrateDepartment.value)[optionIndex] ?? ''
-}
-
-function buildWelcomeChoiceReplyValue(option: ChoiceReplyOption): string {
-  const seedShape = welcomeChoiceSeedShape(option)
-  if (!seedShape || !activeIcSubstrateDepartment.value) {
-    return buildChoiceReplyValue(option)
-  }
-  return starterDepartmentIntakeSeed(activeIcSubstrateDepartment.value, seedShape)
-}
-
 function isImmediateVibeCodingOpenText(text: string): boolean {
   const normalized = text.trim().toLowerCase()
   if (!normalized) {
@@ -3834,7 +3998,10 @@ function isLatestAssistantChoiceMessage(message: ChatMessage, index: number): bo
 }
 
 function choiceReplyOptions(message: ChatMessage, index: number): ChoiceReplyOption[] {
-  if (!isLatestAssistantChoiceMessage(message, index)) {
+  if (
+    !shouldShowLegacyChoiceReplies(interviewState.value) ||
+    !isLatestAssistantChoiceMessage(message, index)
+  ) {
     return []
   }
   return extractChoiceReplyOptions(message.content)
@@ -3865,7 +4032,7 @@ async function sendChoiceReply(option: ChoiceReplyOption) {
   await sendMessage()
 }
 
-async function sendWelcomeChoiceReply(option: ChoiceReplyOption) {
+async function selectLaunchSuggestion(text: string) {
   if (
     pendingAttachment.value ||
     sending.value ||
@@ -3874,9 +4041,10 @@ async function sendWelcomeChoiceReply(option: ChoiceReplyOption) {
   ) {
     return
   }
-  inputText.value = buildWelcomeChoiceReplyValue(option)
+  inputText.value = text
   await nextTick()
-  await sendMessage()
+  autoResizeTextarea()
+  textareaRef.value?.focus()
 }
 
 async function generatePanelDocuments() {
@@ -3923,7 +4091,59 @@ async function triggerConversationGoalAction() {
   }
 }
 
-async function sendMessage(forceGeneratePrdV0AfterSend: boolean | Event = false): Promise<boolean> {
+function focusComposerInput() {
+  textareaRef.value?.focus()
+}
+
+async function editInterviewProposal(text: string) {
+  inputText.value = text
+  await nextTick()
+  autoResizeTextarea()
+  textareaRef.value?.focus()
+}
+
+async function sendInterviewOption(text: string) {
+  if (sending.value || generatingDocuments.value || switchingSession.value) {
+    return
+  }
+  inputText.value = text
+  await nextTick()
+  await sendMessage()
+}
+
+async function sendInterviewReply(replyContext: InterviewReplyContext) {
+  if (sending.value || generatingDocuments.value || switchingSession.value) {
+    return
+  }
+  const labels = {
+    request_example: {
+      en: 'Show me one example',
+      zh: '给我一个例子',
+      de: 'Zeige mir ein Beispiel',
+      ms: 'Tunjukkan satu contoh',
+    },
+    accept_proposal: {
+      en: 'Adopt this proposal',
+      zh: '采用这个提案',
+      de: 'Diesen Vorschlag uebernehmen',
+      ms: 'Guna cadangan ini',
+    },
+    defer_decision: {
+      en: 'Keep this as an assumption and continue',
+      zh: '暂存为假设并继续',
+      de: 'Als Annahme vormerken und fortfahren',
+      ms: 'Simpan sebagai andaian dan teruskan',
+    },
+  } as const
+  inputText.value = labels[replyContext.action][currentLanguage.value]
+  await nextTick()
+  await sendMessage(false, replyContext)
+}
+
+async function sendMessage(
+  forceGeneratePrdV0AfterSend: boolean | Event = false,
+  replyContext?: InterviewReplyContext,
+): Promise<boolean> {
   void forceGeneratePrdV0AfterSend
   const typedMessage = inputText.value.trim()
   const attachment = pendingAttachment.value
@@ -3996,6 +4216,7 @@ async function sendMessage(forceGeneratePrdV0AfterSend: boolean | Event = false)
       currentLanguage.value,
       pipelineState,
       displayMessage,
+      replyContext,
     )
     assistantMessage.streaming = false
     const streamParsed = parseThinkContent(assistantMessage.content)
@@ -4003,7 +4224,14 @@ async function sendMessage(forceGeneratePrdV0AfterSend: boolean | Event = false)
     assistantMessage.thinking = [assistantMessage.thinking || '', streamParsed.thinking].filter(Boolean).join('\n\n')
 
     if (!assistantMessage.content.trim()) {
-      await sendMessageFallback(sessionId.value, message, assistantMessage, currentLanguage.value, displayMessage)
+      await sendMessageFallback(
+        sessionId.value,
+        message,
+        assistantMessage,
+        currentLanguage.value,
+        displayMessage,
+        replyContext,
+      )
     }
 
     await refreshHistory()
@@ -4038,7 +4266,6 @@ async function generateDocuments(_options: GenerateDocumentsOptions = {}) {
   if (
     !hasSession.value ||
     generatingDocuments.value ||
-    documentGenerationConfirmOpen.value ||
     messagePipelineActive.value ||
     switchingSession.value
   ) {
@@ -4073,18 +4300,6 @@ async function generateDocuments(_options: GenerateDocumentsOptions = {}) {
     }
     shouldRefreshHistory = true
 
-    if (generateFinalDocuments) {
-      const designMessage = appendReactiveMessage(createGeneratedDocumentMessage('design_doc'))
-      scrollToBottom()
-
-      await sendDesignDocStream(sessionId.value, designMessage, currentLanguage.value)
-      finishGeneratedDocumentMessage(designMessage)
-      if (!designMessage.content.trim()) {
-        await sendDesignDocFallback(sessionId.value, designMessage, currentLanguage.value)
-        finishGeneratedDocumentMessage(designMessage)
-      }
-      shouldRefreshHistory = true
-    }
     generatedSuccessfully = true
   } catch (error) {
     globalError.value = formatError(error, t.value.failedToGenerate)
@@ -4229,6 +4444,7 @@ onMounted(async () => {
 })
 
 watch(currentLanguage, (language, previousLanguage) => {
+  saveLanguagePreference(resolveLanguagePreferenceStorage(), language)
   const localizedTemplate = resolveLocalizedBusinessTemplateSummary(selectedBusinessTemplateId.value)
   if (localizedTemplate && localizedTemplate.template_id !== selectedBusinessTemplateId.value) {
     selectedBusinessTemplateId.value = localizedTemplate.template_id
@@ -4242,13 +4458,39 @@ watch(currentLanguage, (language, previousLanguage) => {
       })
   }
 
-  if (!sessionId.value || language === previousLanguage) {
+  const explicit = languageSwitchIsExplicit
+  languageSwitchIsExplicit = false
+  if (!explicit || language === previousLanguage) {
     return
   }
-  void loadStructuredRequirement(
-    sessionId.value,
-    { background: hasStructuredRequirementContent(structuredRequirementModel.value) },
-  )
+  const targetSessionId = sessionId.value
+  const serverLanguage = (sessionContentLanguage.value || previousLanguage) as LanguageCode
+  void syncSessionLanguage({
+    sessionId: targetSessionId,
+    language,
+    serverLanguage,
+  }).then(async (outcome) => {
+    if (outcome.status === 'stale' || outcome.status === 'skipped') {
+      return
+    }
+    if (outcome.status === 'failed') {
+      // The server still holds the previous language, so follow it back rather
+      // than leaving the UI claiming a language that was never persisted.
+      if (currentLanguage.value === language) {
+        currentLanguage.value = outcome.revertTo
+      }
+      sessionContentLanguage.value = outcome.revertTo
+      globalError.value = formatError(outcome.error, t.value.languageSwitchFailed)
+      return
+    }
+    if (sessionId.value !== targetSessionId || currentLanguage.value !== language) {
+      return
+    }
+    applySessionDetail(outcome.detail as SessionDetail)
+    await nextTick()
+    scrollToBottom()
+    await refreshHistory()
+  })
 })
 
 watch(messageRenderSignature, (signature, previousSignature) => {
@@ -4277,6 +4519,15 @@ watch(messageRenderSignature, (signature, previousSignature) => {
     </div>
 
     <main class="layout" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+      <button
+        v-if="!sidebarCollapsed"
+        class="compact-overlay-backdrop"
+        :class="{ 'sidebar-active': !sidebarCollapsed }"
+        type="button"
+        :aria-label="t.close"
+        @click="closeCompactOverlays"
+      ></button>
+
       <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
         <div class="sidebar-topbar">
           <div class="sidebar-identity">
@@ -4455,91 +4706,45 @@ watch(messageRenderSignature, (signature, previousSignature) => {
         </div>      </aside>
 
       <section class="main-shell">
-        <header class="main-topbar">
-          <div class="ats-lockup" aria-label="AT&S AI Platform">
-            <img class="ats-lockup-logo" src="./logo.svg" alt="AT&S AI Platform" />
-          </div>
+        <WorkspaceHeader
+          :language="currentLanguage"
+          :language-options="languageOptions"
+          :theme-mode="themeMode"
+          :theme-toggle-label="themeToggleLabel"
+          :theme-toggle-value="themeToggleValue"
+          :tagline="shellText.topbarTagline"
+          :navigation-label="t.expandSidebar"
+          :navigation-expanded="!sidebarCollapsed"
+          :language-label="t.languageSection"
+          :requirements-label="shellText.requirements"
+          :brief-progress-label="briefProgressLabel"
+          :inspector-open="inspectorOpen"
+          :show-inspector="isChatView && messages.length > 0"
+          @toggle-navigation="toggleSidebar"
+          @toggle-inspector="toggleInspector"
+          @toggle-theme="toggleThemeMode"
+          @select-language="selectLanguage"
+        />
 
-          <p class="main-topbar-tagline">{{ shellText.topbarTagline }}</p>
-
-          <div class="main-topbar-actions">
-            <button
-              class="theme-toggle"
-              type="button"
-              :aria-label="themeToggleLabel"
-              :title="themeToggleLabel"
-              @click="toggleThemeMode"
-            >
-              <span class="theme-toggle-icon" aria-hidden="true">
-                <svg v-if="themeMode === 'dark'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="4"/>
-                  <path d="M12 2v2"/>
-                  <path d="M12 20v2"/>
-                  <path d="m4.93 4.93 1.41 1.41"/>
-                  <path d="m17.66 17.66 1.41 1.41"/>
-                  <path d="M2 12h2"/>
-                  <path d="M20 12h2"/>
-                  <path d="m6.34 17.66-1.41 1.41"/>
-                  <path d="m19.07 4.93-1.41 1.41"/>
-                </svg>
-                <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.7 6.7 0 0 0 9.8 9.8Z"/>
-                </svg>
-              </span>
-              <span>{{ themeToggleValue }}</span>
-            </button>
-
-            <details ref="languageMenuRef" class="language-switcher">
-              <summary>
-                <span class="language-switcher-label">{{ t.languageSection }}</span>
-                <span class="language-switcher-value">{{ currentLanguageLabel }}</span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="6 9 12 15 18 9"/>
-                </svg>
-              </summary>
-
-              <div class="language-switcher-menu">
-                <button
-                  v-for="option in languageOptions"
-                  :key="option.code"
-                  type="button"
-                  class="language-switcher-option"
-                  :class="{ active: currentLanguage === option.code }"
-                  @click="selectLanguage(option.code)"
-                >
-                  {{ option.label }}
-                </button>
-              </div>
-            </details>
-          </div>
-        </header>
-
-        <div v-if="isChatView" class="main-stage">
+        <ConversationWorkspace
+          v-if="isChatView"
+          :inspector-open="inspectorOpen && messages.length > 0"
+          :single-column="!messages.length"
+          :close-inspector-label="shellText.closeRequirements"
+          @close-inspector="inspectorOpen = false"
+        >
           <section class="conversation-shell" :class="{ 'has-messages': messages.length > 0 }">
             <div v-if="!messages.length" class="welcome-stage">
-              <div class="welcome-copy">
-                <p class="welcome-kicker">{{ shellText.heroTag }}</p>
-              </div>
-
-              <div class="assistant-prompt">
-                <span class="assistant-prompt-badge">AI</span>
-                <p>{{ assistantIntroText }}</p>
-              </div>
-
-              <div v-if="welcomeChoiceOptions.length" class="welcome-quick-reply-options">
-                <button
-                  v-for="option in welcomeChoiceOptions"
-                  :key="option.key"
-                  class="welcome-quick-reply-option"
-                  type="button"
-                  :disabled="Boolean(pendingAttachment) || sending || generatingDocuments || switchingSession"
-                  @click="sendWelcomeChoiceReply(option)"
-                >
-                  <span>{{ option.key }}</span>
-                  <strong>{{ option.label }}</strong>
-                </button>
-              </div>
-
+              <EmptySessionLanding
+                v-if="!messages.length"
+                :language="currentLanguage"
+                :routes="emptySessionRouteOptions"
+                :selected-route="emptySessionRouteSelected"
+                :starters="emptySessionStarters"
+                :busy="Boolean(pendingAttachment) || sending || generatingDocuments || switchingSession"
+                @select-route="selectEmptySessionRoute"
+                @select-starter="selectLaunchSuggestion"
+              />
             </div>
 
             <div v-else class="chat-stream-shell">
@@ -4565,7 +4770,10 @@ watch(messageRenderSignature, (signature, previousSignature) => {
                     <span class="timestamp">{{ formatMessageTime(msg.createdAt) }}</span>
                   </div>
 
-                  <details v-if="msg.role === 'assistant' && msg.thinking" class="think-box">
+                  <details
+                    v-if="showReasoning && msg.role === 'assistant' && msg.thinking"
+                    class="think-box"
+                  >
                     <summary class="think-box-summary">
                       <svg class="think-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10"/>
@@ -4645,8 +4853,8 @@ watch(messageRenderSignature, (signature, previousSignature) => {
               </div>
             </div>
 
-            <div class="composer-zone">
-              <div v-if="hasSession" class="composer-context">
+            <div class="composer-zone" :class="{ 'empty-session-composer': !messages.length }">
+              <div v-if="hasSession && messages.length" class="composer-context">
                 <div v-if="showProcessRail && conversationGoalVisible" class="conversation-goal-strip" aria-live="polite">
                   <div class="conversation-goal-copy">
                     <span>{{ conversationGoalCopy.target }}</span>
@@ -4733,7 +4941,7 @@ watch(messageRenderSignature, (signature, previousSignature) => {
                 </div>
               </div>
 
-              <div v-if="showProcessRail && composerGoCodingReadyCta" class="composer-go-coding-ready">
+              <div v-if="messages.length && showProcessRail && composerGoCodingReadyCta" class="composer-go-coding-ready">
                 <p>{{ composerGoCodingHelpText }}</p>
                 <button
                   class="composer-go-coding-btn"
@@ -4745,7 +4953,7 @@ watch(messageRenderSignature, (signature, previousSignature) => {
                 </button>
               </div>
 
-              <div v-if="composerFastSeedOptions.length" class="composer-fast-seed-options" :aria-label="shellText.fastSeedShapeHint">
+              <div v-if="messages.length && composerFastSeedOptions.length" class="composer-fast-seed-options" :aria-label="shellText.fastSeedShapeHint">
                 <span>{{ shellText.fastSeedShapeHint }}</span>
                 <button
                   v-for="option in composerFastSeedOptions"
@@ -4760,11 +4968,11 @@ watch(messageRenderSignature, (signature, previousSignature) => {
                 </button>
               </div>
 
-              <p v-if="composerFastIntakeHint" class="composer-fast-intake-hint">
+              <p v-if="messages.length && composerFastIntakeHint" class="composer-fast-intake-hint">
                 {{ composerFastIntakeHint }}
               </p>
 
-              <div v-if="composerFastStartHint" class="composer-fast-start-hint">
+              <div v-if="messages.length && composerFastStartHint" class="composer-fast-start-hint">
                 <span>{{ composerFastStartHint }}</span>
                 <div class="composer-fast-start-actions">
                   <button
@@ -4786,7 +4994,22 @@ watch(messageRenderSignature, (signature, previousSignature) => {
                 </div>
               </div>
 
-              <form class="composer-card" @submit.prevent="sendMessage">
+              <NextDecisionCard
+                v-if="messages.length"
+                :language="currentLanguage"
+                :interview-state="interviewState"
+                :disabled="messagePipelineActive || generatingDocuments || switchingSession"
+                @reply="sendInterviewReply"
+                @focus-input="focusComposerInput"
+                @edit-proposal="editInterviewProposal"
+                @select-option="sendInterviewOption"
+              />
+
+              <form
+                v-if="messages.length || emptySessionRouteSelected"
+                class="composer-card"
+                @submit.prevent="sendMessage"
+              >
                 <input
                   ref="attachmentInputRef"
                   class="composer-file-input"
@@ -4891,94 +5114,41 @@ watch(messageRenderSignature, (signature, previousSignature) => {
             </div>
           </section>
 
-          <aside class="workspace-side">
-            <div class="workspace-side-scroll">
-              <StructuredRequirementPanel
-                :language="currentLanguage"
-                :model="structuredRequirementModel"
-                :pm-methodology-state="pmMethodologyState"
-                :ic-substrate-evidence-state="icSubstrateEvidenceState"
-                :loading="loadingStructuredRequirement"
-                :syncing="syncingStructuredRequirement"
-                :generating-documents="generatingDocuments"
-                :opening-go-coding="openingGoCoding"
-                :generation-disabled="messagePipelineActive || switchingSession || documentGenerationConfirmOpen || !hasSession"
-                :generation-label="documentGenerationActionLabel"
-                :has-prd-document="Boolean(latestPrdDocument)"
-                :error="structuredRequirementError"
-                @generate-documents="generatePanelDocuments"
-                @go-coding="openGoCodingWhenReady"
-              />
-            </div>
-          </aside>
-        </div>
+          <template #inspector>
+            <RequirementInspector
+              v-if="messages.length"
+              :open="inspectorOpen"
+              :title="shellText.requirements"
+              :close-label="shellText.closeRequirements"
+              :interview-state="interviewState"
+              :language="currentLanguage"
+              :model="structuredRequirementModel"
+              :pm-methodology-state="pmMethodologyState"
+              :ic-substrate-evidence-state="icSubstrateEvidenceState"
+              :loading="loadingStructuredRequirement"
+              :syncing="syncingStructuredRequirement"
+              :generating-documents="generatingDocuments"
+              :opening-go-coding="openingGoCoding"
+              :generation-disabled="messagePipelineActive || switchingSession || !hasSession"
+              :generation-label="documentGenerationActionLabel"
+              :error="structuredRequirementError"
+              @close="inspectorOpen = false"
+              @generate-documents="generatePanelDocuments"
+              @go-coding="openGoCodingWhenReady"
+            />
+          </template>
+        </ConversationWorkspace>
 
         <div v-else class="main-stage template-stage">
-          <section class="template-page-shell">
-            <header class="template-page-hero">
-              <div class="template-page-hero-copy">
-                <p class="template-page-kicker">{{ templateCountLabel }}</p>
-                <h1>{{ t.templateLibrary }}</h1>
-                <p>{{ t.templateLibraryHint }}</p>
-              </div>
-            </header>
-
-            <div v-if="loadingTemplates" class="template-page-state">
-              {{ t.templateLibraryLoading }}
-            </div>
-            <div v-else-if="localizedBusinessTemplates.length" class="template-page-grid">
-              <article v-for="templateItem in localizedBusinessTemplates" :key="templateItem.template_id" class="template-page-card">
-                <div class="template-page-card-head">
-                  <div class="template-page-card-heading">
-                    <p class="template-page-card-eyebrow">
-                      {{ formatTemplateFacet(templateItem.business_domain || templateItem.template_category) }}
-                    </p>
-                    <h3>{{ templateItem.template_name }}</h3>
-                  </div>
-                  <button
-                    class="btn btn-secondary template-page-detail-btn template-page-card-detail-btn"
-                    type="button"
-                    :disabled="loadingSession || messagePipelineActive || generatingDocuments || Boolean(applyingTemplateId)"
-                    @click="openBusinessTemplate(templateItem.template_id)"
-                  >
-                    {{ t.templateOpen }}
-                  </button>
-                </div>
-
-                <p class="template-page-card-description">
-                  {{ templateItem.description || t.templateLibraryHint }}
-                </p>
-
-                <div v-if="templateItem.tags.length" class="template-page-tags">
-                  <span v-for="tag in templateItem.tags.slice(0, 4)" :key="tag" class="template-page-tag">{{ formatTemplateTag(tag) }}</span>
-                </div>
-
-                <div v-if="templateItem.section_titles.length" class="template-page-sections">
-                  <span
-                    v-for="sectionTitle in templateItem.section_titles.slice(0, 4)"
-                    :key="sectionTitle"
-                    class="template-page-section-pill"
-                  >
-                    {{ sectionTitle }}
-                  </span>
-                </div>
-
-                <div class="template-page-card-actions">
-                  <button
-                    class="btn template-page-apply-btn"
-                    type="button"
-                    :disabled="loadingSession || messagePipelineActive || generatingDocuments || Boolean(applyingTemplateId)"
-                    @click="launchBusinessTemplateSession(templateItem.template_id)"
-                  >
-                    {{ applyingTemplateId === templateItem.template_id ? t.creating : t.templateApplyGuided }}
-                  </button>
-                </div>
-              </article>
-            </div>
-            <div v-else class="template-page-state">
-              {{ t.templateLibraryEmpty }}
-            </div>
-          </section>
+          <TemplateCatalog
+            :templates="localizedBusinessTemplates"
+            :language="currentLanguage"
+            :loading="loadingTemplates"
+            :disabled="loadingSession || messagePipelineActive || generatingDocuments"
+            :applying-template-id="applyingTemplateId"
+            @view-details="openBusinessTemplate"
+            @start="launchBusinessTemplateSession"
+          />
         </div>
       </section>
     </main>
@@ -5044,7 +5214,7 @@ watch(messageRenderSignature, (signature, previousSignature) => {
                     class="new-chat-scratch-btn"
                     type="button"
                     :disabled="newChatActionDisabled || loadingTemplates"
-                    @click="startIcSubstrateNewChat(department.label, 'from_scratch')"
+                    @click="startIcSubstrateNewChat(department.key, 'from_scratch')"
                   >
                     {{ t.newChatStartFromScratch }}
                   </button>
@@ -5052,9 +5222,9 @@ watch(messageRenderSignature, (signature, previousSignature) => {
                     class="new-chat-draft-btn"
                     type="button"
                     :disabled="newChatActionDisabled || loadingTemplates || uploadingAttachment"
-                    @click="openDraftNewChatPicker(department.label)"
+                    @click="openDraftNewChatPicker(department.key)"
                   >
-                    {{ uploadingAttachment && draftAttachmentDepartment === department.label ? t.uploadingAttachment : t.newChatImproveFromDraft }}
+                    {{ uploadingAttachment && draftAttachmentDepartment === department.key ? t.uploadingAttachment : t.newChatImproveFromDraft }}
                   </button>
                 </div>
               </article>
@@ -5157,56 +5327,6 @@ watch(messageRenderSignature, (signature, previousSignature) => {
           </button>
           <button class="btn btn-danger" type="button" @click="resolveDeleteSessionConfirm(true)">
             {{ t.delete }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <div
-      v-if="documentGenerationConfirmOpen"
-      class="template-dialog-backdrop"
-      @click.self="resolveDocumentGenerationConfirm(false)"
-    >
-      <div class="template-dialog document-confirm-dialog" role="dialog" aria-modal="true" aria-label="AIPM">
-        <div class="template-dialog-head">
-          <div>
-            <p class="template-dialog-eyebrow">{{ t.generatePrd }}</p>
-            <h3>AIPM</h3>
-          </div>
-          <button
-            class="template-dialog-close"
-            type="button"
-            :aria-label="t.close"
-            @click="resolveDocumentGenerationConfirm(false)"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        </div>
-
-        <div class="template-dialog-body">
-          <p class="document-confirm-message">{{ documentGenerationConfirmMessage }}</p>
-          <p
-            v-if="documentGenerationMethodologyMessage"
-            class="document-confirm-message methodology"
-          >
-            {{ documentGenerationMethodologyMessage }}
-          </p>
-        </div>
-
-        <div class="template-dialog-actions">
-          <button class="btn btn-secondary" type="button" @click="resolveDocumentGenerationConfirm(false)">
-            {{ t.templateCancel }}
-          </button>
-          <button
-            v-if="structuredRequirementProgress.readyToGenerate"
-            class="btn btn-primary"
-            type="button"
-            @click="resolveDocumentGenerationConfirm(true)"
-          >
-            {{ t.generatePrd }}
           </button>
         </div>
       </div>
@@ -5407,6 +5527,14 @@ body {
 
 .layout.sidebar-collapsed {
   grid-template-columns: 92px minmax(0, 1fr);
+}
+
+.compact-overlay-backdrop,
+.inspector-overlay-backdrop,
+.mobile-nav-trigger,
+.mobile-inspector-trigger,
+.workspace-side-mobile-head {
+  display: none;
 }
 
 .sidebar {
@@ -5922,6 +6050,7 @@ body {
 }
 
 .main-shell {
+  position: relative;
   height: 100%;
   min-width: 0;
   min-height: 0;
@@ -5930,21 +6059,50 @@ body {
   gap: 10px;
   padding: 0 12px 0;
   border-radius: 0;
-  background: linear-gradient(180deg, #fbfdff 0%, var(--page-bg) 48%, #edf4f8 100%);
+  background: linear-gradient(180deg, #f8fbff 0%, #eef6fb 52%, #e5eff7 100%);
   border: 0;
   box-shadow: none;
   overflow: hidden;
 }
 
+.main-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: url('./assets/ats-official-workspace-bg.jpg');
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  opacity: 0.36;
+  filter: saturate(0.92) brightness(0.96) contrast(0.94);
+  pointer-events: none;
+}
+
+.main-shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(247, 251, 255, 0.34) 42%, rgba(232, 242, 249, 0.4) 100%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.66) 0%, rgba(255, 255, 255, 0.24) 38%, rgba(255, 255, 255, 0.36) 100%);
+  pointer-events: none;
+}
+
 .main-topbar {
+  position: relative;
+  z-index: 2;
   display: flex;
+  flex: 0 0 auto;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
   min-height: 58px;
   padding: 8px 0 10px;
-  background-color: #ffffff;
-  background-image: linear-gradient(90deg, #ffffff 0%, #f8fbff 54%, #f3fbfc 100%);
+  background-color: rgba(255, 255, 255, 0.84);
+  background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 251, 255, 0.82) 54%, rgba(243, 251, 252, 0.76) 100%);
+  backdrop-filter: blur(12px);
   border: 0;
   border-bottom: 1px solid var(--line);
   border-radius: 0;
@@ -6135,12 +6293,22 @@ body {
 }
 
 .main-stage {
+  position: relative;
+  z-index: 1;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(300px, 320px);
   gap: 18px;
+}
+
+.main-stage.inspector-active {
+  z-index: 3;
+}
+
+.main-stage.single-column {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .template-stage {
@@ -6155,6 +6323,27 @@ body {
   flex-direction: column;
   gap: 12px;
   overflow: hidden;
+}
+
+.conversation-shell:not(.has-messages) {
+  width: min(100%, 860px);
+  margin: 0 auto;
+  justify-content: center;
+  align-items: center;
+  gap: 22px;
+  padding: clamp(24px, 5vh, 56px) 12px;
+  overflow: auto;
+}
+
+.conversation-shell:not(.has-messages) .welcome-stage {
+  flex: 0 0 auto;
+  align-items: center;
+  overflow: visible;
+  padding: 0;
+}
+
+.conversation-shell:not(.has-messages) .composer-zone {
+  width: min(100%, 760px);
 }
 
 .template-page-shell {
@@ -6270,6 +6459,35 @@ body {
   gap: 8px;
 }
 
+.mobile-nav-trigger,
+.mobile-inspector-trigger,
+.workspace-side-mobile-head button {
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  height: 38px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.mobile-nav-trigger svg,
+.mobile-inspector-trigger svg,
+.workspace-side-mobile-head button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.mobile-inspector-trigger {
+  gap: 6px;
+  padding: 0 10px;
+  color: var(--accent-strong);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
 .template-page-tag,
 .template-page-section-pill {
   display: inline-flex;
@@ -6338,6 +6556,12 @@ body {
   gap: 26px;
   padding: 8px 10px;
   overflow: auto;
+}
+
+.welcome-stage.has-launch-context {
+  justify-content: flex-start;
+  gap: 0;
+  padding: 0;
 }
 
 .welcome-kicker {
@@ -6568,8 +6792,9 @@ body {
   min-height: 38px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.74);
   color: #24384f;
+  backdrop-filter: blur(10px);
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
@@ -6583,7 +6808,7 @@ body {
 .quick-reply-option:hover:not(:disabled),
 .welcome-quick-reply-option:hover:not(:disabled) {
   transform: translateY(-1px);
-  background: var(--accent-soft);
+  background: rgba(236, 246, 255, 0.92);
   border-color: rgba(0, 94, 184, 0.28);
 }
 
@@ -6918,6 +7143,20 @@ body {
   gap: 8px;
 }
 
+.empty-session-composer .composer-card {
+  min-height: 112px;
+  padding: 16px 18px;
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--line));
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  box-shadow: 0 18px 42px rgba(31, 80, 145, 0.12);
+}
+
+.empty-session-composer .composer-input {
+  min-height: 72px;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
 .conversation-goal-strip {
   display: grid;
   grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1.35fr);
@@ -7197,8 +7436,9 @@ body {
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   padding: 9px 12px;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.74);
   color: #2f4770;
+  backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -7374,7 +7614,8 @@ body {
   padding: 12px 14px;
   border-radius: var(--radius-md);
   border: 1px solid var(--line);
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.76);
+  backdrop-filter: blur(14px);
   box-shadow: var(--shadow-soft);
 }
 
@@ -7571,6 +7812,32 @@ body {
   min-height: 0;
 }
 
+.workspace-side-mobile-head {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.workspace-side-mobile-head > div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.workspace-side-mobile-head span {
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.workspace-side-mobile-head strong {
+  color: var(--accent-strong);
+  font-size: 0.82rem;
+}
+
 .workspace-side-scroll {
   height: 100%;
   min-height: 0;
@@ -7610,7 +7877,42 @@ body {
 }
 
 .new-chat-dialog {
+  position: relative;
+  isolation: isolate;
   width: min(900px, 100%);
+  background: #fff;
+}
+
+.new-chat-dialog::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: url('./assets/ats-official-workspace-bg.jpg');
+  background-position: center 44%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  opacity: 0.32;
+  filter: saturate(0.92) brightness(0.98) contrast(0.92);
+  pointer-events: none;
+}
+
+.new-chat-dialog::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.62) 46%, rgba(247, 250, 255, 0.68) 100%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.86) 0%, rgba(255, 255, 255, 0.5) 50%, rgba(255, 255, 255, 0.34) 100%);
+  pointer-events: none;
+}
+
+.new-chat-dialog > .template-dialog-head,
+.new-chat-dialog > .template-dialog-body,
+.new-chat-dialog > .template-dialog-actions {
+  position: relative;
+  z-index: 2;
 }
 
 .new-chat-dialog-body {
@@ -7631,8 +7933,9 @@ body {
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   padding: 10px 12px;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.76);
   color: #18345f;
+  backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -7644,7 +7947,7 @@ body {
 .new-chat-template-shortcut:hover {
   transform: translateY(-1px);
   border-color: rgba(0, 94, 184, 0.28);
-  background: var(--accent-soft);
+  background: rgba(237, 246, 255, 0.9);
 }
 
 .new-chat-template-icon {
@@ -7691,8 +7994,9 @@ body {
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   padding: 12px;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.76);
   color: #18345f;
+  backdrop-filter: blur(10px);
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr);
   grid-template-rows: auto auto;
@@ -7710,7 +8014,7 @@ body {
 
 .new-chat-department-card.disabled {
   border-color: #d7dde8;
-  background: #f3f5f8;
+  background: rgba(239, 243, 248, 0.72);
   color: #778294;
   box-shadow: none;
 }
@@ -7920,15 +8224,6 @@ body {
   line-height: 1.7;
 }
 
-.document-confirm-message.methodology {
-  padding: 12px 14px;
-  border: 1px solid #eadfb9;
-  border-radius: var(--radius-md);
-  background: rgba(255, 252, 242, 0.82);
-  color: #503900;
-  overflow-wrap: anywhere;
-}
-
 .template-dialog-block {
   display: grid;
   gap: 10px;
@@ -8098,16 +8393,20 @@ body {
 .composer-card,
 .template-dialog,
 .language-switcher-menu {
-  background: var(--panel);
+  background: rgba(255, 255, 255, 0.76);
   border: 1px solid var(--line);
   box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(14px);
 }
 
 .template-page-card,
 .assistant-prompt,
-.bubble.assistant,
 .composer-card {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.bubble.assistant {
+  background: rgba(255, 255, 255, 0.64);
 }
 
 .bubble.user,
@@ -8124,7 +8423,7 @@ body {
 }
 
 .bubble.user {
-  background: #f4f8fc;
+  background: rgba(244, 248, 252, 0.74);
   border-color: #cfdae6;
   border-right: 3px solid var(--accent);
   color: var(--ink);
@@ -8327,9 +8626,32 @@ body {
   background: linear-gradient(180deg, #101a28 0%, var(--page-bg) 48%, #08101a 100%);
 }
 
+.app-shell[data-theme='dark'] .main-shell::before {
+  opacity: 0.24;
+  filter: saturate(0.88) brightness(0.74) contrast(0.92);
+  mix-blend-mode: screen;
+}
+
+.app-shell[data-theme='dark'] .main-shell::after {
+  background:
+    linear-gradient(180deg, rgba(12, 22, 34, 0.78) 0%, rgba(10, 20, 32, 0.56) 44%, rgba(8, 16, 26, 0.7) 100%),
+    linear-gradient(90deg, rgba(12, 22, 34, 0.76) 0%, rgba(12, 22, 34, 0.46) 38%, rgba(12, 22, 34, 0.58) 100%);
+}
+
+.app-shell[data-theme='dark'] .new-chat-dialog::before {
+  opacity: 0.28;
+  mix-blend-mode: screen;
+}
+
+.app-shell[data-theme='dark'] .new-chat-dialog::after {
+  background:
+    linear-gradient(180deg, rgba(17, 27, 40, 0.82) 0%, rgba(17, 27, 40, 0.64) 46%, rgba(13, 23, 36, 0.72) 100%),
+    linear-gradient(90deg, rgba(17, 27, 40, 0.88) 0%, rgba(17, 27, 40, 0.62) 52%, rgba(17, 27, 40, 0.46) 100%);
+}
+
 .app-shell[data-theme='dark'] .main-topbar {
-  background-color: var(--panel);
-  background-image: linear-gradient(90deg, #111b28 0%, #132234 54%, #0f2a30 100%);
+  background-color: rgba(17, 27, 40, 0.86);
+  background-image: linear-gradient(90deg, rgba(17, 27, 40, 0.94) 0%, rgba(19, 34, 52, 0.88) 54%, rgba(15, 42, 48, 0.84) 100%);
 }
 
 .app-shell[data-theme='dark'] .theme-toggle,
@@ -8371,6 +8693,36 @@ body {
 
 .app-shell[data-theme='dark'] .bubble.assistant {
   border-left-color: var(--teal);
+}
+
+.app-shell[data-theme='dark'] .template-page-card,
+.app-shell[data-theme='dark'] .assistant-prompt,
+.app-shell[data-theme='dark'] .template-dialog,
+.app-shell[data-theme='dark'] .composer-card,
+.app-shell[data-theme='dark'] .new-chat-department-card,
+.app-shell[data-theme='dark'] .new-chat-template-shortcut {
+  background: rgba(17, 27, 40, 0.74);
+  backdrop-filter: blur(14px);
+}
+
+.app-shell[data-theme='dark'] .bubble.assistant {
+  background: rgba(17, 27, 40, 0.66);
+  backdrop-filter: blur(14px);
+}
+
+.app-shell[data-theme='dark'] .bubble.user {
+  background: rgba(19, 35, 52, 0.74);
+}
+
+.app-shell[data-theme='dark'] .quick-reply-option,
+.app-shell[data-theme='dark'] .welcome-quick-reply-option,
+.app-shell[data-theme='dark'] .composer-fast-start-hint {
+  background: rgba(18, 29, 42, 0.74);
+  backdrop-filter: blur(12px);
+}
+
+.app-shell[data-theme='dark'] .new-chat-department-card.disabled {
+  background: rgba(18, 29, 42, 0.64);
 }
 
 .app-shell[data-theme='dark'] .content,
@@ -8462,8 +8814,48 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .mobile-inspector-trigger {
+    display: inline-flex;
+  }
+
+  .inspector-overlay-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: rgba(19, 34, 56, 0.34);
+    backdrop-filter: blur(3px);
+  }
+
   .workspace-side {
-    min-height: min(90dvh, 980px);
+    position: fixed;
+    inset: 0 0 0 auto;
+    z-index: 45;
+    width: min(420px, 100vw);
+    min-height: 100dvh;
+    padding: 0 10px 10px;
+    background: var(--page-bg);
+    box-shadow: -18px 0 40px rgba(19, 34, 56, 0.2);
+    transform: translateX(105%);
+    transition: transform 180ms ease;
+    pointer-events: none;
+  }
+
+  .workspace-side.mobile-open {
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+
+  .workspace-side-mobile-head {
+    display: flex;
+    margin: 0 -10px 10px;
+  }
+
+  .workspace-side-scroll {
+    height: calc(100dvh - 68px);
   }
 }
 
@@ -8495,6 +8887,16 @@ body {
   .conversation-shell,
   .chat-stream-shell {
     gap: 14px;
+  }
+
+  .conversation-shell:not(.has-messages) {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .conversation-shell:not(.has-messages) .welcome-stage.has-launch-context {
+    flex: 0 0 auto;
+    overflow: visible;
   }
 
   .welcome-stage {
@@ -8567,8 +8969,8 @@ body {
 
 @media (max-width: 1040px) {
   .app-shell {
-    height: auto;
-    overflow: visible;
+    height: 100dvh;
+    overflow: hidden;
   }
 
   .layout,
@@ -8578,16 +8980,51 @@ body {
 
   .sidebar,
   .sidebar.collapsed {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 50;
+    width: min(320px, calc(100vw - 44px));
+    height: 100dvh;
     padding: 16px;
+    border-right: 1px solid var(--line);
+    box-shadow: 18px 0 40px rgba(19, 34, 56, 0.2);
+    transform: translateX(0);
+    transition: transform 180ms ease;
+  }
+
+  .sidebar.collapsed {
+    transform: translateX(-105%);
+    pointer-events: none;
   }
 
   .sidebar.collapsed .sidebar-body,
   .sidebar.collapsed .sidebar-appmark {
-    display: grid;
+    display: none;
   }
 
   .sidebar-body {
     grid-template-rows: auto auto auto;
+  }
+
+  .compact-overlay-backdrop.sidebar-active {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: rgba(19, 34, 56, 0.34);
+    backdrop-filter: blur(3px);
+  }
+
+  .mobile-nav-trigger {
+    display: inline-flex;
+    flex: 0 0 auto;
+  }
+
+  .main-shell {
+    height: 100dvh;
   }
 }
 
@@ -8634,14 +9071,37 @@ body {
     border-radius: 0;
   }
 
+  .main-shell::before {
+    opacity: 0.28;
+    background-position: center center;
+  }
+
+  .app-shell[data-theme='dark'] .main-shell::before {
+    opacity: 0.18;
+  }
+
+  .new-chat-dialog::before {
+    opacity: 0.26;
+    background-position: center;
+  }
+
+  .app-shell[data-theme='dark'] .new-chat-dialog::before {
+    opacity: 0.12;
+  }
+
   .main-topbar {
     flex-wrap: wrap;
+  }
+
+  .main-stage {
+    margin-top: 10px;
   }
 
   .main-topbar-tagline {
     order: 3;
     flex-basis: 100%;
     text-align: left;
+    margin-bottom: 4px;
   }
 
   .ats-lockup-segment {
@@ -8654,6 +9114,19 @@ body {
 
   .welcome-stage {
     padding: 8px 0;
+  }
+
+  .conversation-shell:not(.has-messages) {
+    overflow-x: hidden;
+    overflow-y: hidden;
+  }
+
+  .conversation-shell:not(.has-messages) .welcome-stage.has-launch-context {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-bottom: 12px;
   }
 
   .assistant-prompt {
@@ -8809,6 +9282,26 @@ body {
   .template-dialog-actions .btn {
     width: 100%;
     justify-content: center;
+  }
+
+  .conversation-shell:not(.has-messages) {
+    justify-content: flex-start;
+    gap: 18px;
+    padding: 24px 8px 16px;
+    overflow-y: auto;
+  }
+
+  .conversation-shell:not(.has-messages) .welcome-stage {
+    align-items: stretch;
+  }
+
+  .empty-session-composer .composer-card {
+    min-height: 104px;
+    padding: 14px;
+  }
+
+  .empty-session-composer .composer-input {
+    min-height: 58px;
   }
 }
 </style>

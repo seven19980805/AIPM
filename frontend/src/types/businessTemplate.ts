@@ -4,6 +4,7 @@ export type BusinessTemplateSummary = {
   template_name: string
   template_category: string
   business_domain: string
+  business_route: 'production' | 'quality' | 'tdi'
   language: string
   version: string
   description: string

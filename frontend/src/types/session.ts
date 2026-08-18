@@ -1,11 +1,58 @@
 import type { ConversationChainState } from './structuredRequirement'
+import type { InterviewStateV2 } from './interviewState'
 
 export type MessageRole = 'user' | 'assistant'
 export type MessageKind = 'chat' | 'design_doc' | 'prd_doc'
 export type PromptTemplate = 'personal_project' | 'standard'
 export type StartFunction = 'from_scratch' | 'improve_draft'
+export type IntakeMode = 'scratch' | 'draft' | 'template'
+export type BusinessRoute = 'production' | 'quality' | 'tdi'
 export type LanguageCode = 'en' | 'de' | 'zh' | 'ms'
 export type HandoffMode = 'prd_v0' | 'final_documents'
+export type SessionLaunchMode = IntakeMode
+export type SessionLaunchStatus = 'not_started' | 'in_progress' | 'complete'
+
+export type SessionLaunchStage = {
+  key: string
+  track: string
+  label: string
+  status: 'current' | 'complete' | 'pending'
+}
+
+export type SessionLaunchSuggestion = {
+  id: string
+  label: string
+  text: string
+}
+
+export type SessionLaunchSource = {
+  type: IntakeMode
+  id: string
+  name: string
+  version: string
+  language: string
+  start_function: StartFunction | string
+  business_route: BusinessRoute | string
+}
+
+export type SessionLaunchContext = {
+  version: 2
+  mode: SessionLaunchMode
+  business_route: BusinessRoute | string
+  status: SessionLaunchStatus
+  title: string
+  description: string
+  question: string
+  stages: SessionLaunchStage[]
+  suggestions: SessionLaunchSuggestion[]
+  question_budget: {
+    target: number
+    maximum: number
+    asked: number
+    remaining: number
+  }
+  source: SessionLaunchSource
+}
 
 export type PrdV0DiscoveryExitContract = {
   contract_version?: string
@@ -208,10 +255,13 @@ export type ChatMessage = {
 export type SessionSummary = {
   session_id: string
   title: string
+  language?: LanguageCode
   prompt_template: PromptTemplate
   applied_template_id: string
   applied_template_name: string
   start_function?: StartFunction
+  intake_mode?: IntakeMode
+  business_route?: BusinessRoute
   created_at: string
   updated_at: string
   message_count: number
@@ -221,10 +271,13 @@ export type SessionSummary = {
 export type SessionDetail = {
   session_id: string
   title: string
+  language: LanguageCode
   prompt_template: PromptTemplate
   applied_template_id: string
   applied_template_name: string
   start_function?: StartFunction
+  intake_mode?: IntakeMode
+  business_route?: BusinessRoute
   created_at: string
   updated_at: string
   messages: ChatMessagePayload[]
@@ -232,6 +285,8 @@ export type SessionDetail = {
   structured_requirement_model?: unknown
   structured_requirement_sync_status?: 'ready' | 'stale' | 'missing'
   conversation_chain_state?: ConversationChainState
+  interview_state?: InterviewStateV2
+  launch_context?: SessionLaunchContext
 }
 
 export type GeneratedDocumentResponse = {
@@ -247,6 +302,7 @@ export type GeneratedDocumentResponse = {
   structured_requirement_model?: unknown
   structured_requirement_sync_status?: 'ready' | 'stale' | 'missing'
   conversation_chain_state?: ConversationChainState
+  interview_state?: InterviewStateV2
 }
 
 export type MessageResponse = {
@@ -256,6 +312,7 @@ export type MessageResponse = {
   structured_requirement_model?: unknown
   structured_requirement_sync_status?: 'ready' | 'stale' | 'missing'
   conversation_chain_state?: ConversationChainState
+  interview_state?: InterviewStateV2
   session_id?: string
   message_count?: number
 }

@@ -22,4 +22,4 @@ RUN mkdir -p /app/data/prd_docs /app/data/design_docs /app/recordings
 
 EXPOSE 8000
 
-CMD ["waitress-serve", "--host=0.0.0.0", "--port=8000", "run:app"]
+CMD ["python", "run.py"]

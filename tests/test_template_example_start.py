@@ -18,7 +18,7 @@ from app.services.requirement_collector import (
     RequirementCollectorService,
 )
 from app.services.llm_client import LLMError
-from app.services.session_store import SQLiteSessionStore
+from tests.postgres_test_support import create_postgres_test_store
 from app.services.structured_requirement_model import REQUIREMENT_ITEM_KEYS, normalize_structured_requirement_model
 
 
@@ -45,11 +45,10 @@ class FakeLLMClient:
 class TemplateExampleStartTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tmpdir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
-        db_path = Path(self.tmpdir.name) / "rqmd.sqlite3"
         self.llm_client = FakeLLMClient()
         self.service = RequirementCollectorService(
             self.llm_client,
-            SQLiteSessionStore(str(db_path)),
+            create_postgres_test_store(self, self.tmpdir.name),
         )
         self.template_id = "business_process_requirement_template_en"
 
@@ -123,7 +122,11 @@ class TemplateExampleStartTest(unittest.TestCase):
                     "P0 must show lot yield losses before export or production writeback.",
                     "No production writeback before approval.",
                 ],
-                "data_and_dependencies": ["QIS/MES export"],
+                "data_and_dependencies": [
+                    "Read-only CSV file quality_signal_export.csv; no production writeback in v1.",
+                    "Join by lot_id and defect_code; fields include yield_pct and loss_code.",
+                    "The file refreshes daily before Quality review.",
+                ],
                 "risks_and_notes": ["Risk: QIS/MES export freshness may delay daily review."],
                 "acceptance_criteria": [
                     "Success metric: Quality manager verifies loss by lot within 10 minutes.",
@@ -139,8 +142,8 @@ class TemplateExampleStartTest(unittest.TestCase):
             for call in self.llm_client.calls
             if call
             and (
-                "principal Product Manager" in call[0].get("content", "")
-                or "方法论扎实的产品经理" in call[0].get("content", "")
+                "You are AT&S AI PM" in call[0].get("content", "")
+                or "你是 AT&S AI PM" in call[0].get("content", "")
             )
         ]
 
@@ -157,9 +160,35 @@ class TemplateExampleStartTest(unittest.TestCase):
             {
                 "document_info": {"project_name": "Thin dashboard"},
                 "background": {
-                    "objective": "Track a quality signal.",
+                    "objective": "Track a quality signal and cut abnormal-lot review time by 20%.",
                     "summary": "A thin dashboard requirement.",
                 },
+                "product_context": {
+                    "primary_user": "Quality engineer",
+                    "decision_or_action": "Prioritize abnormal lots for review.",
+                    "business_owner": "Quality manager",
+                    "acceptance_owner": "Quality manager",
+                },
+                "scope": {
+                    "in_scope": ["Read-only quality signal dashboard"],
+                    "out_of_scope": ["Production writeback"],
+                },
+                "users_and_scenarios": {
+                    "target_users": ["Quality engineer"],
+                    "core_scenarios": ["Inspect an abnormal quality signal"],
+                },
+                "functional_requirements": {
+                    "overview": "Filter and inspect the quality signal."
+                },
+                "business_rules": ["Use the Quality-approved signal threshold."],
+                "data_and_dependencies": [
+                    "Read-only SQL Server view dbo.quality_signal; no production writeback.",
+                    "Join by lot_id; fields include signal_value and threshold_status.",
+                    "Refresh the view every five minutes.",
+                ],
+                "acceptance_criteria": [
+                    "Quality engineer identifies the abnormal lot in under two minutes."
+                ],
                 "collection_status": collection_status,
             }
         )
@@ -214,7 +243,7 @@ class TemplateExampleStartTest(unittest.TestCase):
         self.assertEqual(session.applied_template_id, self.template_id)
         self.assertEqual(session.messages, [])
 
-    def test_guided_template_prompt_uses_conversation_chain(self) -> None:
+    def test_guided_template_prompt_uses_an_unconfirmed_compact_baseline(self) -> None:
         session = self.service.create_session(
             template_id=self.template_id,
             language="en",
@@ -222,11 +251,13 @@ class TemplateExampleStartTest(unittest.TestCase):
 
         prompt = self.service._pm_prompt(session, "en")
 
-        self.assertIn("Template conversation chain", prompt)
-        self.assertIn("progressive interview chain", prompt)
+        self.assertIn("TEMPLATE BASELINE (unconfirmed)", prompt)
+        self.assertIn("Business Process Requirement Template", prompt)
+        self.assertIn("RUNTIME STATE (authoritative)", prompt)
+        self.assertNotIn("Template conversation chain", prompt)
         self.assertNotIn("IC Substrate initial chain", prompt)
 
-    def test_pm_prompt_uses_skill_style_discovery_method(self) -> None:
+    def test_pm_prompt_uses_the_compact_production_interview_contract(self) -> None:
         session = self.service.create_session(
             template_id="qdm_finished_lot_yield_dashboard_template_zh_cn",
             language="zh",
@@ -234,13 +265,14 @@ class TemplateExampleStartTest(unittest.TestCase):
 
         prompt = self.service._pm_prompt(session, "zh")
 
-        self.assertIn("AI PM skill-style 工作法", prompt)
-        self.assertIn("沿需求决策树逐支拆解", prompt)
-        self.assertIn("每个问题必须带一个可快速确认的推荐答案或选项示例", prompt)
-        self.assertIn("建立共享领域语言", prompt)
-        self.assertIn("PRD 质量门", prompt)
-        self.assertIn("PM Methodology 只作质量参考", prompt)
-        self.assertIn("最后一段必须使用 A/B/C 选项格式", prompt)
+        self.assertIn("AI PM 生产访谈合同", prompt)
+        self.assertIn("入口：template；路线：Quality", prompt)
+        self.assertIn("界面单独展示唯一下一问题", prompt)
+        self.assertIn("SQL Server、SAP", prompt)
+        self.assertIn("模板基线（未确认）", prompt)
+        self.assertIn("运行状态（权威）", prompt)
+        self.assertNotIn("AI PM skill-style 工作法", prompt)
+        self.assertNotIn("PM Methodology", prompt)
 
     def test_pm_prompt_treats_methodology_gaps_as_advisory_when_structured_ready(self) -> None:
         session = self.service.create_session(language="en", starter_department="quality")
@@ -249,16 +281,11 @@ class TemplateExampleStartTest(unittest.TestCase):
 
         prompt = self.service._pm_prompt(self.service._require_session(session.id), "en")
 
-        self.assertIn("PM methodology state", prompt)
-        self.assertIn("PM Methodology is advisory", prompt)
-        self.assertIn("Phase = ready to generate", prompt)
-        self.assertNotIn("Hard gate: while PM Methodology is not ready_for_pm_review", prompt)
-        self.assertNotIn("do NOT tell the user to generate documents", prompt)
-        self.assertNotIn("The next assistant turn must ask the first methodology gap", prompt)
-        self.assertNotIn(
-            "Only suggest document generation when structured requirement ready_to_generate=true AND PM Methodology ready_for_pm_review=true",
-            prompt,
-        )
+        self.assertIn('"phase":"brief_ready"', prompt)
+        self.assertIn("VISIBLE RESPONSE CONTRACT", prompt)
+        self.assertNotIn("PM methodology state", prompt)
+        self.assertNotIn("PM Methodology is advisory", prompt)
+        self.assertNotIn("ready_for_pm_review", prompt)
 
     def test_false_ready_assistant_reply_is_replaced_when_gate_is_not_ready(self) -> None:
         self.llm_client.chat_response = (
@@ -269,12 +296,13 @@ class TemplateExampleStartTest(unittest.TestCase):
 
         result = self.service.send_user_message(session.id, "Build a thin dashboard.", language="en")
 
-        self.assertIn("Not ready to generate the formal document yet", result["assistant_message"])
-        self.assertIn("Next, close one highest-value gap", result["assistant_message"])
-        self.assertIn("A. Use a practical v1 assumption", result["assistant_message"])
-        self.assertIn("B. I will provide the exact", result["assistant_message"])
-        self.assertIn("C. Leave this pending for now", result["assistant_message"])
-        self.assertNotIn("suggested interpretation above", result["assistant_message"])
+        self.assertEqual("That information has been recorded.", result["assistant_message"])
+        self.assertEqual("brief_discovery", result["interview_state"]["stage"])
+        self.assertEqual(
+            "outcome",
+            result["interview_state"]["next_decision"]["decision_id"],
+        )
+        self.assertNotIn("A.", result["assistant_message"])
         self.assertNotIn("Click Generate Document", result["assistant_message"])
 
     def test_handoff_finalization_prompt_is_treated_as_generation_ready_claim(self) -> None:
@@ -318,7 +346,7 @@ class TemplateExampleStartTest(unittest.TestCase):
             "en",
         )
 
-        self.assertIn("Generate Documents", guarded)
+        self.assertIn("Generate Build Brief", guarded)
         self.assertNotIn("Choose one option", guarded)
         self.assertNotIn("A. Confirm", guarded)
         self.assertNotIn("Keep this point pending", guarded)
@@ -421,7 +449,7 @@ class TemplateExampleStartTest(unittest.TestCase):
             "en",
         )
 
-        self.assertIn("Generate Documents", guarded)
+        self.assertIn("Generate Build Brief", guarded)
         self.assertNotIn("Not ready", guarded)
         self.assertNotIn("PM Methodology", guarded)
         self.assertNotIn("Choose one option", guarded)
@@ -475,6 +503,55 @@ class TemplateExampleStartTest(unittest.TestCase):
         self.assertEqual(promoted["collection_status"]["pages"]["status"], "confirmed")
         self.assertEqual(promoted["collection_status"]["pages"]["pending_questions"], [])
 
+    def test_generic_option_a_control_does_not_confirm_a_requirement_item(self) -> None:
+        session = self.service.create_session(language="en", starter_department="quality")
+        self.service._append_message(session.id, "user", "Build a quality yield dashboard.")
+        self.service._append_message(
+            session.id,
+            "assistant",
+            (
+                "Next gap: Please confirm the page elements and interaction flow.\n\n"
+                "A. I will provide the exact answer now\n"
+                "B. Show me one concrete example to edit\n"
+                "C. Leave this pending for now"
+            ),
+        )
+        self.service._append_message(
+            session.id,
+            "user",
+            "A. I will provide the exact answer now",
+        )
+        model = normalize_structured_requirement_model(
+            {
+                "page_and_interaction": {
+                    "pages": [
+                        {
+                            "page_name": "Yield Dashboard",
+                            "entry_point": "Browser URL",
+                        }
+                    ]
+                },
+                "collection_status": {
+                    "pages": {
+                        "status": "captured",
+                        "reason": "Page wording is still only captured.",
+                        "pending_questions": ["Please confirm the page elements and interaction flow."],
+                    }
+                },
+            }
+        )
+
+        unchanged = self.service._apply_recent_choice_confirmation_to_model(
+            model,
+            self.service._require_session(session.id).messages,
+        )
+
+        self.assertEqual(unchanged["collection_status"]["pages"]["status"], "captured")
+        self.assertEqual(
+            unchanged["collection_status"]["pages"]["pending_questions"],
+            ["Please confirm the page elements and interaction flow."],
+        )
+
     def test_stream_false_ready_reply_emits_replacement_when_gate_is_not_ready(self) -> None:
         self.llm_client.chat_response = "# Not structured JSON"
         self.llm_client.stream_response_parts = [
@@ -490,12 +567,16 @@ class TemplateExampleStartTest(unittest.TestCase):
 
         events = list(self.service.stream_user_message(session.id, "Build a thin dashboard.", language="en"))
         replacement_events = [event for event in events if event.get("event") == "replace_content"]
+        streamed_text = "".join(
+            str(event.get("delta", ""))
+            for event in events
+            if event.get("event") == "content"
+        )
         saved_session = self.service._require_session(session.id)
 
-        self.assertTrue(replacement_events)
-        self.assertIn("Not ready to generate the formal document yet", str(replacement_events[-1].get("content")))
-        self.assertIn("Not ready to generate the formal document yet", saved_session.messages[-1]["content"])
-        self.assertNotIn("suggested interpretation above", saved_session.messages[-1]["content"])
+        self.assertFalse(replacement_events)
+        self.assertEqual("That information has been recorded.", streamed_text)
+        self.assertEqual(streamed_text, saved_session.messages[-1]["content"])
         self.assertNotIn("Click Generate Document", saved_session.messages[-1]["content"])
 
     def test_open_clarification_question_gets_choice_fallback(self) -> None:
@@ -503,8 +584,8 @@ class TemplateExampleStartTest(unittest.TestCase):
 
         formatted = self.service._ensure_choice_question_format(text, "zh")
 
-        self.assertIn("A. 先按一个可落地的 v1 假设推进", formatted)
-        self.assertIn("B. 我补充真实业务口径或例外情况", formatted)
+        self.assertIn("A. 我现在补充准确答案", formatted)
+        self.assertIn("B. 请给一个可编辑的示例", formatted)
         self.assertIn("C. 这个点先保持待确认", formatted)
         self.assertNotIn("按上面的建议口径", formatted)
         self.assertNotIn("建议回复 A、B、C", formatted)
@@ -516,7 +597,7 @@ class TemplateExampleStartTest(unittest.TestCase):
 
         self.assertEqual(formatted, text)
 
-    def test_streamed_open_question_gets_ui_language_choice_fallback_before_save(self) -> None:
+    def test_streamed_open_question_uses_persisted_session_language_before_save(self) -> None:
         self.llm_client.stream_response_parts = [
             {"type": "content", "text": "Which department owns this first-version requirement?"}
         ]
@@ -540,13 +621,43 @@ class TemplateExampleStartTest(unittest.TestCase):
         refreshed = self.service.get_session(session.id)
         self.assertIsNotNone(refreshed)
 
-        self.assertIn("Which department owns this first-version requirement?", streamed_text)
-        self.assertIn("A. Use a practical v1 assumption and continue", streamed_text)
-        self.assertIn("B. I will provide the exact wording or an exception", streamed_text)
-        self.assertIn("C. Leave this pending for now", streamed_text)
-        self.assertNotIn("suggested interpretation above", streamed_text)
-        self.assertNotIn("Reply with A, B, C", streamed_text)
-        self.assertNotIn("同意按上面的建议口径", streamed_text)
+        self.assertEqual("已记录这条信息。", streamed_text)
+        self.assertNotIn("Which department", streamed_text)
+        self.assertNotIn("A.", streamed_text)
+        self.assertEqual(refreshed.messages[-1]["content"], streamed_text)
+
+    def test_streamed_reply_does_not_repeat_generic_choices_after_user_selected_one(self) -> None:
+        self.llm_client.stream_response_parts = [
+            {
+                "type": "content",
+                "text": (
+                    "缺料公式示例：净需求 = 订单需求 - 当前库存 - 在途量 + 安全库存。"
+                    "请确认是否采纳，或直接修改公式？"
+                ),
+            }
+        ]
+        session = self.service.create_session(language="zh")
+
+        events = list(
+            self.service.stream_user_message(
+                session.id,
+                "B. 请给一个可编辑的示例",
+                language="zh",
+            )
+        )
+        streamed_text = "".join(
+            str(event.get("delta", ""))
+            for event in events
+            if event.get("event") == "content"
+        )
+        refreshed = self.service.get_session(session.id)
+        self.assertIsNotNone(refreshed)
+
+        self.assertEqual("已记录这条信息。", streamed_text)
+        self.assertNotIn("请确认是否采纳", streamed_text)
+        self.assertNotIn("A. 我现在补充准确答案", streamed_text)
+        self.assertNotIn("B. 请给一个可编辑的示例", streamed_text)
+        self.assertNotIn("C. 这个点先保持待确认", streamed_text)
         self.assertEqual(refreshed.messages[-1]["content"], streamed_text)
 
     def test_streamed_reply_returns_fresh_structured_summary_before_done(self) -> None:
@@ -650,7 +761,17 @@ class TemplateExampleStartTest(unittest.TestCase):
 
         self.assertEqual(len(self.llm_client.stream_calls), 1)
         self.assertEqual(len(self.llm_client.calls), 1)
-        self.assertIn("What machine states", streamed_text)
+        self.assertEqual("That information has been recorded.", streamed_text)
+        self.assertNotIn("What machine states", streamed_text)
+        summary_event = next(event for event in events if event.get("event") == "summary")
+        self.assertEqual(
+            "outcome",
+            summary_event["interview_state"]["next_decision"]["decision_id"],
+        )
+        self.assertEqual(
+            0,
+            summary_event["interview_state"]["brief"]["confirmed_decisions"],
+        )
 
     def test_methodology_priority_recognizes_v1_first_release_scope_boundary(self) -> None:
         model = normalize_structured_requirement_model(
@@ -690,7 +811,7 @@ class TemplateExampleStartTest(unittest.TestCase):
 
         self.assertEqual(formatted, text)
 
-    def test_structured_requirement_prompt_extracts_shared_domain_language(self) -> None:
+    def test_structured_requirement_prompt_enforces_compact_evidence_and_data_rules(self) -> None:
         session = self.service.create_session(
             template_id="qdm_finished_lot_yield_dashboard_template_zh_cn",
             language="zh",
@@ -698,11 +819,12 @@ class TemplateExampleStartTest(unittest.TestCase):
 
         prompt = self.service._structured_requirement_model_prompt(session, "zh")
 
-        self.assertIn("Skill-style 抽取补充规则", prompt)
-        self.assertIn("共享领域语言", prompt)
-        self.assertIn("业务术语、KPI 名称、状态名、对象粒度、owner、数据源、验收口径", prompt)
-        self.assertIn("不新增 schema", prompt)
-        self.assertIn("不要升级为 confirmed", prompt)
+        self.assertIn("Evidence and status contract", prompt)
+        self.assertIn("Approved data paths are SQL Server, SAP, MES, QIS/QMS", prompt)
+        self.assertIn("Never fabricate source objects, fields, joins, tables, APIs", prompt)
+        self.assertIn("feature_details: at most 6", prompt)
+        self.assertIn("模板基线（未确认）", prompt)
+        self.assertNotIn("Skill-style 抽取补充规则", prompt)
 
     def test_prd_prompt_uses_skill_style_document_rules(self) -> None:
         session = self.service.create_session(
@@ -784,6 +906,79 @@ class TemplateExampleStartTest(unittest.TestCase):
         self.assertEqual(merged["collection_status"]["rules"]["status"], "confirmed")
         self.assertEqual(merged["collection_status"]["integrations"]["status"], "captured")
 
+    def test_methodology_evidence_does_not_disappear_when_later_extraction_omits_it(self) -> None:
+        confirmed_status = {
+            key: {"status": "confirmed", "reason": "Confirmed.", "pending_questions": []}
+            for key in REQUIREMENT_ITEM_KEYS
+        }
+        shared_evidence = {
+            "background": {
+                "objective": "Reduce approval time from three days to one day.",
+                "summary": "First release expense approval workflow.",
+            },
+            "product_context": {
+                "primary_user": "Finance specialist",
+                "decision_or_action": "Approve or reject an expense claim.",
+            },
+            "scope": {
+                "in_scope": ["P0 expense submission and approval"],
+                "out_of_scope": ["Tax filing is excluded from the first release"],
+            },
+            "users_and_scenarios": {
+                "target_users": ["Employee", "Finance specialist"],
+                "core_scenarios": ["Submit and approve an expense claim"],
+            },
+            "functional_requirements": {
+                "overview": "Expense submission, approval, and payment tracking.",
+            },
+            "business_rules": ["Duplicate invoices must be blocked."],
+            "data_and_dependencies": ["SAP is the source of truth."],
+            "acceptance_criteria": ["Approval completes within one business day."],
+            "collection_status": confirmed_status,
+        }
+        previous = normalize_structured_requirement_model(
+            {
+                **shared_evidence,
+                "risks_and_notes": [
+                    "Risk: SAP interface outages can delay synchronization.",
+                    "Later phase: SAP writeback remains outside the first release.",
+                ],
+            }
+        )
+        current = normalize_structured_requirement_model(
+            {
+                **shared_evidence,
+                "scope": {
+                    "in_scope": ["P0 expense submission and approval"],
+                    "out_of_scope": [],
+                },
+                "data_and_dependencies": [],
+                "acceptance_criteria": [],
+            }
+        )
+
+        previous_state = self.service.build_pm_methodology_state(previous, "en")
+        current_state = self.service.build_pm_methodology_state(current, "en")
+        self.assertLess(current_state["score"], previous_state["score"])
+
+        merged = self.service._merge_structured_requirement_collection_status(
+            current,
+            previous,
+        )
+        merged_state = self.service.build_pm_methodology_state(merged, "en")
+
+        self.assertEqual(merged["risks_and_notes"], previous["risks_and_notes"])
+        self.assertEqual(merged["scope"]["out_of_scope"], previous["scope"]["out_of_scope"])
+        self.assertEqual(
+            merged["data_and_dependencies"],
+            previous["data_and_dependencies"],
+        )
+        self.assertEqual(
+            merged["acceptance_criteria"],
+            previous["acceptance_criteria"],
+        )
+        self.assertGreaterEqual(merged_state["score"], previous_state["score"])
+
     def test_generation_readiness_requires_full_structured_confirmation(self) -> None:
         # Formal documents are only generated once every structured requirement
         # item is confirmed and no field-level pending questions remain.
@@ -847,7 +1042,7 @@ class TemplateExampleStartTest(unittest.TestCase):
         )
         self.assertFalse(conflict_progress["ready_to_generate"])
 
-        # One missing field still blocks the formal document gate.
+        # Page layout is advisory because it can be derived from confirmed workflows.
         one_missing = {
             key: {"status": "confirmed", "reason": "Confirmed.", "pending_questions": []}
             for key in REQUIREMENT_ITEM_KEYS
@@ -856,7 +1051,8 @@ class TemplateExampleStartTest(unittest.TestCase):
         one_missing_progress = self.service._structured_requirement_progress(
             normalize_structured_requirement_model({"collection_status": one_missing})
         )
-        self.assertFalse(one_missing_progress["ready_to_generate"])
+        self.assertTrue(one_missing_progress["ready_to_generate"])
+        self.assertFalse(one_missing_progress["fully_confirmed"])
 
         # Too many missing fields (low coverage) blocks readiness.
         low_coverage = {
@@ -895,8 +1091,12 @@ class TemplateExampleStartTest(unittest.TestCase):
         self.assertIn(document_result["status"], {"ok", "draft_with_assumptions"})
         self.assertIn("handoff_token", handoff_result)
         self.assertTrue(handoff_result["payload"]["documents_ready"])
-        self.assertEqual(handoff_result["payload"]["documents"][0]["kind"], "prd")
-        self.assertIn("Lot Yield Dashboard PRD", self.service.get_saved_prd_document(session.id)[0].read_text())
+        self.assertEqual(handoff_result["payload"]["documents"][0]["kind"], "coding_contract")
+        self.assertEqual(handoff_result["payload"]["documents"][1]["kind"], "prd")
+        self.assertEqual(handoff_result["payload"]["workflow_mode"], "scratch")
+        saved_brief = self.service.get_saved_prd_document(session.id)[0].read_text()
+        self.assertIn("# Build Brief", saved_brief)
+        self.assertIn("Track lot yield losses", saved_brief)
 
     def test_prd_generation_not_blocked_by_advisory_pm_methodology(self) -> None:
         # PM Methodology is advisory: with the structured "Fully Confirmed" gate passed,
@@ -909,7 +1109,8 @@ class TemplateExampleStartTest(unittest.TestCase):
         document_result = self.service.build_prd_document(session.id, "en", save_history=True)
 
         self.assertNotEqual(document_result["status"], "quality_gate_blocked")
-        self.assertIn("Thin Dashboard PRD", document_result["document_markdown"])
+        self.assertIn("# Build Brief", document_result["document_markdown"])
+        self.assertIn("Track a quality signal", document_result["document_markdown"])
         self.assertIsNotNone(self.service.get_saved_prd_document(session.id))
 
     def test_coding_handoff_allows_prd_with_advisory_pm_methodology(self) -> None:
@@ -961,46 +1162,16 @@ class TemplateExampleStartTest(unittest.TestCase):
 
         prompt = self.service._pm_prompt(session, "zh")
 
-        self.assertIn("模板对话链路", prompt)
-        self.assertIn("IC Substrate 专业对话链路", prompt)
-        self.assertIn("AI 产品经理，不是制造/质量/工程顾问", prompt)
-        self.assertIn("软件、Web dashboard、流程工具、报表或数据产品", prompt)
-        self.assertIn("当前开放范围只包含 Production、Quality、TDI 和 General 四个同级入口", prompt)
-        self.assertIn("其他部门链路先隐藏，统一归入 General", prompt)
-        self.assertIn("首问选项只能列这四个入口", prompt)
-        self.assertIn("Production、Quality、TDI，还是 General", prompt)
-        self.assertNotIn("Customer/Program、EHS、Engineering/Process", prompt)
-        self.assertNotIn("Warehouse/Logistics", prompt)
-        self.assertNotIn("核心制造链路的专业样板，不是唯一入口", prompt)
-        self.assertIn("部门/业务 owner 路由", prompt)
-        self.assertIn("来自哪个部门", prompt)
-        self.assertIn("反问必须先落到软件需求", prompt)
-        self.assertIn("首版软件形态", prompt)
+        self.assertIn("入口：template；路线：Quality", prompt)
+        self.assertIn("模板基线（未确认）", prompt)
         self.assertIn("Finished Lot", prompt)
-        self.assertIn("MRB", prompt)
-        self.assertIn("CAPA", prompt)
-        self.assertIn("不要擅自展开缩写", prompt)
-        self.assertIn("不要擅自引入未确认的站点缩写", prompt)
-        self.assertIn("每轮只能有一个问句", prompt)
-        self.assertIn("2-5 个业务选项", prompt)
-        self.assertIn("TDI 只能写作 TDI", prompt)
-        self.assertIn("部门首问的选项说明里也不能展开 TDI", prompt)
-        self.assertIn("不要自造 TDI case 状态名、SLA 数字、owner 角色或审批层级", prompt)
-        self.assertIn("Created/In Progress/Closed、24 小时、QA 签核", prompt)
-        self.assertIn("不要替 Production 编 route/站点/yield 公式", prompt)
-        self.assertIn("不要替 Quality 编 inspection point/defect taxonomy/spec limit/MRB/CAPA 流程", prompt)
-        self.assertIn("FVI、AOI、E-test、AVI、SAP、EAP、SPC", prompt)
-        self.assertIn("不要擅自引入未确认的站点缩写、工艺站点名、设备名、供应商名、系统品牌", prompt)
-        self.assertIn("需求形态明确但用户没有说清发起部门或业务 owner", prompt)
-        self.assertIn("先问部门/owner", prompt)
-        self.assertIn("当前开放入口平级", prompt)
-        self.assertNotIn("核心主线", prompt)
-        self.assertNotIn("Planning/PMC", prompt)
-        self.assertNotIn("Equipment/Maintenance", prompt)
-        self.assertNotIn("Finance/Cost", prompt)
-        self.assertIn("当前节点专业追问方向", prompt)
+        self.assertIn("不得虚构范围、负责人、公式、数据字段、表、接口", prompt)
+        self.assertIn("SQL Server、SAP", prompt)
+        self.assertIn("运行状态（权威）", prompt)
+        self.assertNotIn("General", prompt)
+        self.assertNotIn("IC Substrate 专业对话链路", prompt)
 
-    def test_ic_substrate_template_prompt_has_german_expert_chain(self) -> None:
+    def test_ic_substrate_template_prompt_has_compact_german_baseline(self) -> None:
         session = self.service.create_session(
             template_id="qdm_finished_lot_yield_dashboard_template_de",
             language="de",
@@ -1010,18 +1181,17 @@ class TemplateExampleStartTest(unittest.TestCase):
         snapshot = self.service.get_structured_requirement_snapshot(session.id, "de")
         chain_state = snapshot["conversation_chain_state"]
 
-        self.assertIn("Vorlagen-Dialogkette", prompt)
-        self.assertIn("IC Substrate Experten-Dialogkette", prompt)
-        self.assertIn("AI Product Manager", prompt)
-        self.assertIn("Production, Quality, TDI und General", prompt)
-        self.assertIn("Harte Regel: TDI", prompt)
-        self.assertIn("Runtime-Hard-Constraints", prompt)
+        self.assertIn("TEMPLATE BASELINE (unconfirmed)", prompt)
+        self.assertIn("QDM Finished-Lot-Yield-Dashboard Anforderungsvorlage", prompt)
+        self.assertIn("route: Quality", prompt)
+        self.assertIn("Respond entirely in German", prompt)
         self.assertNotIn("Template conversation chain", prompt)
+        self.assertNotIn("IC Substrate Experten-Dialogkette", prompt)
         self.assertEqual(chain_state["current_node_label"], "Anfordernden Bereich, Business Owner und First-Version Szenario klaeren")
         production_scope = next(node for node in chain_state["nodes"] if node["node"] == "production_scope")
         self.assertIn("Produkt, Werk, Linie", production_scope["label"])
 
-    def test_ic_substrate_template_prompt_has_malay_expert_chain(self) -> None:
+    def test_ic_substrate_template_prompt_has_compact_malay_baseline(self) -> None:
         session = self.service.create_session(
             template_id="qdm_finished_lot_yield_dashboard_template_ms",
             language="ms",
@@ -1031,12 +1201,12 @@ class TemplateExampleStartTest(unittest.TestCase):
         snapshot = self.service.get_structured_requirement_snapshot(session.id, "ms")
         chain_state = snapshot["conversation_chain_state"]
 
-        self.assertIn("Rantaian dialog templat", prompt)
-        self.assertIn("Rantaian dialog pakar IC Substrate", prompt)
-        self.assertIn("Production, Quality, TDI dan General", prompt)
-        self.assertIn("Peraturan keras: tulis TDI hanya sebagai TDI", prompt)
-        self.assertIn("Peraturan keras runtime", prompt)
+        self.assertIn("TEMPLATE BASELINE (unconfirmed)", prompt)
+        self.assertIn("Templat Keperluan Dashboard Yield Finished Lot QDM", prompt)
+        self.assertIn("route: Quality", prompt)
+        self.assertIn("Respond entirely in Bahasa Melayu", prompt)
         self.assertNotIn("Template conversation chain", prompt)
+        self.assertNotIn("Rantaian dialog pakar IC Substrate", prompt)
         self.assertEqual(chain_state["current_node_label"], "Sahkan jabatan pemohon, business owner dan senario versi pertama")
         production_scope = next(node for node in chain_state["nodes"] if node["node"] == "production_scope")
         self.assertIn("Sahkan product, plant, line", production_scope["label"])
@@ -1049,13 +1219,12 @@ class TemplateExampleStartTest(unittest.TestCase):
 
         prompt = self.service._pm_prompt(session, "zh")
 
-        self.assertGreater(prompt.index("运行时硬约束"), prompt.index("Template context"))
-        self.assertIn("本轮 prompt 的最终规则", prompt)
-        self.assertIn("每轮只能问一个问题", prompt)
-        self.assertIn("模板来源术语只能作为证据，不要自动变成选项", prompt)
-        self.assertIn("TDI 只能写作 TDI", prompt)
-        self.assertIn("不要自造公式、状态、站点、系统名、缺陷分类、SLA 数字或 owner 角色", prompt)
-        self.assertIn("第一问先确认来自哪个入口或首版业务 owner", prompt)
+        self.assertGreater(prompt.index("运行状态（权威）"), prompt.index("模板基线（未确认）"))
+        self.assertIn("运行状态拥有最高优先级", prompt)
+        self.assertIn("界面单独展示唯一下一问题", prompt)
+        self.assertIn("模板、上传草稿、助手摘要和建议都只是候选", prompt)
+        self.assertIn("不得虚构范围、负责人、公式", prompt)
+        self.assertNotIn("运行时硬约束", prompt)
 
     def test_no_template_ic_substrate_session_preserves_expert_chain_from_cached_model(self) -> None:
         session = self.service.create_session(language="zh")
@@ -1091,10 +1260,10 @@ class TemplateExampleStartTest(unittest.TestCase):
         prompt = self.service._pm_prompt(session, "zh")
         chain_state = self.service.build_conversation_chain_state(session, cached_model, "zh")
 
-        self.assertIn("IC Substrate 专业对话链路", prompt)
-        self.assertIn("当前对话链路状态", prompt)
-        self.assertIn("链路类型：ic_substrate", prompt)
-        self.assertIn("运行时硬约束", prompt)
+        self.assertIn("入口：scratch；路线：Quality", prompt)
+        self.assertIn("运行状态（权威）", prompt)
+        self.assertIn("空白访谈：从业务动作开始，不预设方案", prompt)
+        self.assertNotIn("IC Substrate 专业对话链路", prompt)
         self.assertTrue(chain_state["enabled"])
         self.assertEqual(chain_state["mode"], "ic_substrate")
         self.assertEqual(chain_state["intent_track"], "quality")
@@ -1191,7 +1360,13 @@ class TemplateExampleStartTest(unittest.TestCase):
 
         snapshot = self.service.get_structured_requirement_snapshot(session.id, "en")
 
-        self.assertEqual(snapshot["conversation_chain_state"], {"enabled": False})
+        chain_state = snapshot["conversation_chain_state"]
+        self.assertFalse(chain_state["enabled"])
+        self.assertEqual(chain_state["workflow_mode"], "scratch")
+        self.assertEqual(
+            chain_state["delivery_workflow"]["phases"][0]["key"],
+            "discover",
+        )
 
     def test_prd_generation_strips_embedded_thinking(self) -> None:
         self.llm_client.chat_response = "<think>private reasoning</think>\n# Clean PRD\n\nReady."
@@ -1199,17 +1374,19 @@ class TemplateExampleStartTest(unittest.TestCase):
             template_id=self.template_id,
             language="en",
         )
-        # Seed minimal user message so build_prd_document calls the LLM stub
+        # Seed a user message so the confirmed structured model can produce a brief.
         self.service.send_user_message(session.id, "We want to track lot yield.", language="en")
         self._cache_ready_requirement_model(session.id)
 
+        call_count_before_document = len(self.llm_client.calls)
         result = self.service.build_prd_document(session.id, "en", save_history=False)
 
-        # The LLM-authored core content must appear and the raw <think> tag must never leak through.
-        self.assertIn("# Clean PRD", result["document_markdown"])
-        self.assertIn("Ready.", result["document_markdown"])
+        # Build Brief rendering is deterministic and cannot leak model reasoning.
+        self.assertIn("# Build Brief", result["document_markdown"])
+        self.assertEqual(len(self.llm_client.calls), call_count_before_document)
         self.assertNotIn("<think>", result["document_markdown"])
         self.assertNotIn("</think>", result["document_markdown"])
+        self.assertNotIn("private reasoning", result["document_markdown"])
 
     def test_prd_generation_falls_back_to_template_when_model_returns_empty(self) -> None:
         # When the LLM only produces a <think> block, the parsed body is empty
@@ -1334,10 +1511,11 @@ class TemplateExampleStartTest(unittest.TestCase):
         self.assertIn('w:val="bullet"', numbering_xml)
         self.assertIn('w:val="decimal"', numbering_xml)
 
-    def test_structured_requirement_prompt_contains_option_a_extraction_rules(self) -> None:
+    def test_structured_requirement_prompt_never_expands_an_option_reply(self) -> None:
         session = self.service.create_session(language="zh")
         prompt = self.service._structured_requirement_model_prompt(session, "zh")
-        self.assertIn("When the user selects Option A", prompt)
-        self.assertIn("Identify which blocker label is being confirmed", prompt)
-        self.assertIn("Formulate a reasonable, concrete version-one assumption", prompt)
-        self.assertIn("Upgrade the status of the corresponding key(s)", prompt)
+        self.assertIn("An A/B/C reply confirms only the exact option text", prompt)
+        self.assertIn("Never add detail that was absent from that option", prompt)
+        self.assertNotIn("When the user selects Option A", prompt)
+        self.assertNotIn("Formulate a reasonable, concrete version-one assumption", prompt)
+        self.assertNotIn("Upgrade the status of the corresponding key(s)", prompt)

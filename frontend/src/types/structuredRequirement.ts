@@ -38,6 +38,7 @@ export type StructuredRequirementCollectionStatus = {
   rules: RequirementCollectionItem
   integrations: RequirementCollectionItem
   acceptance: RequirementCollectionItem
+  ownership: RequirementCollectionItem
 }
 
 export type StructuredRequirementModel = {
@@ -276,6 +277,7 @@ export function createEmptyStructuredRequirementModel(): StructuredRequirementMo
       rules: createEmptyRequirementCollectionItem(),
       integrations: createEmptyRequirementCollectionItem(),
       acceptance: createEmptyRequirementCollectionItem(),
+      ownership: createEmptyRequirementCollectionItem(),
     },
   }
 }
@@ -325,6 +327,51 @@ export function normalizePMMethodologyState(payload: unknown): PMMethodologyStat
     missing_evidence: asStringArray(root.missing_evidence),
     checks: asPMMethodologyChecks(root.checks),
     prompt_guidance: asStringArray(root.prompt_guidance),
+  }
+}
+
+export function mergePMMethodologyState(
+  previous: PMMethodologyState,
+  next: PMMethodologyState,
+): PMMethodologyState {
+  if (!previous.checks.length || previous.version !== next.version) {
+    return next
+  }
+
+  const previousByKey = new Map(previous.checks.map((check) => [check.key, check]))
+  const mergedChecks = next.checks.map((check) => {
+    const previousCheck = previousByKey.get(check.key)
+    if (!previousCheck) {
+      return check
+    }
+    previousByKey.delete(check.key)
+
+    if (check.status === 'conflict' || previousCheck.status === 'conflict') {
+      return check
+    }
+
+    return methodologyStatusRank(previousCheck.status) > methodologyStatusRank(check.status)
+      ? previousCheck
+      : check
+  })
+  mergedChecks.push(...previousByKey.values())
+
+  const hasConflict = mergedChecks.some((check) => check.status === 'conflict')
+  const missingEvidence = mergedChecks
+    .filter((check) => check.status !== 'ready')
+    .map((check) => check.key)
+
+  return {
+    ...next,
+    score: hasConflict ? next.score : Math.max(previous.score, next.score),
+    ready_for_pm_review: hasConflict
+      ? next.ready_for_pm_review
+      : previous.ready_for_pm_review || next.ready_for_pm_review,
+    recommended_next_method: missingEvidence.includes(next.recommended_next_method)
+      ? next.recommended_next_method
+      : (missingEvidence[0] ?? ''),
+    missing_evidence: missingEvidence,
+    checks: mergedChecks,
   }
 }
 
@@ -565,6 +612,16 @@ function isPMMethodologyCheckStatus(value: string): value is PMMethodologyCheckS
   return value === 'ready' || value === 'partial' || value === 'missing' || value === 'conflict'
 }
 
+function methodologyStatusRank(status: PMMethodologyCheckStatus): number {
+  if (status === 'ready') {
+    return 2
+  }
+  if (status === 'partial') {
+    return 1
+  }
+  return 0
+}
+
 function isConversationChainNodeStatus(value: string): value is ConversationChainNodeStatus {
   return value === 'complete' || value === 'current' || value === 'pending'
 }
@@ -657,6 +714,7 @@ function asCollectionStatus(value: unknown): StructuredRequirementCollectionStat
     rules: asCollectionItem(raw.rules),
     integrations: asCollectionItem(raw.integrations),
     acceptance: asCollectionItem(raw.acceptance),
+    ownership: asCollectionItem(raw.ownership),
   }
 }
 
